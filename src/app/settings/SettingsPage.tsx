@@ -1,13 +1,31 @@
 import { PageHeader } from '@/components/PageHeader';
+import { useProfile } from '@/db/repos/profile';
+import { GoalsSection } from '@/features/settings/GoalsSection';
+import { ProfileSection } from '@/features/settings/ProfileSection';
+import { PreferencesSection } from '@/features/settings/PreferencesSection';
+import { DataSection } from '@/features/settings/DataSection';
+import { AboutSection } from '@/features/settings/AboutSection';
 
 export function SettingsPage() {
+  const profile = useProfile();
+
   return (
     <>
       <PageHeader title="Settings" />
-      <div className="mx-auto max-w-md px-4 py-4">
-        <div className="rounded-2xl border border-dashed border-border bg-card p-8 text-center text-sm text-muted-foreground">
-          Goals, profile, and preferences come online in Phase 7.
-        </div>
+      <div className="mx-auto max-w-md space-y-3 px-4 py-4">
+        {profile ? (
+          <>
+            <GoalsSection profile={profile} />
+            <ProfileSection profile={profile} />
+            <PreferencesSection profile={profile} />
+            <DataSection />
+            <AboutSection />
+          </>
+        ) : (
+          <div className="rounded-2xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
+            Loading…
+          </div>
+        )}
       </div>
     </>
   );

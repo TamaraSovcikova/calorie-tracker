@@ -5,8 +5,10 @@ import { MealsPage } from '@/app/meals/MealsPage';
 import { ProgressPage } from '@/app/progress/ProgressPage';
 import { SettingsPage } from '@/app/settings/SettingsPage';
 import { MealEditor } from '@/features/meals/MealEditor';
+import { useThemeEffect } from '@/features/settings/useThemeEffect';
 
 export default function App() {
+  useThemeEffect();
   return (
     <Routes>
       {/* Meal editor routes use a fullscreen layout (no bottom nav). */}
