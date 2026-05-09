@@ -31,6 +31,9 @@ export async function ensureSeed(): Promise<void> {
     return;
   }
 
+  // Skip onboarding in the dev seed so we land in the diary directly.
+  await db.profiles.update(userId, { onboarded: true });
+
   // Seed a handful of staples so the search list isn't empty during dev.
   const oats = await createFood({
     source: 'custom',
