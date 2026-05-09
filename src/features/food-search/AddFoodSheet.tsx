@@ -10,8 +10,12 @@ import { computeMacros, type QuantityState } from './foodMath';
 import { createDiaryEntry } from '@/db/repos/diary';
 import { db } from '@/db/dexie';
 import { lookupBarcode, OffRateLimitError } from '@/lib/off-api';
+import { MealPicker } from '@/features/meals/MealPicker';
+import { LogMealStep } from '@/features/meals/LogMealStep';
+import { multiplyTotals } from '@/features/meals/mealMath';
+import { useMealResolved } from '@/features/meals/useMealResolved';
 import type { LocalDate } from '@/lib/dates';
-import type { Food, MealSection } from '@/db/types';
+import type { Food, Meal, MealSection } from '@/db/types';
 
 interface AddFoodSheetProps {
   open: boolean;
@@ -24,6 +28,7 @@ type Step =
   | { kind: 'pick' }
   | { kind: 'looking-up'; barcode: string }
   | { kind: 'quantity'; food: Food }
+  | { kind: 'meal-portion'; meal: Meal }
   | { kind: 'manual'; presetName?: string; presetBarcode?: string };
 
 type Tab = 'search' | 'scan' | 'meals';
@@ -49,6 +54,8 @@ export function AddFoodSheet({ open, onClose, date, section }: AddFoodSheetProps
     setStep({ kind: 'manual', presetName: name || undefined });
   const handleManualCreated = (food: Food) =>
     setStep({ kind: 'quantity', food });
+  const handlePickMeal = (meal: Meal) =>
+    setStep({ kind: 'meal-portion', meal });
 
   const handleSaveQuantity = async (state: QuantityState) => {
     if (step.kind !== 'quantity') return;
@@ -69,18 +76,17 @@ export function AddFoodSheet({ open, onClose, date, section }: AddFoodSheetProps
     handleClose();
   };
 
+  // For meal save we need the resolved meal totals; do it inline in render via hook.
   const handleBarcode = async (code: string) => {
     setScanError(null);
     setStep({ kind: 'looking-up', barcode: code });
     try {
       const food = await lookupBarcode(code);
       if (food) {
-        // Cache to local for offline.
         await db.foods.put(food);
         setStep({ kind: 'quantity', food });
         return;
       }
-      // Not found — send to manual entry pre-filled with the barcode.
       setStep({ kind: 'manual', presetBarcode: code });
     } catch (err) {
       if (err instanceof OffRateLimitError) {
@@ -130,11 +136,7 @@ export function AddFoodSheet({ open, onClose, date, section }: AddFoodSheetProps
             <BarcodeScanner onCode={handleBarcode} />
           </>
         )}
-        {tab === 'meals' && (
-          <div className="p-8 text-center text-sm text-muted-foreground">
-            Saved meals come online in Phase 6.
-          </div>
-        )}
+        {tab === 'meals' && <MealPicker onPick={handlePickMeal} />}
       </div>
     );
   } else if (step.kind === 'looking-up') {
@@ -157,6 +159,17 @@ export function AddFoodSheet({ open, onClose, date, section }: AddFoodSheetProps
         onSave={handleSaveQuantity}
       />
     );
+  } else if (step.kind === 'meal-portion') {
+    title = 'Log meal';
+    content = (
+      <MealPortionStep
+        meal={step.meal}
+        date={date}
+        section={section}
+        onBack={() => setStep({ kind: 'pick' })}
+        onDone={handleClose}
+      />
+    );
   } else {
     title = 'New product';
     content = (
@@ -174,4 +187,44 @@ export function AddFoodSheet({ open, onClose, date, section }: AddFoodSheetProps
       {content}
     </Sheet>
   );
+}
+
+/**
+ * Inner component so the useMealResolved hook only runs when actually
+ * showing the meal-portion step. Saves the diary entry with the meal's
+ * totals scaled by the chosen multiplier.
+ */
+function MealPortionStep({
+  meal,
+  date,
+  section,
+  onBack,
+  onDone,
+}: {
+  meal: Meal;
+  date: LocalDate;
+  section: MealSection;
+  onBack: () => void;
+  onDone: () => void;
+}) {
+  const resolved = useMealResolved(meal.id);
+  const handleSave = async (multiplier: number) => {
+    if (!resolved) return;
+    const totals = multiplyTotals(resolved.totals, multiplier);
+    await createDiaryEntry({
+      date,
+      section,
+      kind: 'meal',
+      meal_id: meal.id,
+      qty: multiplier,
+      unit: 'serving',
+      portion_multiplier: multiplier,
+      kcal: totals.kcal,
+      protein: totals.protein,
+      carbs: totals.carbs,
+      fat: totals.fat,
+    });
+    onDone();
+  };
+  return <LogMealStep mealId={meal.id} onBack={onBack} onSave={handleSave} />;
 }
