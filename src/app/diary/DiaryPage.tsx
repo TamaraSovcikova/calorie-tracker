@@ -6,6 +6,7 @@ import { MacroSummary } from '@/features/diary/MacroSummary';
 import { DiarySectionView } from '@/features/diary/DiarySection';
 import { AddFoodSheet } from '@/features/food-search/AddFoodSheet';
 import { EditEntrySheet } from '@/features/food-search/EditEntrySheet';
+import { ExerciseSection } from '@/features/exercise/ExerciseSection';
 import { formatDayHeader, isToday, shiftDate, todayLocal, type LocalDate } from '@/lib/dates';
 import {
   groupBySection,
@@ -81,6 +82,8 @@ export function DiaryPage() {
             onEntryClick={(e) => setEditing(e)}
           />
         ))}
+
+        <ExerciseSection date={currentDate} />
       </div>
 
       <AddFoodSheet
