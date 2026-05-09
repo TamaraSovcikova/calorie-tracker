@@ -1,24 +1,51 @@
 import { useNavigate, useParams } from 'react-router-dom';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { PageHeader } from '@/components/PageHeader';
-import { formatDayHeader, shiftDate, todayLocal, type LocalDate } from '@/lib/dates';
-
-const MEAL_SECTIONS = ['Breakfast', 'Lunch', 'Dinner', 'Snacks'] as const;
+import { MacroSummary } from '@/features/diary/MacroSummary';
+import { DiarySectionView } from '@/features/diary/DiarySection';
+import { formatDayHeader, isToday, shiftDate, todayLocal, type LocalDate } from '@/lib/dates';
+import {
+  groupBySection,
+  sumTotals,
+  useDiaryDay,
+  ZERO_TOTALS,
+} from '@/db/repos/diary';
+import { useExerciseDay, totalBurned } from '@/db/repos/exercise';
+import { useProfile } from '@/db/repos/profile';
+import { MEAL_SECTIONS, type DiaryEntry, type MealSection } from '@/db/types';
 
 export function DiaryPage() {
   const { date } = useParams<{ date?: LocalDate }>();
   const navigate = useNavigate();
   const currentDate: LocalDate = date ?? todayLocal();
 
+  const profile = useProfile();
+  const entries = useDiaryDay(currentDate);
+  const exercise = useExerciseDay(currentDate);
+
   const goToDate = (next: LocalDate) => {
-    navigate(next === todayLocal() ? '/diary' : `/diary/${next}`);
+    navigate(isToday(next) ? '/diary' : `/diary/${next}`);
   };
+
+  const handleAdd = (_section: MealSection) => {
+    // wired in Phase 4
+  };
+
+  const handleEntryClick = (_entry: DiaryEntry) => {
+    // wired in Phase 4
+  };
+
+  const totals = entries ? sumTotals(entries) : ZERO_TOTALS;
+  const grouped = entries
+    ? groupBySection(entries)
+    : { breakfast: [], lunch: [], dinner: [], snacks: [] };
+  const burned = exercise ? totalBurned(exercise) : 0;
 
   return (
     <>
       <PageHeader
         title={formatDayHeader(currentDate)}
-        subtitle={currentDate}
+        subtitle={isToday(currentDate) ? currentDate : undefined}
         trailing={
           <div className="flex items-center gap-1">
             <button
@@ -41,34 +68,20 @@ export function DiaryPage() {
         }
       />
 
-      <div className="mx-auto max-w-md space-y-4 px-4 py-4">
-        {/* Macro summary placeholder — fully implemented in Phase 3 */}
-        <div className="rounded-2xl border border-border bg-card p-4">
-          <div className="text-sm text-muted-foreground">Daily summary</div>
-          <div className="mt-2 text-2xl font-semibold tabular-nums">— / — kcal</div>
-          <div className="mt-1 text-xs text-muted-foreground">
-            Macro tracking comes online in Phase 3.
-          </div>
-        </div>
+      <div className="mx-auto max-w-md space-y-3 px-4 py-4">
+        {profile && (
+          <MacroSummary profile={profile} totals={totals} burnedKcal={burned} />
+        )}
 
         {MEAL_SECTIONS.map((section) => (
-          <section
+          <DiarySectionView
             key={section}
-            className="rounded-2xl border border-border bg-card p-4"
-          >
-            <div className="flex items-center justify-between">
-              <h2 className="text-base font-medium">{section}</h2>
-              <button
-                type="button"
-                className="rounded-full bg-primary px-3 py-1 text-sm font-medium text-primary-foreground tap-target"
-                disabled
-                aria-label={`Add ${section}`}
-              >
-                + Add
-              </button>
-            </div>
-            <p className="mt-3 text-sm text-muted-foreground">No entries yet.</p>
-          </section>
+            section={section}
+            entries={grouped[section]}
+            primaryMacro={profile?.primary_macro ?? 'protein'}
+            onAdd={handleAdd}
+            onEntryClick={handleEntryClick}
+          />
         ))}
       </div>
     </>
