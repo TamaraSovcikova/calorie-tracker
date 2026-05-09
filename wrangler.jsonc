@@ -1,0 +1,23 @@
+/**
+ * Cloudflare Workers + Static Assets config for the Vite SPA.
+ *
+ * Build → `pnpm build` writes the static bundle to ./dist
+ * Deploy → `npx wrangler deploy` uploads ./dist as a static asset binding
+ *
+ * `not_found_handling: "single-page-application"` makes the worker serve
+ * /index.html for any unmatched route, which is what react-router needs.
+ *
+ * Compatibility date pinned so future runtime changes don't surprise us.
+ */
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "calorie-tracker",
+  "compatibility_date": "2025-01-01",
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "single-page-application"
+  },
+  "observability": {
+    "enabled": true
+  }
+}
