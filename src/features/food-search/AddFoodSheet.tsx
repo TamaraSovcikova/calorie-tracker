@@ -1,11 +1,15 @@
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { Sheet } from '@/components/ui/Sheet';
 import { Tabs } from '@/components/ui/Tabs';
 import { FoodSearchPanel } from './FoodSearchPanel';
 import { QuantityStep } from './QuantityStep';
 import { ManualEntryForm } from './ManualEntryForm';
-import { BarcodeScanner } from './BarcodeScanner';
+
+// ZXing is ~600 kB; only load it when the user opens the Scan tab.
+const BarcodeScanner = lazy(() =>
+  import('./BarcodeScanner').then((m) => ({ default: m.BarcodeScanner })),
+);
 import { computeMacros, type QuantityState } from './foodMath';
 import { createDiaryEntry } from '@/db/repos/diary';
 import { db } from '@/db/dexie';
@@ -133,7 +137,15 @@ export function AddFoodSheet({ open, onClose, date, section }: AddFoodSheetProps
                 {scanError}
               </div>
             )}
-            <BarcodeScanner onCode={handleBarcode} />
+            <Suspense
+              fallback={
+                <div className="flex flex-1 items-center justify-center p-12">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                </div>
+              }
+            >
+              <BarcodeScanner onCode={handleBarcode} />
+            </Suspense>
           </>
         )}
         {tab === 'meals' && <MealPicker onPick={handlePickMeal} />}

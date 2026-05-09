@@ -13,7 +13,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.svg'],
+      includeAssets: ['favicon.svg', 'favicon.ico', 'apple-touch-icon-180x180.png'],
       manifest: {
         name: 'Calorie Tracker',
         short_name: 'Calories',
@@ -24,15 +24,15 @@ export default defineConfig({
         orientation: 'portrait',
         start_url: '/',
         scope: '/',
-        // Real PWA icons (192/512/maskable PNG) generated in Phase 14.
-        // Until then the SVG favicon is the only icon — fine for dev,
-        // Lighthouse PWA install will warn but still work.
         icons: [
+          { src: 'pwa-64x64.png', sizes: '64x64', type: 'image/png' },
+          { src: 'pwa-192x192.png', sizes: '192x192', type: 'image/png' },
+          { src: 'pwa-512x512.png', sizes: '512x512', type: 'image/png' },
           {
-            src: 'favicon.svg',
-            sizes: 'any',
-            type: 'image/svg+xml',
-            purpose: 'any',
+            src: 'maskable-icon-512x512.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'maskable',
           },
         ],
       },

@@ -7,6 +7,7 @@ import { SettingsPage } from '@/app/settings/SettingsPage';
 import { MealEditor } from '@/features/meals/MealEditor';
 import { useThemeEffect } from '@/features/settings/useThemeEffect';
 import { OnboardingGate } from '@/features/onboarding/OnboardingWizard';
+import { InstallPrompt } from '@/features/install-prompt/InstallPrompt';
 
 export default function App() {
   useThemeEffect();
@@ -28,6 +29,7 @@ export default function App() {
         </Route>
       </Routes>
       <OnboardingGate />
+      <InstallPrompt />
     </>
   );
 }
