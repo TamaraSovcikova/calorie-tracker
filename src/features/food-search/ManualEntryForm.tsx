@@ -1,0 +1,237 @@
+import { useState } from 'react';
+import { ArrowLeft, Plus, Trash2 } from 'lucide-react';
+import { Button } from '@/components/ui/Button';
+import { Input, LabeledInput } from '@/components/ui/Input';
+import { createFood } from '@/db/repos/foods';
+import type { CustomUnit, Food } from '@/db/types';
+
+interface ManualEntryFormProps {
+  initialName?: string;
+  initialBarcode?: string;
+  onBack: () => void;
+  onCreated: (food: Food) => void;
+}
+
+interface FormState {
+  name: string;
+  brand: string;
+  kcal: string;
+  protein: string;
+  carbs: string;
+  fat: string;
+  serving_g: string;
+}
+
+export function ManualEntryForm({
+  initialName = '',
+  initialBarcode,
+  onBack,
+  onCreated,
+}: ManualEntryFormProps) {
+  const [form, setForm] = useState<FormState>({
+    name: initialName,
+    brand: '',
+    kcal: '',
+    protein: '',
+    carbs: '',
+    fat: '',
+    serving_g: '',
+  });
+  const [units, setUnits] = useState<CustomUnit[]>([]);
+  const [newLabel, setNewLabel] = useState('');
+  const [newGrams, setNewGrams] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const update = (k: keyof FormState, v: string) => setForm((s) => ({ ...s, [k]: v }));
+
+  const addUnit = () => {
+    const grams = parseFloat(newGrams);
+    if (!newLabel.trim() || !Number.isFinite(grams) || grams <= 0) return;
+    setUnits((u) => [...u, { label: newLabel.trim(), grams }]);
+    setNewLabel('');
+    setNewGrams('');
+  };
+
+  const removeUnit = (label: string) => {
+    setUnits((u) => u.filter((x) => x.label !== label));
+  };
+
+  const handleSave = async () => {
+    setError(null);
+    if (!form.name.trim()) return setError('Name is required');
+    const kcal = parseFloat(form.kcal);
+    const protein = parseFloat(form.protein);
+    const carbs = parseFloat(form.carbs);
+    const fat = parseFloat(form.fat);
+    if (![kcal, protein, carbs, fat].every((n) => Number.isFinite(n) && n >= 0)) {
+      return setError('Calories and macros must be non-negative numbers');
+    }
+    const serving_g = form.serving_g ? parseFloat(form.serving_g) : undefined;
+    if (serving_g !== undefined && (!Number.isFinite(serving_g) || serving_g <= 0)) {
+      return setError('Serving size must be a positive number');
+    }
+    setSaving(true);
+    try {
+      const food = await createFood({
+        source: 'custom',
+        off_barcode: initialBarcode,
+        name: form.name.trim(),
+        brand: form.brand.trim() || undefined,
+        kcal_100: kcal,
+        protein_100: protein,
+        carbs_100: carbs,
+        fat_100: fat,
+        serving_g,
+        custom_units: units,
+      });
+      onCreated(food);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="flex flex-col">
+      <div className="border-b border-border px-4 py-3">
+        <button
+          type="button"
+          onClick={onBack}
+          className="-ml-2 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back
+        </button>
+        <h2 className="mt-1 text-lg font-semibold">Add a new product</h2>
+        <p className="text-xs text-muted-foreground">
+          Saved to your "My Products" library — always surfaces top of search.
+        </p>
+      </div>
+
+      <div className="space-y-3 p-4">
+        <LabeledInput
+          label="Name"
+          required
+          value={form.name}
+          onChange={(e) => update('name', e.target.value)}
+          autoFocus
+        />
+        <LabeledInput
+          label="Brand (optional)"
+          value={form.brand}
+          onChange={(e) => update('brand', e.target.value)}
+        />
+
+        <div className="grid grid-cols-2 gap-3">
+          <LabeledInput
+            label="kcal / 100g"
+            type="number"
+            inputMode="decimal"
+            step="any"
+            value={form.kcal}
+            onChange={(e) => update('kcal', e.target.value)}
+            trailing="kcal"
+          />
+          <LabeledInput
+            label="Protein / 100g"
+            type="number"
+            inputMode="decimal"
+            step="any"
+            value={form.protein}
+            onChange={(e) => update('protein', e.target.value)}
+            trailing="g"
+          />
+          <LabeledInput
+            label="Carbs / 100g"
+            type="number"
+            inputMode="decimal"
+            step="any"
+            value={form.carbs}
+            onChange={(e) => update('carbs', e.target.value)}
+            trailing="g"
+          />
+          <LabeledInput
+            label="Fat / 100g"
+            type="number"
+            inputMode="decimal"
+            step="any"
+            value={form.fat}
+            onChange={(e) => update('fat', e.target.value)}
+            trailing="g"
+          />
+        </div>
+
+        <LabeledInput
+          label="Serving size (optional)"
+          type="number"
+          inputMode="decimal"
+          step="any"
+          hint="Lets you log by serving as well as by grams."
+          value={form.serving_g}
+          onChange={(e) => update('serving_g', e.target.value)}
+          trailing="g"
+        />
+
+        <div className="space-y-2">
+          <span className="block text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Custom units (optional)
+          </span>
+          {units.length > 0 && (
+            <ul className="space-y-1">
+              {units.map((u) => (
+                <li
+                  key={u.label}
+                  className="flex items-center justify-between rounded-md border border-border bg-muted/40 px-3 py-2 text-sm"
+                >
+                  <span>
+                    1 {u.label} = {u.grams} g
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => removeUnit(u.label)}
+                    aria-label={`Remove ${u.label}`}
+                    className="text-muted-foreground hover:text-destructive"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          <div className="grid grid-cols-[1fr_1fr_auto] gap-2">
+            <Input
+              placeholder="e.g. scoop"
+              value={newLabel}
+              onChange={(e) => setNewLabel(e.target.value)}
+            />
+            <Input
+              placeholder="grams"
+              type="number"
+              inputMode="decimal"
+              step="any"
+              value={newGrams}
+              onChange={(e) => setNewGrams(e.target.value)}
+            />
+            <Button type="button" variant="secondary" onClick={addUnit} aria-label="Add custom unit">
+              <Plus className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+
+        {error && <p className="text-sm text-destructive">{error}</p>}
+      </div>
+
+      <div className="mt-auto border-t border-border bg-card p-4">
+        <Button
+          type="button"
+          variant="primary"
+          block
+          disabled={saving}
+          onClick={handleSave}
+        >
+          {saving ? 'Saving…' : 'Save product'}
+        </Button>
+      </div>
+    </div>
+  );
+}

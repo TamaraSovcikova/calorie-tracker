@@ -1,8 +1,11 @@
+import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { PageHeader } from '@/components/PageHeader';
 import { MacroSummary } from '@/features/diary/MacroSummary';
 import { DiarySectionView } from '@/features/diary/DiarySection';
+import { AddFoodSheet } from '@/features/food-search/AddFoodSheet';
+import { EditEntrySheet } from '@/features/food-search/EditEntrySheet';
 import { formatDayHeader, isToday, shiftDate, todayLocal, type LocalDate } from '@/lib/dates';
 import {
   groupBySection,
@@ -23,16 +26,11 @@ export function DiaryPage() {
   const entries = useDiaryDay(currentDate);
   const exercise = useExerciseDay(currentDate);
 
+  const [addingTo, setAddingTo] = useState<MealSection | null>(null);
+  const [editing, setEditing] = useState<DiaryEntry | null>(null);
+
   const goToDate = (next: LocalDate) => {
     navigate(isToday(next) ? '/diary' : `/diary/${next}`);
-  };
-
-  const handleAdd = (_section: MealSection) => {
-    // wired in Phase 4
-  };
-
-  const handleEntryClick = (_entry: DiaryEntry) => {
-    // wired in Phase 4
   };
 
   const totals = entries ? sumTotals(entries) : ZERO_TOTALS;
@@ -79,11 +77,23 @@ export function DiaryPage() {
             section={section}
             entries={grouped[section]}
             primaryMacro={profile?.primary_macro ?? 'protein'}
-            onAdd={handleAdd}
-            onEntryClick={handleEntryClick}
+            onAdd={(s) => setAddingTo(s)}
+            onEntryClick={(e) => setEditing(e)}
           />
         ))}
       </div>
+
+      <AddFoodSheet
+        open={addingTo !== null}
+        onClose={() => setAddingTo(null)}
+        date={currentDate}
+        section={addingTo ?? 'breakfast'}
+      />
+      <EditEntrySheet
+        open={editing !== null}
+        entry={editing}
+        onClose={() => setEditing(null)}
+      />
     </>
   );
 }
