@@ -1,11 +1,15 @@
 import { useState } from 'react';
+import { Loader2 } from 'lucide-react';
 import { Sheet } from '@/components/ui/Sheet';
 import { Tabs } from '@/components/ui/Tabs';
 import { FoodSearchPanel } from './FoodSearchPanel';
 import { QuantityStep } from './QuantityStep';
 import { ManualEntryForm } from './ManualEntryForm';
+import { BarcodeScanner } from './BarcodeScanner';
 import { computeMacros, type QuantityState } from './foodMath';
 import { createDiaryEntry } from '@/db/repos/diary';
+import { db } from '@/db/dexie';
+import { lookupBarcode, OffRateLimitError } from '@/lib/off-api';
 import type { LocalDate } from '@/lib/dates';
 import type { Food, MealSection } from '@/db/types';
 
@@ -18,24 +22,25 @@ interface AddFoodSheetProps {
 
 type Step =
   | { kind: 'pick' }
+  | { kind: 'looking-up'; barcode: string }
   | { kind: 'quantity'; food: Food }
-  | { kind: 'manual'; presetName?: string };
+  | { kind: 'manual'; presetName?: string; presetBarcode?: string };
 
 type Tab = 'search' | 'scan' | 'meals';
 
 export function AddFoodSheet({ open, onClose, date, section }: AddFoodSheetProps) {
   const [tab, setTab] = useState<Tab>('search');
   const [step, setStep] = useState<Step>({ kind: 'pick' });
+  const [scanError, setScanError] = useState<string | null>(null);
 
   const reset = () => {
     setStep({ kind: 'pick' });
     setTab('search');
+    setScanError(null);
   };
 
   const handleClose = () => {
     onClose();
-    // small UX detail — don't reset until the close animation has run, but
-    // since we have no animation, reset immediately
     reset();
   };
 
@@ -64,7 +69,33 @@ export function AddFoodSheet({ open, onClose, date, section }: AddFoodSheetProps
     handleClose();
   };
 
-  // Title + content vary by step.
+  const handleBarcode = async (code: string) => {
+    setScanError(null);
+    setStep({ kind: 'looking-up', barcode: code });
+    try {
+      const food = await lookupBarcode(code);
+      if (food) {
+        // Cache to local for offline.
+        await db.foods.put(food);
+        setStep({ kind: 'quantity', food });
+        return;
+      }
+      // Not found — send to manual entry pre-filled with the barcode.
+      setStep({ kind: 'manual', presetBarcode: code });
+    } catch (err) {
+      if (err instanceof OffRateLimitError) {
+        setScanError(
+          `Open Food Facts rate limit hit. Try again in ${Math.ceil(err.retryAfterMs / 1000)}s, or add it manually.`,
+        );
+      } else {
+        setScanError(
+          err instanceof Error ? err.message : 'Lookup failed. Try again or add manually.',
+        );
+      }
+      setStep({ kind: 'manual', presetBarcode: code });
+    }
+  };
+
   let title: string;
   let content: React.ReactNode;
   if (step.kind === 'pick') {
@@ -90,15 +121,31 @@ export function AddFoodSheet({ open, onClose, date, section }: AddFoodSheetProps
           />
         )}
         {tab === 'scan' && (
-          <div className="p-8 text-center text-sm text-muted-foreground">
-            Barcode scanning comes online in Phase 5.
-          </div>
+          <>
+            {scanError && (
+              <div className="mx-4 mt-3 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+                {scanError}
+              </div>
+            )}
+            <BarcodeScanner onCode={handleBarcode} />
+          </>
         )}
         {tab === 'meals' && (
           <div className="p-8 text-center text-sm text-muted-foreground">
             Saved meals come online in Phase 6.
           </div>
         )}
+      </div>
+    );
+  } else if (step.kind === 'looking-up') {
+    title = 'Looking up…';
+    content = (
+      <div className="flex flex-1 flex-col items-center justify-center gap-3 p-12 text-center">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <div className="text-sm">
+          Searching Open Food Facts for{' '}
+          <span className="font-mono">{step.barcode}</span>
+        </div>
       </div>
     );
   } else if (step.kind === 'quantity') {
@@ -115,6 +162,7 @@ export function AddFoodSheet({ open, onClose, date, section }: AddFoodSheetProps
     content = (
       <ManualEntryForm
         initialName={step.presetName}
+        initialBarcode={step.presetBarcode}
         onBack={() => setStep({ kind: 'pick' })}
         onCreated={handleManualCreated}
       />
