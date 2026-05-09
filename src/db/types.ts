@@ -1,0 +1,142 @@
+/**
+ * Shared types for the local IndexedDB schema and (Phase 11+) Supabase.
+ * Naming is snake_case to match the future Postgres schema 1:1, so the same
+ * row shape can round-trip through the sync worker without renames.
+ */
+
+import type { LocalDate } from '@/lib/dates';
+import type { ActivityLevel, Sex } from '@/lib/tdee';
+import type { UnitSystem } from '@/lib/units';
+
+export type ID = string; // uuid v4
+export type ISOTimestamp = string;
+
+export type MealSection = 'breakfast' | 'lunch' | 'dinner' | 'snacks';
+export const MEAL_SECTIONS: MealSection[] = ['breakfast', 'lunch', 'dinner', 'snacks'];
+
+export type FoodSource = 'off' | 'custom';
+
+/** Quantity units a logged item can use. */
+export type QuantityUnit = 'g' | 'ml' | 'serving' | string; // string = custom unit label
+
+export interface CustomUnit {
+  label: string; // e.g. "scoop", "slice", "biscuit"
+  grams: number; // weight in grams of one unit
+}
+
+export interface Profile {
+  user_id: ID; // 'local' until Phase 11 sign-in
+  name?: string;
+  sex?: Sex;
+  dob?: LocalDate;
+  height_cm?: number;
+  weight_kg?: number;
+  activity_level?: ActivityLevel;
+
+  kcal_target: number;
+  protein_g: number;
+  carbs_g: number;
+  fat_g: number;
+  primary_macro: 'protein' | 'carbs' | 'fat';
+
+  eat_back_burned: boolean;
+  units: UnitSystem;
+  theme: 'system' | 'light' | 'dark';
+
+  plan: 'free' | 'pro';
+  fitbit_connected: boolean;
+  onboarded: boolean;
+
+  created_at: ISOTimestamp;
+  updated_at: ISOTimestamp;
+}
+
+export interface Food {
+  id: ID;
+  user_id: ID;
+  source: FoodSource;
+  off_barcode?: string;
+  name: string;
+  brand?: string;
+
+  kcal_100: number;
+  protein_100: number;
+  carbs_100: number;
+  fat_100: number;
+
+  serving_g?: number;
+  custom_units: CustomUnit[];
+
+  created_at: ISOTimestamp;
+  updated_at: ISOTimestamp;
+  deleted_at?: ISOTimestamp;
+}
+
+export interface Meal {
+  id: ID;
+  user_id: ID;
+  name: string;
+  notes?: string;
+  created_at: ISOTimestamp;
+  updated_at: ISOTimestamp;
+  deleted_at?: ISOTimestamp;
+}
+
+export interface MealItem {
+  id: ID;
+  meal_id: ID;
+  food_id: ID;
+  qty: number;
+  unit: QuantityUnit;
+}
+
+/**
+ * A row in the daily diary. Macros are denormalised: the snapshot is taken
+ * at log time so editing the underlying food/meal later doesn't retroactively
+ * change history. Editing the entry itself recomputes the snapshot.
+ */
+export interface DiaryEntry {
+  id: ID;
+  user_id: ID;
+  date: LocalDate;
+  section: MealSection;
+  kind: 'food' | 'meal';
+  food_id?: ID;
+  meal_id?: ID;
+  qty: number;
+  unit: QuantityUnit;
+  portion_multiplier?: number; // meals only
+
+  kcal: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+
+  created_at: ISOTimestamp;
+  updated_at: ISOTimestamp;
+  deleted_at?: ISOTimestamp;
+}
+
+export interface ExerciseEntry {
+  id: ID;
+  user_id: ID;
+  date: LocalDate;
+  source: 'manual' | 'fitbit';
+  name: string;
+  duration_min?: number;
+  kcal_burned: number;
+
+  created_at: ISOTimestamp;
+  updated_at: ISOTimestamp;
+  deleted_at?: ISOTimestamp;
+}
+
+export interface WeightEntry {
+  id: ID; // for sync; primary key in Dexie is [user_id+date]
+  user_id: ID;
+  date: LocalDate;
+  weight_kg: number;
+  note?: string;
+  created_at: ISOTimestamp;
+  updated_at: ISOTimestamp;
+}

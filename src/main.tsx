@@ -3,7 +3,13 @@ import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import App from './App';
+import { ensureSeed } from './db/seed';
 import './index.css';
+
+// Fire-and-forget; useLiveQuery refetches once writes land.
+ensureSeed().catch((err) => {
+  console.error('Seed/profile init failed', err);
+});
 
 const queryClient = new QueryClient({
   defaultOptions: {
