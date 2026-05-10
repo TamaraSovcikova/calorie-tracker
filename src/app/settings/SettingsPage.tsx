@@ -2,6 +2,7 @@ import { PageHeader } from '@/components/PageHeader';
 import { useProfile } from '@/db/repos/profile';
 import { GoalsSection } from '@/features/settings/GoalsSection';
 import { ProfileSection } from '@/features/settings/ProfileSection';
+import { FoodSourcesSection } from '@/features/settings/FoodSourcesSection';
 import { PreferencesSection } from '@/features/settings/PreferencesSection';
 import { SyncSection } from '@/features/settings/SyncSection';
 import { DataSection } from '@/features/settings/DataSection';
@@ -18,6 +19,7 @@ export function SettingsPage() {
           <>
             <GoalsSection profile={profile} />
             <ProfileSection profile={profile} />
+            <FoodSourcesSection />
             <PreferencesSection profile={profile} />
             <SyncSection />
             <DataSection />

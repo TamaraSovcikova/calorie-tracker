@@ -73,6 +73,7 @@ const COLUMNS: Record<TableName, string[]> = {
     'id',
     'user_id',
     'source',
+    'usda_data_type',
     'off_barcode',
     'name',
     'brand',

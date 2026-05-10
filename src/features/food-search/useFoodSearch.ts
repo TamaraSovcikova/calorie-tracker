@@ -4,26 +4,48 @@ import { db } from '@/db/dexie';
 import { searchLocalFoods } from '@/db/repos/foods';
 import { recentFoodsInSection } from '@/db/repos/diary';
 import { OffRateLimitError, searchOff } from '@/lib/off-api';
+import {
+  getUsdaApiKey,
+  searchUsda,
+  UsdaAuthError,
+  UsdaRateLimitError,
+} from '@/lib/usda-api';
+import {
+  getShowPackaged,
+  subscribeToFoodSourceSettings,
+} from '@/features/settings/foodSourceSettings';
 import type { Food, MealSection } from '@/db/types';
 
 /**
  * Combines:
  *  - section-aware recents (foods previously logged in this section)
- *  - local search across My Products + cached OFF rows
- *  - live OFF search (rate-limited 10/min)
+ *  - local search across My Products + cached USDA/OFF rows
+ *  - live USDA FoodData Central search (generic + branded)
+ *  - live Open Food Facts search (rate-limited 10/min, packaged-product DB)
  *
- * OFF results are written to Dexie as source='off' so subsequent searches
- * find them locally — even offline.
+ * Result groups returned to the UI:
+ *   recents       — section-aware
+ *   myProducts    — user's manually-added products (source='custom')
+ *   common        — USDA Foundation / SR Legacy / Survey (FNDDS)
+ *   packaged      — USDA Branded + OFF (hidden when showPackaged=false)
+ *
+ * All search hits are also written to Dexie so subsequent searches resolve
+ * locally — even offline.
  */
 
 export interface FoodSearchResult {
   query: string;
   recents: Food[];
-  local: Food[];
-  off: Food[];
+  myProducts: Food[];
+  common: Food[];
+  packaged: Food[];
   isSearching: boolean;
   rateLimitedSeconds: number | null;
-  offError: string | null;
+  /** Source-agnostic banner for unrecoverable issues. */
+  errorBanner: string | null;
+  /** True when the USDA key is missing — prompts to add one in Settings. */
+  needsUsdaKey: boolean;
+  showPackaged: boolean;
 }
 
 const DEBOUNCE_MS = 350;
@@ -33,6 +55,10 @@ export function useFoodSearch(
   section?: MealSection,
 ): FoodSearchResult {
   const [debouncedQuery, setDebouncedQuery] = useState(query.trim());
+  const [showPackaged, setShowPackaged] = useState(getShowPackaged());
+
+  // Mirror the settings switch live.
+  useEffect(() => subscribeToFoodSourceSettings(() => setShowPackaged(getShowPackaged())), []);
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedQuery(query.trim()), DEBOUNCE_MS);
@@ -48,21 +74,25 @@ export function useFoodSearch(
   }, [section]);
 
   const [local, setLocal] = useState<Food[]>([]);
+  const [usda, setUsda] = useState<Food[]>([]);
   const [off, setOff] = useState<Food[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [rateLimitedSeconds, setRateLimitedSeconds] = useState<number | null>(null);
-  const [offError, setOffError] = useState<string | null>(null);
+  const [errorBanner, setErrorBanner] = useState<string | null>(null);
+  const [needsUsdaKey, setNeedsUsdaKey] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     const ctrl = new AbortController();
-    setOffError(null);
+    setErrorBanner(null);
     setRateLimitedSeconds(null);
 
     if (!debouncedQuery) {
       setLocal([]);
+      setUsda([]);
       setOff([]);
       setIsSearching(false);
+      setNeedsUsdaKey(!getUsdaApiKey());
       return;
     }
     setIsSearching(true);
@@ -71,30 +101,65 @@ export function useFoodSearch(
       if (!cancelled) setLocal(rows);
     });
 
-    const offPromise = searchOff(debouncedQuery, ctrl.signal)
-      .then(async (rows) => {
-        if (cancelled) return;
-        setOff(rows);
-        // Cache to local for offline next-time lookup. Don't await UI on
-        // this; it's fire-and-forget.
-        if (rows.length > 0) {
-          void db.foods.bulkPut(rows).catch(() => undefined);
-        }
-      })
-      .catch((err: unknown) => {
-        if (cancelled) return;
-        if (err instanceof OffRateLimitError) {
-          setRateLimitedSeconds(Math.ceil(err.retryAfterMs / 1000));
-          setOff([]);
-          return;
-        }
-        if ((err as DOMException)?.name === 'AbortError') return;
-        const msg = err instanceof Error ? err.message : 'Search failed';
-        setOffError(msg);
-        setOff([]);
-      });
+    // USDA — only if key is present.
+    const apiKey = getUsdaApiKey();
+    setNeedsUsdaKey(!apiKey);
+    const usdaPromise = apiKey
+      ? searchUsda(debouncedQuery, apiKey, {
+          signal: ctrl.signal,
+          genericOnly: !showPackaged,
+        })
+          .then(async (rows) => {
+            if (cancelled) return;
+            setUsda(rows);
+            if (rows.length > 0) {
+              void db.foods.bulkPut(rows).catch(() => undefined);
+            }
+          })
+          .catch((err: unknown) => {
+            if (cancelled) return;
+            if (err instanceof UsdaRateLimitError) {
+              setRateLimitedSeconds(Math.ceil(err.retryAfterMs / 1000));
+              setUsda([]);
+              return;
+            }
+            if (err instanceof UsdaAuthError) {
+              setErrorBanner('USDA API key rejected. Update it in Settings.');
+              setUsda([]);
+              return;
+            }
+            if ((err as DOMException)?.name === 'AbortError') return;
+            // Don't blow up the panel — local + OFF still render.
+            setUsda([]);
+          })
+      : Promise.resolve();
 
-    void Promise.allSettled([localPromise, offPromise]).then(() => {
+    // OFF — only when packaged products are enabled.
+    const offPromise = showPackaged
+      ? searchOff(debouncedQuery, ctrl.signal)
+          .then(async (rows) => {
+            if (cancelled) return;
+            setOff(rows);
+            if (rows.length > 0) {
+              void db.foods.bulkPut(rows).catch(() => undefined);
+            }
+          })
+          .catch((err: unknown) => {
+            if (cancelled) return;
+            if (err instanceof OffRateLimitError) {
+              // Don't override a USDA rate-limit countdown if both fire.
+              setRateLimitedSeconds((prev) =>
+                prev ?? Math.ceil(err.retryAfterMs / 1000),
+              );
+              setOff([]);
+              return;
+            }
+            if ((err as DOMException)?.name === 'AbortError') return;
+            setOff([]);
+          })
+      : Promise.resolve(setOff([]));
+
+    void Promise.allSettled([localPromise, usdaPromise, offPromise]).then(() => {
       if (!cancelled) setIsSearching(false);
     });
 
@@ -102,24 +167,72 @@ export function useFoodSearch(
       cancelled = true;
       ctrl.abort();
     };
-  }, [debouncedQuery]);
+  }, [debouncedQuery, showPackaged]);
 
-  // Dedupe — an OFF row may already be in `local` (cached from a prior search).
-  const dedupedOff = useMemo(() => {
+  // ---------- Group + dedupe ----------
+  const grouped = useMemo(() => {
     const localIds = new Set(local.map((f) => f.id));
-    return off.filter((f) => !localIds.has(f.id));
-  }, [off, local]);
+    const usdaIds = new Set(usda.map((f) => f.id));
+    const offIds = new Set(off.map((f) => f.id));
+
+    const myProducts = local.filter((f) => f.source === 'custom');
+
+    // Common foods = USDA Foundation/SR/Survey (live) + cached USDA non-branded
+    // matches we already had locally.
+    const cachedUsdaCommon = local.filter(
+      (f) =>
+        f.source === 'usda' &&
+        f.usda_data_type !== 'branded' &&
+        !usdaIds.has(f.id),
+    );
+    const liveUsdaCommon = usda.filter((f) => f.usda_data_type !== 'branded');
+    const common = [...liveUsdaCommon, ...cachedUsdaCommon];
+
+    // Packaged = USDA Branded + OFF (live and cached), de-duped.
+    const cachedPackaged = local.filter(
+      (f) =>
+        ((f.source === 'usda' && f.usda_data_type === 'branded') ||
+          f.source === 'off') &&
+        !usdaIds.has(f.id) &&
+        !offIds.has(f.id),
+    );
+    const liveUsdaBranded = usda.filter((f) => f.usda_data_type === 'branded');
+    const packaged = showPackaged
+      ? [...liveUsdaBranded, ...off, ...cachedPackaged]
+      : [];
+
+    // Strip myProducts from common/packaged to avoid double-listing.
+    const myIds = new Set(myProducts.map((f) => f.id));
+    return {
+      myProducts,
+      common: common.filter((f) => !myIds.has(f.id)),
+      packaged: packaged.filter((f) => !myIds.has(f.id)),
+      _localIds: localIds,
+    };
+  }, [local, usda, off, showPackaged]);
 
   return useMemo(
     () => ({
       query: debouncedQuery,
       recents: recents ?? [],
-      local,
-      off: dedupedOff,
+      myProducts: grouped.myProducts,
+      common: grouped.common,
+      packaged: grouped.packaged,
       isSearching,
       rateLimitedSeconds,
-      offError,
+      errorBanner,
+      needsUsdaKey,
+      showPackaged,
     }),
-    [debouncedQuery, recents, local, dedupedOff, isSearching, rateLimitedSeconds, offError],
+    [
+      debouncedQuery,
+      recents,
+      grouped,
+      isSearching,
+      rateLimitedSeconds,
+      errorBanner,
+      needsUsdaKey,
+      showPackaged,
+    ],
   );
 }

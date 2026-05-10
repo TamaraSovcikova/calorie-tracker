@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Loader2, Plus, Search } from 'lucide-react';
+import { Loader2, Plus, Search, Settings as SettingsIcon } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { useFoodSearch } from './useFoodSearch';
@@ -19,12 +20,23 @@ const SECTION_TITLES: Record<MealSection, string> = {
   snacks: 'Snacks',
 };
 
-function Group({ title, children }: { title: string; children: React.ReactNode }) {
+function Group({
+  title,
+  hint,
+  children,
+}: {
+  title: string;
+  hint?: string;
+  children: React.ReactNode;
+}) {
   return (
     <section className="space-y-1">
-      <h3 className="px-2 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-        {title}
-      </h3>
+      <div className="flex items-baseline justify-between px-2">
+        <h3 className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+          {title}
+        </h3>
+        {hint && <span className="text-[10px] text-muted-foreground">{hint}</span>}
+      </div>
       <div>{children}</div>
     </section>
   );
@@ -36,13 +48,26 @@ export function FoodSearchPanel({
   onManualEntry,
 }: FoodSearchPanelProps) {
   const [query, setQuery] = useState('');
-  const { recents, local, off, isSearching, rateLimitedSeconds, offError } =
-    useFoodSearch(query, section);
+  const {
+    recents,
+    myProducts,
+    common,
+    packaged,
+    isSearching,
+    rateLimitedSeconds,
+    errorBanner,
+    needsUsdaKey,
+    showPackaged,
+  } = useFoodSearch(query, section);
 
-  const showRecents = query.trim().length === 0 && recents.length > 0;
-  const showResults = query.trim().length > 0;
+  const hasQuery = query.trim().length > 0;
+  const showRecents = !hasQuery && recents.length > 0;
   const noResults =
-    showResults && !isSearching && local.length === 0 && off.length === 0;
+    hasQuery &&
+    !isSearching &&
+    myProducts.length === 0 &&
+    common.length === 0 &&
+    packaged.length === 0;
 
   return (
     <div className="flex flex-col">
@@ -68,11 +93,26 @@ export function FoodSearchPanel({
         </p>
       </div>
 
-      {(rateLimitedSeconds || offError) && (
+      {needsUsdaKey && hasQuery && (
+        <div className="mx-4 mt-3 flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-xs">
+          <SettingsIcon className="h-3.5 w-3.5 shrink-0 text-primary" />
+          <span className="flex-1">
+            Add a free USDA API key in Settings for cleaner generic-food results.
+          </span>
+          <Link
+            to="/settings"
+            className="shrink-0 font-medium text-primary hover:underline"
+          >
+            Settings
+          </Link>
+        </div>
+      )}
+
+      {(rateLimitedSeconds || errorBanner) && (
         <div className="mx-4 mt-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
           {rateLimitedSeconds != null
-            ? `Open Food Facts rate limit hit. Showing local results only — try again in ${rateLimitedSeconds}s.`
-            : `Open Food Facts unreachable. ${offError}`}
+            ? `Search rate limit hit. Showing local + cached results — try again in ${rateLimitedSeconds}s.`
+            : errorBanner}
         </div>
       )}
 
@@ -85,28 +125,42 @@ export function FoodSearchPanel({
           </Group>
         )}
 
-        {!showRecents && !showResults && (
+        {!showRecents && !hasQuery && (
           <div className="rounded-2xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
             Search by name, scan a barcode, or pick a saved meal.
           </div>
         )}
 
-        {showResults && (
+        {hasQuery && (
           <>
-            {local.length > 0 && (
-              <Group title="My Products & saved">
-                {local.map((f) => (
+            {myProducts.length > 0 && (
+              <Group title="My Products">
+                {myProducts.map((f) => (
                   <FoodResultRow key={f.id} food={f} onClick={onPick} />
                 ))}
               </Group>
             )}
 
-            {off.length > 0 && (
-              <Group title="Open Food Facts">
-                {off.map((f) => (
+            {common.length > 0 && (
+              <Group title="Common foods" hint="USDA">
+                {common.map((f) => (
                   <FoodResultRow key={f.id} food={f} onClick={onPick} />
                 ))}
               </Group>
+            )}
+
+            {showPackaged && packaged.length > 0 && (
+              <Group title="Packaged products">
+                {packaged.map((f) => (
+                  <FoodResultRow key={f.id} food={f} onClick={onPick} />
+                ))}
+              </Group>
+            )}
+
+            {!showPackaged && (
+              <p className="px-2 text-[11px] text-muted-foreground">
+                Packaged products are hidden — toggle in Settings → Food sources.
+              </p>
             )}
 
             {noResults && (

@@ -14,7 +14,15 @@ export type ISOTimestamp = string;
 export type MealSection = 'breakfast' | 'lunch' | 'dinner' | 'snacks';
 export const MEAL_SECTIONS: MealSection[] = ['breakfast', 'lunch', 'dinner', 'snacks'];
 
-export type FoodSource = 'off' | 'custom';
+export type FoodSource = 'off' | 'custom' | 'usda';
+
+/**
+ * For 'usda' rows, the more specific dataType from FoodData Central.
+ * Stored on the Food row so the search panel can show the right pill and
+ * group results between "Common foods" (Foundation/SR Legacy/Survey) and
+ * "Packaged products" (Branded).
+ */
+export type UsdaDataType = 'foundation' | 'sr_legacy' | 'survey' | 'branded';
 
 /** Quantity units a logged item can use. */
 export type QuantityUnit = 'g' | 'ml' | 'serving' | string; // string = custom unit label
@@ -55,6 +63,8 @@ export interface Food {
   id: ID;
   user_id: ID;
   source: FoodSource;
+  /** When source='usda', records which FDC dataset this came from. */
+  usda_data_type?: UsdaDataType;
   off_barcode?: string;
   name: string;
   brand?: string;

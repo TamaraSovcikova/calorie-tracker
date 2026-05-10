@@ -25,17 +25,60 @@ pnpm build        # production build to dist/
 pnpm preview      # serve dist/
 ```
 
-To test PWA on your phone over local network:
-
-```bash
-pnpm dev --host   # then open http://<your-lan-ip>:5173 on your phone
-```
-
 For full offline behaviour test the production build:
 
 ```bash
 pnpm build && pnpm preview --host
 ```
+
+## Test on your phone over LAN (WSL2 quirk)
+
+Vite's "Network" URL is the WSL2 virtual NIC, not your laptop's actual
+LAN IP, so your phone can't reach it directly. Pick one of these:
+
+**Easiest — Win11 22H2+: enable mirrored networking (one-time)**
+
+Add `[wsl2]\nnetworkingMode=mirrored\n` to `%USERPROFILE%\.wslconfig`,
+then `wsl --shutdown` in PowerShell. WSL ports become available on every
+host network interface automatically. No script needed; the phone just
+opens `http://<your-laptop-lan-ip>:5173`.
+
+**Otherwise — netsh portproxy (works on all WSL2 setups)**
+
+From an *elevated* PowerShell (Run as administrator):
+
+```powershell
+cd \\wsl.localhost\Ubuntu\home\snaccident\projects_\calorie-tracker
+powershell -ExecutionPolicy Bypass -File .\scripts\wsl-lan-setup.ps1
+```
+
+The script prints a `Phone URL:` line. Open exactly that URL on your
+phone (same Wi-Fi as the laptop), making sure to type the explicit
+`http://` prefix — Chrome on Android sometimes auto-upgrades to HTTPS
+which the dev server doesn't speak.
+
+WSL2's IP changes after every WSL restart, so re-run the setup script
+if the phone connection stops working. Clean up later with:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\wsl-lan-teardown.ps1
+```
+
+## Food-database setup (Settings → Food sources)
+
+The search is layered:
+
+| Layer | Where | Needs setup? |
+|---|---|---|
+| My Products | local Dexie | nothing |
+| Common foods (generic) | USDA FoodData Central | free API key |
+| Packaged products | USDA Branded + Open Food Facts | nothing for OFF; key for USDA |
+| Barcode scan | Open Food Facts | nothing |
+
+Get the free USDA key (instant) at https://api.data.gov/signup/, then
+paste it into Settings → Food sources → Test key. Searches will start
+showing clean generic entries like "Bananas, raw" plus FNDDS portion
+sizes like "1 medium banana, 118 g".
 
 ## Project structure
 

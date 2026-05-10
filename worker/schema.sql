@@ -31,21 +31,22 @@ CREATE TABLE IF NOT EXISTS profiles (
 );
 
 CREATE TABLE IF NOT EXISTS foods (
-  id            TEXT PRIMARY KEY,
-  user_id       TEXT NOT NULL,
-  source        TEXT NOT NULL,
-  off_barcode   TEXT,
-  name          TEXT NOT NULL,
-  brand         TEXT,
-  kcal_100      REAL NOT NULL,
-  protein_100   REAL NOT NULL,
-  carbs_100     REAL NOT NULL,
-  fat_100       REAL NOT NULL,
-  serving_g     REAL,
-  custom_units  TEXT NOT NULL,  -- JSON [{label, grams}]
-  created_at    TEXT NOT NULL,
-  updated_at    TEXT NOT NULL,
-  deleted_at    TEXT
+  id              TEXT PRIMARY KEY,
+  user_id         TEXT NOT NULL,
+  source          TEXT NOT NULL,
+  usda_data_type  TEXT,  -- 'foundation' | 'sr_legacy' | 'survey' | 'branded' for source='usda'
+  off_barcode     TEXT,
+  name            TEXT NOT NULL,
+  brand           TEXT,
+  kcal_100        REAL NOT NULL,
+  protein_100     REAL NOT NULL,
+  carbs_100       REAL NOT NULL,
+  fat_100         REAL NOT NULL,
+  serving_g       REAL,
+  custom_units    TEXT NOT NULL,  -- JSON [{label, grams}]
+  created_at      TEXT NOT NULL,
+  updated_at      TEXT NOT NULL,
+  deleted_at      TEXT
 );
 CREATE INDEX IF NOT EXISTS foods_updated_at ON foods (updated_at);
 
