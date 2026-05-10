@@ -4,12 +4,16 @@ import { BrowserRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import App from './App';
 import { ensureSeed } from './db/seed';
+import { installSync } from './db/sync/install';
 import './index.css';
 
 // Fire-and-forget; useLiveQuery refetches once writes land.
-ensureSeed().catch((err) => {
-  console.error('Seed/profile init failed', err);
-});
+ensureSeed()
+  .then(() => installSync())
+  .catch((err) => {
+    console.error('Seed/profile init failed', err);
+    installSync();
+  });
 
 const queryClient = new QueryClient({
   defaultOptions: {

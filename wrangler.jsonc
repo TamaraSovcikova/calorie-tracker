@@ -1,22 +1,47 @@
 /**
- * Cloudflare Workers + Static Assets config for the Vite SPA.
+ * Cloudflare Worker config — serves the Vite SPA (./dist) alongside a
+ * sync API backed by D1.
  *
- * Build → `pnpm build` writes the static bundle to ./dist
- * Deploy → `npx wrangler deploy` uploads ./dist as a static asset binding
+ * Build pipeline:
+ *   pnpm build                 → ./dist (Vite SPA)
+ *   wrangler deploy            → ships ./dist + worker/index.ts to CF
  *
- * `not_found_handling: "single-page-application"` makes the worker serve
- * /index.html for any unmatched route, which is what react-router needs.
+ * The worker's fetch handler routes:
+ *   /api/*  → sync API (worker/index.ts)
+ *   else    → static asset binding (Vite SPA)
  *
- * Compatibility date pinned so future runtime changes don't surprise us.
+ * Manual one-time setup (Tamara, see README "Cloud sync setup"):
+ *   1. wrangler login
+ *   2. wrangler d1 create calorie-tracker
+ *      → paste the returned database_id below where it says
+ *        REPLACE_WITH_D1_DATABASE_ID.
+ *   3. wrangler d1 execute calorie-tracker --remote --file ./worker/schema.sql
+ *   4. wrangler secret put SYNC_TOKEN
+ *      → paste a random 32+ char string (same one you'll paste in
+ *        Settings → Cloud sync on each device).
+ *   5. wrangler deploy
  */
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "calorie-tracker",
+  "main": "worker/index.ts",
   "compatibility_date": "2025-01-01",
+  "compatibility_flags": ["nodejs_compat"],
+
   "assets": {
     "directory": "./dist",
+    "binding": "ASSETS",
     "not_found_handling": "single-page-application"
   },
+
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "calorie-tracker",
+      "database_id": "REPLACE_WITH_D1_DATABASE_ID"
+    }
+  ],
+
   "observability": {
     "enabled": true
   }

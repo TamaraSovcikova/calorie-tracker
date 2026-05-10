@@ -3,6 +3,7 @@ import { useProfile } from '@/db/repos/profile';
 import { GoalsSection } from '@/features/settings/GoalsSection';
 import { ProfileSection } from '@/features/settings/ProfileSection';
 import { PreferencesSection } from '@/features/settings/PreferencesSection';
+import { SyncSection } from '@/features/settings/SyncSection';
 import { DataSection } from '@/features/settings/DataSection';
 import { AboutSection } from '@/features/settings/AboutSection';
 
@@ -18,6 +19,7 @@ export function SettingsPage() {
             <GoalsSection profile={profile} />
             <ProfileSection profile={profile} />
             <PreferencesSection profile={profile} />
+            <SyncSection />
             <DataSection />
             <AboutSection />
           </>
