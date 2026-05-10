@@ -31,6 +31,18 @@ For full offline behaviour test the production build:
 pnpm build && pnpm preview --host
 ```
 
+## Quick start / stop (Windows shortcuts)
+
+Three double-clickable `.cmd` files in `scripts/` for day-to-day use:
+
+| File | What it does |
+|---|---|
+| `scripts/dev-on.cmd` | Opens a Windows Terminal tab in WSL and starts `pnpm dev --host` on port 5173. Close the tab to stop. |
+| `scripts/dev-off.cmd` | Kills any vite/esbuild/cloudflared processes in WSL. Use this when you've left a stray dev server running and want to free port 5173 for another project. |
+| `scripts/dev-tunnel.cmd` | Opens a second tab running `cloudflared tunnel --url http://localhost:5173`. Prints an HTTPS `*.trycloudflare.com` URL you can open on your phone. **Use this for testing the barcode scanner** — phone cameras only work over HTTPS. |
+
+Pin them to your taskbar (right-click → Pin to taskbar) for one-click switching between projects.
+
 ## Test on your phone over LAN (WSL2 quirk)
 
 Vite's "Network" URL is the WSL2 virtual NIC, not your laptop's actual
@@ -63,6 +75,17 @@ if the phone connection stops working. Clean up later with:
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\wsl-lan-teardown.ps1
 ```
+
+### Camera / barcode scanner on phone
+
+Even with LAN access set up, **the barcode scanner won't work on your phone over plain HTTP** — browsers only expose `navigator.mediaDevices.getUserMedia` in secure contexts (HTTPS or localhost). For phone testing of the scanner, use the Cloudflare tunnel:
+
+```cmd
+scripts\dev-on.cmd       (start the dev server)
+scripts\dev-tunnel.cmd   (open an HTTPS tunnel to it)
+```
+
+The tunnel window prints `https://<random>.trycloudflare.com`. Open that on your phone (works on any network, not just LAN) → camera permission prompt → scanner works. URL changes every time you start the tunnel; permanent HTTPS comes with the Cloudflare deploy (below).
 
 ## Food-database setup (Settings → Food sources)
 
