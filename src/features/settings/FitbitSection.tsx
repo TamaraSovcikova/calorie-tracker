@@ -53,13 +53,13 @@ export function FitbitSection() {
 
   return (
     <SettingCard
-      title="Fitbit"
-      description="Auto-import daily activity calories into the diary's exercise section."
+      title="Fitbit (via Google Health)"
+      description="Auto-import daily activity calories into the diary's exercise section. Reads your Fitbit data through the new Google Health API."
     >
       {/* Client ID input — required for OAuth to work */}
       <LabeledInput
-        label="Fitbit OAuth Client ID"
-        placeholder="e.g. 23ABCD"
+        label="Google OAuth Client ID"
+        placeholder="…apps.googleusercontent.com"
         value={draftId}
         onChange={(e) => setDraftId(e.target.value)}
         autoComplete="off"
@@ -67,12 +67,12 @@ export function FitbitSection() {
       />
       <div className="flex items-center justify-between gap-2">
         <a
-          href="https://dev.fitbit.com/apps/new"
+          href="https://console.cloud.google.com/apis/credentials"
           target="_blank"
           rel="noreferrer"
           className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
         >
-          Register an app
+          Google Cloud Credentials
           <ExternalLink className="h-3 w-3" />
         </a>
         <Button
@@ -153,15 +153,26 @@ export function FitbitSection() {
         )}
       </div>
 
-      <p className="text-xs text-muted-foreground">
-        On dev.fitbit.com choose <span className="font-medium">Client</span>{' '}
-        type + redirect URL{' '}
-        <span className="font-mono">
+      <div className="space-y-2 rounded-lg border border-border bg-muted/30 p-3 text-xs text-muted-foreground">
+        <p>
+          In Google Cloud Console pick <span className="font-medium">Web application</span>{' '}
+          OAuth client + add this redirect URI:
+        </p>
+        <p className="font-mono break-all text-foreground/80">
           {typeof window !== 'undefined' ? window.location.origin : 'http://localhost:5173'}
           /auth/fitbit/callback
-        </span>
-        . Connecting on one device works on every device via cloud sync.
-      </p>
+        </p>
+        <p>
+          <span className="font-medium text-amber-700 dark:text-amber-300">
+            Heads-up:
+          </span>{' '}
+          Google issues 7-day refresh tokens to apps in "Testing" mode (which
+          is normal for personal use, avoids needing app verification).
+          About once a week you'll see a "Reconnect Fitbit" button — one tap to
+          re-authorise. Connecting on one device propagates to every device
+          via cloud sync.
+        </p>
+      </div>
     </SettingCard>
   );
 }

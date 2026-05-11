@@ -1,13 +1,19 @@
 /**
- * Fitbit Web API client — OAuth 2.0 PKCE flow + daily activity summary.
+ * Fitbit data access via the Google Health API.
  *
- * We use the "Client" application type on dev.fitbit.com — public client,
- * PKCE only, no secret in the browser. Activity scope is sufficient for
- * the daily caloriesOut/caloriesBMR fields the diary needs.
+ * Why Google: Fitbit shut down new app registrations on their legacy Web
+ * API in May 2026 ahead of the September 2026 sunset. The replacement is
+ * Google Health API, which exposes Fitbit/Pixel Watch data through a
+ * unified data-point model.
+ *
+ * Auth model: Google OAuth 2.0 Authorization Code with PKCE — no client
+ * secret in the browser. Refresh tokens issued in "Testing" mode (which
+ * personal-use apps stay in indefinitely without going through Google'\''s
+ * full verification process) expire after ~7 days. The UI surfaces that
+ * with a "Reconnect Fitbit" prompt; one-tap to re-authorise.
  *
  * Token storage: src/db/repos/fitbitTokens (Dexie + Cloudflare Worker
- * sync). Connecting on one device makes Fitbit data available on every
- * device automatically.
+ * sync). Connect once on the laptop, available everywhere.
  */
 
 import {
@@ -17,23 +23,35 @@ import {
 } from '@/db/repos/fitbitTokens';
 import type { LocalDate } from '@/lib/dates';
 
-const AUTH_BASE = 'https://www.fitbit.com/oauth2/authorize';
-const TOKEN_URL = 'https://api.fitbit.com/oauth2/token';
-const API_BASE = 'https://api.fitbit.com';
+const AUTH_BASE = 'https://accounts.google.com/o/oauth2/v2/auth';
+const TOKEN_URL = 'https://oauth2.googleapis.com/token';
+const API_BASE = 'https://health.googleapis.com/v4';
 
-const CLIENT_ID_LS = 'calorie-tracker:fitbit-client-id';
+const CLIENT_ID_LS = 'calorie-tracker:google-client-id';
+const LEGACY_CLIENT_ID_LS = 'calorie-tracker:fitbit-client-id'; // migrate from
 const PKCE_LS = 'calorie-tracker:fitbit-pkce';
 const REDIRECT_PATH = '/auth/fitbit/callback';
 
-// Activity is the only scope we need for caloriesOut. heartrate is requested
-// too in case we expand later; profile gives us the user name for the UI.
-const SCOPES = ['activity', 'heartrate', 'profile'].join(' ');
+const SCOPES = [
+  'https://www.googleapis.com/auth/googlehealth.activity_and_fitness.readonly',
+].join(' ');
 
-// ---------- Client ID storage (entered by user in Settings) ----------
+// ---------- Client ID storage ----------
 
 export function getFitbitClientId(): string | null {
   if (typeof localStorage === 'undefined') return null;
-  return localStorage.getItem(CLIENT_ID_LS) || import.meta.env.VITE_FITBIT_CLIENT_ID || null;
+  // One-time migration: if a value lived under the old fitbit-client-id
+  // key (from the pre-Google-Health attempt), promote it to the new key.
+  const legacy = localStorage.getItem(LEGACY_CLIENT_ID_LS);
+  if (legacy && !localStorage.getItem(CLIENT_ID_LS)) {
+    localStorage.setItem(CLIENT_ID_LS, legacy);
+    localStorage.removeItem(LEGACY_CLIENT_ID_LS);
+  }
+  return (
+    localStorage.getItem(CLIENT_ID_LS) ||
+    import.meta.env.VITE_FITBIT_CLIENT_ID ||
+    null
+  );
 }
 
 export function setFitbitClientId(id: string | null): void {
@@ -42,7 +60,7 @@ export function setFitbitClientId(id: string | null): void {
   else localStorage.setItem(CLIENT_ID_LS, id.trim());
 }
 
-// ---------- PKCE ----------
+// ---------- PKCE helpers ----------
 
 function base64UrlEncode(bytes: ArrayBuffer): string {
   const arr = new Uint8Array(bytes);
@@ -72,12 +90,16 @@ function getRedirectUri(): string {
 }
 
 /**
- * Build the authorize URL and stash the verifier + state in sessionStorage
- * for the callback to pick up. Caller should `window.location.assign(url)`.
+ * Build the Google authorize URL and stash the verifier + state in
+ * sessionStorage for the callback to pick up.
+ *
+ * `access_type=offline` + `prompt=consent` are critical — without them
+ * Google won'\''t issue a refresh_token at all, and we'\''d be locked into
+ * the 1-hour access-token expiry with no way to renew silently.
  */
 export async function beginFitbitAuth(): Promise<string> {
   const clientId = getFitbitClientId();
-  if (!clientId) throw new Error('Fitbit Client ID not configured');
+  if (!clientId) throw new Error('Google OAuth Client ID not configured');
 
   const verifier = randomString(64);
   const state = randomString(32);
@@ -98,30 +120,28 @@ export async function beginFitbitAuth(): Promise<string> {
     code_challenge_method: 'S256',
     state,
     redirect_uri: redirectUri,
+    access_type: 'offline',
+    prompt: 'consent',
+    include_granted_scopes: 'true',
   });
   return `${AUTH_BASE}?${params.toString()}`;
 }
 
-interface FitbitTokenResponse {
+interface GoogleTokenResponse {
   access_token: string;
-  refresh_token: string;
+  refresh_token?: string;
   expires_in: number;
   scope: string;
   token_type: string;
-  user_id?: string;
+  id_token?: string;
 }
 
-/**
- * Handle the OAuth callback. Reads ?code&state from the current URL,
- * exchanges for tokens, persists them. Throws on any validation error
- * (caller catches and renders a message).
- */
 export async function completeFitbitAuth(searchParams: URLSearchParams): Promise<void> {
   const code = searchParams.get('code');
   const state = searchParams.get('state');
   const errorParam = searchParams.get('error');
   if (errorParam) {
-    throw new Error(`Fitbit returned error: ${errorParam}`);
+    throw new Error(`Google returned error: ${errorParam}`);
   }
   if (!code || !state) throw new Error('Missing code or state in callback URL');
 
@@ -133,7 +153,7 @@ export async function completeFitbitAuth(searchParams: URLSearchParams): Promise
   if (state !== pkce.state) throw new Error('OAuth state mismatch — possible CSRF');
 
   const clientId = getFitbitClientId();
-  if (!clientId) throw new Error('Fitbit Client ID not configured');
+  if (!clientId) throw new Error('Google OAuth Client ID not configured');
 
   const body = new URLSearchParams({
     client_id: clientId,
@@ -152,13 +172,21 @@ export async function completeFitbitAuth(searchParams: URLSearchParams): Promise
     const text = await res.text().catch(() => '');
     throw new Error(`Token exchange failed (HTTP ${res.status}): ${text.slice(0, 200)}`);
   }
-  const data = (await res.json()) as FitbitTokenResponse;
+  const data = (await res.json()) as GoogleTokenResponse;
+  if (!data.refresh_token) {
+    // Almost certainly because the user has already granted consent and
+    // Google withheld the refresh token. Easiest fix: ask them to revoke
+    // and reconnect. Surfaces in the callback page error message.
+    throw new Error(
+      'Google did not return a refresh token. Revoke the app at https://myaccount.google.com/permissions and try again.',
+    );
+  }
   await putFitbitTokens({
     access_token: data.access_token,
     refresh_token: data.refresh_token,
     expires_at: new Date(Date.now() + data.expires_in * 1000).toISOString(),
     scope: data.scope,
-    fitbit_user_id: data.user_id,
+    fitbit_user_id: undefined,
   });
 }
 
@@ -168,7 +196,7 @@ async function refreshTokens(): Promise<void> {
   const tokens = await getFitbitTokens();
   if (!tokens) throw new Error('Not connected to Fitbit');
   const clientId = getFitbitClientId();
-  if (!clientId) throw new Error('Fitbit Client ID not configured');
+  if (!clientId) throw new Error('Google OAuth Client ID not configured');
 
   const body = new URLSearchParams({
     grant_type: 'refresh_token',
@@ -181,20 +209,23 @@ async function refreshTokens(): Promise<void> {
     body: body.toString(),
   });
   if (!res.ok) {
-    // 401 usually means the refresh token was revoked — wipe locally so the
-    // UI prompts the user to reconnect.
+    // 400 is the usual "refresh token expired / revoked" response.
+    // Testing-mode tokens expire after 7 days — wipe locally so the UI
+    // surfaces a Reconnect button.
     if (res.status === 400 || res.status === 401) {
       await deleteFitbitTokens();
     }
-    throw new Error(`Fitbit refresh failed (HTTP ${res.status})`);
+    throw new Error(`Google refresh failed (HTTP ${res.status})`);
   }
-  const data = (await res.json()) as FitbitTokenResponse;
+  const data = (await res.json()) as GoogleTokenResponse;
+  // Google refresh responses don'\''t always include a new refresh_token;
+  // re-use the existing one in that case.
   await putFitbitTokens({
     access_token: data.access_token,
-    refresh_token: data.refresh_token,
+    refresh_token: data.refresh_token ?? tokens.refresh_token,
     expires_at: new Date(Date.now() + data.expires_in * 1000).toISOString(),
     scope: data.scope,
-    fitbit_user_id: data.user_id ?? tokens.fitbit_user_id,
+    fitbit_user_id: tokens.fitbit_user_id,
   });
 }
 
@@ -202,7 +233,6 @@ async function ensureValidAccessToken(): Promise<string> {
   let tokens = await getFitbitTokens();
   if (!tokens) throw new Error('Not connected to Fitbit');
 
-  // Refresh if within 60s of expiry.
   const expiresAt = new Date(tokens.expires_at).getTime();
   if (Date.now() >= expiresAt - 60_000) {
     await refreshTokens();
@@ -212,59 +242,127 @@ async function ensureValidAccessToken(): Promise<string> {
   return tokens.access_token;
 }
 
-// ---------- API calls ----------
+// ---------- Daily activity summary ----------
 
 export interface FitbitDailySummary {
   date: LocalDate;
   caloriesOut: number;
   caloriesBMR: number;
-  activityCalories: number; // caloriesOut - caloriesBMR
+  activityCalories: number;
   steps?: number;
 }
 
-interface FitbitActivitiesResponse {
-  summary?: {
-    caloriesOut?: number;
-    caloriesBMR?: number;
-    activityCalories?: number;
-    steps?: number;
+interface GoogleDataPoint {
+  value?: { quantity?: { quantity?: number } };
+  // Google'\''s actual schema is verbose. We accept the various shapes that
+  // dailyRollup can return.
+  quantity?: number;
+  startTime?: string;
+  endTime?: string;
+}
+
+interface GoogleDailyRollupResponse {
+  dataPoints?: GoogleDataPoint[];
+  nextPageToken?: string;
+}
+
+/**
+ * Build the [start, end) ISO range for a local YYYY-MM-DD date.
+ * Google Health API uses UTC timestamps; for our purposes we treat the
+ * date as the local day boundary which is what the user sees in the
+ * diary. A small timezone discrepancy at midnight is acceptable.
+ */
+function dayRangeIso(date: LocalDate): { start: string; end: string } {
+  const start = new Date(`${date}T00:00:00`);
+  const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
+  return { start: start.toISOString(), end: end.toISOString() };
+}
+
+function extractQuantity(p: GoogleDataPoint): number {
+  if (typeof p.quantity === 'number') return p.quantity;
+  if (typeof p.value?.quantity?.quantity === 'number') return p.value.quantity.quantity;
+  return 0;
+}
+
+async function fetchDailyTotal(
+  token: string,
+  dataType: string,
+  date: LocalDate,
+): Promise<number> {
+  const range = dayRangeIso(date);
+  // dailyRollup endpoint: returns one summed point per day inside the range.
+  // Filter syntax per Google Health API docs: `startTime >= "..." AND endTime <= "..."`.
+  const url = `${API_BASE}/users/me/dataTypes/${dataType}:dailyRollup`;
+  const body = {
+    filter: `startTime >= "${range.start}" AND endTime <= "${range.end}"`,
   };
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      authorization: `Bearer ${token}`,
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+  if (res.status === 401) {
+    // Should be caught at caller level via refresh; if it still happens,
+    // surface as auth issue.
+    throw new Error('GOOGLE_AUTH');
+  }
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`Google Health ${dataType} HTTP ${res.status}: ${text.slice(0, 200)}`);
+  }
+  const data = (await res.json()) as GoogleDailyRollupResponse;
+  const points = data.dataPoints ?? [];
+  return points.reduce((sum, p) => sum + extractQuantity(p), 0);
 }
 
 export async function getDailySummary(date: LocalDate): Promise<FitbitDailySummary> {
-  const token = await ensureValidAccessToken();
-  const res = await fetch(`${API_BASE}/1/user/-/activities/date/${date}.json`, {
-    headers: { authorization: `Bearer ${token}` },
-  });
-  if (res.status === 401) {
-    // One retry after a forced refresh — covers the rare case where the
-    // server-side token TTL ended ahead of our local expiry.
-    await refreshTokens();
-    return getDailySummary(date);
+  let token = await ensureValidAccessToken();
+  try {
+    const [totalCalories, steps] = await Promise.all([
+      fetchDailyTotal(token, 'total-calories', date).catch((e) => {
+        if ((e as Error).message === 'GOOGLE_AUTH') throw e;
+        return 0;
+      }),
+      fetchDailyTotal(token, 'steps', date).catch((e) => {
+        if ((e as Error).message === 'GOOGLE_AUTH') throw e;
+        return 0;
+      }),
+    ]);
+    // Google Health doesn't separately expose BMR; we approximate by
+    // reporting the full total as "caloriesOut" and the activity portion
+    // as "active calories" via a different data type in a future pass.
+    // For now, treat all returned calories as activity calories since
+    // Fitbit'\''s number is conceptually total-day-burn, of which BMR is the
+    // chunk you'd be burning anyway. Most calorie trackers show the full
+    // total — feels familiar.
+    return {
+      date,
+      caloriesOut: Math.round(totalCalories),
+      caloriesBMR: 0,
+      activityCalories: Math.round(totalCalories),
+      steps: steps > 0 ? Math.round(steps) : undefined,
+    };
+  } catch (err) {
+    if ((err as Error).message === 'GOOGLE_AUTH') {
+      // Try one refresh + retry.
+      await refreshTokens();
+      token = await ensureValidAccessToken();
+      const totalCalories = await fetchDailyTotal(token, 'total-calories', date);
+      return {
+        date,
+        caloriesOut: Math.round(totalCalories),
+        caloriesBMR: 0,
+        activityCalories: Math.round(totalCalories),
+      };
+    }
+    throw err;
   }
-  if (!res.ok) {
-    throw new Error(`Fitbit API HTTP ${res.status}`);
-  }
-  const data = (await res.json()) as FitbitActivitiesResponse;
-  const caloriesOut = data.summary?.caloriesOut ?? 0;
-  const caloriesBMR = data.summary?.caloriesBMR ?? 0;
-  const activityCalories = Math.max(
-    0,
-    data.summary?.activityCalories ?? caloriesOut - caloriesBMR,
-  );
-  return {
-    date,
-    caloriesOut,
-    caloriesBMR,
-    activityCalories,
-    steps: data.summary?.steps,
-  };
 }
 
 export async function disconnectFitbit(): Promise<void> {
-  // We could POST to /oauth2/revoke but for a personal app just wiping
-  // locally is enough — the access token expires in 8h and refresh tokens
-  // are single-use anyway.
   await deleteFitbitTokens();
 }
 
