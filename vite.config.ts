@@ -62,5 +62,15 @@ export default defineConfig({
   server: {
     host: true,
     port: 5173,
+    // Vite 5 strictly checks the Host header. Allow Cloudflare quick
+    // tunnels (`*.trycloudflare.com`) so `pnpm tunnel` works on a phone
+    // without hand-editing this file per session, plus any *.workers.dev
+    // for the eventual permanent deploy. Localhost / LAN IPs are
+    // implicitly allowed.
+    allowedHosts: [
+      '.trycloudflare.com',
+      '.workers.dev',
+      '.pages.dev',
+    ],
   },
 });
