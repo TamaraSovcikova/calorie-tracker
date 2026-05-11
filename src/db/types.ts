@@ -150,3 +150,27 @@ export interface WeightEntry {
   created_at: ISOTimestamp;
   updated_at: ISOTimestamp;
 }
+
+/**
+ * OAuth tokens for the connected Fitbit account. One row per user_id (so
+ * 'local' until cloud sync, then the synced user id). Stored in Dexie and
+ * synced via the worker — connecting on one device makes Fitbit data
+ * available on every device.
+ *
+ * Plaintext at rest. Security model = the same as everything else here:
+ * the only line of defence is the bearer SYNC_TOKEN you set on the worker
+ * + private Cloudflare account.
+ */
+export interface FitbitTokens {
+  user_id: ID;
+  access_token: string;
+  refresh_token: string;
+  /** ISO8601 timestamp when access_token expires. */
+  expires_at: ISOTimestamp;
+  /** OAuth scopes granted (space-separated). */
+  scope: string;
+  /** Fitbit's internal user id (the `-` placeholder works too, but storing the real one helps debugging). */
+  fitbit_user_id?: string;
+  created_at: ISOTimestamp;
+  updated_at: ISOTimestamp;
+}

@@ -5,6 +5,7 @@ import { MealsPage } from '@/app/meals/MealsPage';
 import { ProgressPage } from '@/app/progress/ProgressPage';
 import { SettingsPage } from '@/app/settings/SettingsPage';
 import { MealEditor } from '@/features/meals/MealEditor';
+import { FitbitCallback } from '@/app/auth/FitbitCallback';
 import { useThemeEffect } from '@/features/settings/useThemeEffect';
 import { OnboardingGate } from '@/features/onboarding/OnboardingWizard';
 import { InstallPrompt } from '@/features/install-prompt/InstallPrompt';
@@ -14,7 +15,8 @@ export default function App() {
   return (
     <>
       <Routes>
-        {/* Meal editor routes use a fullscreen layout (no bottom nav). */}
+        {/* Fullscreen routes (no bottom nav). */}
+        <Route path="/auth/fitbit/callback" element={<FitbitCallback />} />
         <Route path="/meals/new" element={<MealEditor mode="create" />} />
         <Route path="/meals/:id/edit" element={<MealEditor mode="edit" />} />
 

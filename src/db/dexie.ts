@@ -2,6 +2,7 @@ import Dexie, { type EntityTable } from 'dexie';
 import type {
   DiaryEntry,
   ExerciseEntry,
+  FitbitTokens,
   Food,
   Meal,
   MealItem,
@@ -26,6 +27,7 @@ class CalorieDB extends Dexie {
   diary_entries!: EntityTable<DiaryEntry, 'id'>;
   exercise_entries!: EntityTable<ExerciseEntry, 'id'>;
   weight_log!: EntityTable<WeightEntry, 'id'>;
+  fitbit_tokens!: EntityTable<FitbitTokens, 'user_id'>;
 
   constructor() {
     super('calorie-tracker');
@@ -39,6 +41,11 @@ class CalorieDB extends Dexie {
         '&id, user_id, date, [user_id+date], [user_id+date+section], section, deleted_at, updated_at',
       exercise_entries: '&id, user_id, date, [user_id+date], deleted_at, updated_at',
       weight_log: '&id, user_id, date, [user_id+date], updated_at',
+    });
+
+    // v2: Fitbit token storage (Phase 12). Additive — Dexie keeps old data.
+    this.version(2).stores({
+      fitbit_tokens: '&user_id, updated_at',
     });
   }
 }

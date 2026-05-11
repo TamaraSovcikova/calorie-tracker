@@ -7,6 +7,7 @@ import { DiarySectionView } from '@/features/diary/DiarySection';
 import { AddFoodSheet } from '@/features/food-search/AddFoodSheet';
 import { EditEntrySheet } from '@/features/food-search/EditEntrySheet';
 import { ExerciseSection } from '@/features/exercise/ExerciseSection';
+import { useFitbitDailySync } from '@/features/fitbit/useFitbitDailySync';
 import { formatDayHeader, isToday, shiftDate, todayLocal, type LocalDate } from '@/lib/dates';
 import {
   groupBySection,
@@ -26,6 +27,10 @@ export function DiaryPage() {
   const profile = useProfile();
   const entries = useDiaryDay(currentDate);
   const exercise = useExerciseDay(currentDate);
+
+  // If Fitbit is connected, pulls daily calories burned and upserts an
+  // exercise_entry row in the background. No-op when not connected.
+  useFitbitDailySync(currentDate);
 
   const [addingTo, setAddingTo] = useState<MealSection | null>(null);
   const [editing, setEditing] = useState<DiaryEntry | null>(null);

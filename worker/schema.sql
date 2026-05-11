@@ -123,3 +123,15 @@ CREATE TABLE IF NOT EXISTS weight_log (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS weight_log_user_date ON weight_log (user_id, date);
 CREATE INDEX IF NOT EXISTS weight_log_updated_at ON weight_log (updated_at);
+
+CREATE TABLE IF NOT EXISTS fitbit_tokens (
+  user_id         TEXT PRIMARY KEY,
+  access_token    TEXT NOT NULL,
+  refresh_token   TEXT NOT NULL,
+  expires_at      TEXT NOT NULL,
+  scope           TEXT NOT NULL,
+  fitbit_user_id  TEXT,
+  created_at      TEXT NOT NULL,
+  updated_at      TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS fitbit_tokens_updated_at ON fitbit_tokens (updated_at);
