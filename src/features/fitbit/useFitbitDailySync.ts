@@ -29,8 +29,14 @@ import type { ExerciseEntry, Profile } from '@/db/types';
 const CACHE_MS = 5 * 60 * 1000;
 const lastFetched = new Map<string, number>();
 
-function cacheKey(date: LocalDate): string {
-  return `${currentUserId()}:${date}`;
+/**
+ * The BMR estimate is part of the key so that filling in / editing
+ * profile stats invalidates the cache — otherwise a stale "needs profile"
+ * row would survive until the 5-minute window elapsed.
+ */
+function cacheKey(date: LocalDate, dailyBmr: number | null): string {
+  const bmrPart = dailyBmr === null ? 'nobmr' : String(Math.round(dailyBmr));
+  return `${currentUserId()}:${date}:${bmrPart}`;
 }
 
 async function syncFitbitForDate(
@@ -78,7 +84,7 @@ export function useFitbitDailySync(date: LocalDate): void {
 
   useEffect(() => {
     if (!connected) return;
-    const key = cacheKey(date);
+    const key = cacheKey(date, profileDailyBmr(profile));
     const last = lastFetched.get(key);
     if (last && Date.now() - last < CACHE_MS) return;
 

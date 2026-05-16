@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react';
 import { Sparkles } from 'lucide-react';
 import { LabeledInput } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
-import { Button } from '@/components/ui/Button';
 import { SettingCard } from './SettingCard';
 import { updateProfile } from '@/db/repos/profile';
 import {
@@ -127,11 +126,6 @@ export function ProfileSection({ profile }: ProfileSectionProps) {
     });
   }, [form, profile]);
 
-  const applyTdeeAsTarget = () => {
-    if (!previewTdee) return;
-    void updateProfile({ kcal_target: previewTdee });
-  };
-
   const weightUnit = profile.units === 'imperial' ? 'lb' : 'kg';
   const heightUnit = profile.units === 'imperial' ? 'in' : 'cm';
 
@@ -226,25 +220,49 @@ export function ProfileSection({ profile }: ProfileSectionProps) {
         <div className="rounded-lg border border-primary/30 bg-primary/5 p-3">
           <div className="flex items-center gap-1.5 text-xs uppercase tracking-wide text-primary">
             <Sparkles className="h-3.5 w-3.5" />
-            Suggested daily calories (TDEE)
+            Maintenance (TDEE) {formatKcal(previewTdee)} kcal — pick a goal
           </div>
-          <div className="mt-1 flex items-baseline justify-between">
-            <span className="text-2xl font-semibold tabular-nums">
-              {formatKcal(previewTdee)}
-              <span className="ml-1 text-sm text-muted-foreground">kcal</span>
-            </span>
-            <Button
-              size="sm"
-              variant="primary"
-              onClick={applyTdeeAsTarget}
-              disabled={previewTdee === profile.kcal_target}
-            >
-              Use as target
-            </Button>
+          <div className="mt-2 grid grid-cols-3 gap-2">
+            {(
+              [
+                { key: 'cut', label: 'Cut', delta: -500, sub: '-500 deficit' },
+                { key: 'maintain', label: 'Maintain', delta: 0, sub: 'TDEE' },
+                { key: 'bulk', label: 'Bulk', delta: 400, sub: '+400 surplus' },
+              ] as const
+            ).map((g) => {
+              const kcal = Math.max(1000, previewTdee + g.delta);
+              const active = profile.kcal_target === kcal;
+              return (
+                <button
+                  key={g.key}
+                  type="button"
+                  onClick={() => void updateProfile({ kcal_target: kcal })}
+                  className={
+                    active
+                      ? 'rounded-lg border border-primary bg-primary px-2 py-2 text-center text-primary-foreground'
+                      : 'rounded-lg border border-border bg-card px-2 py-2 text-center hover:border-primary'
+                  }
+                >
+                  <div className="text-xs font-medium">{g.label}</div>
+                  <div className="text-base font-semibold tabular-nums">
+                    {formatKcal(kcal)}
+                  </div>
+                  <div
+                    className={
+                      active
+                        ? 'text-[10px] text-primary-foreground/80'
+                        : 'text-[10px] text-muted-foreground'
+                    }
+                  >
+                    {g.sub}
+                  </div>
+                </button>
+              );
+            })}
           </div>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Mifflin-St Jeor × activity multiplier. Adjust to your goal (cut /
-            bulk) under Goals.
+          <p className="mt-2 text-xs text-muted-foreground">
+            Mifflin-St Jeor × activity multiplier. Cut ≈ 0.45 kg/week loss;
+            bulk ≈ lean gain. Tap one to set it as your calorie target.
           </p>
         </div>
       )}
