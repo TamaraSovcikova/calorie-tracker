@@ -4,6 +4,7 @@ import { Sheet } from '@/components/ui/Sheet';
 import { Button } from '@/components/ui/Button';
 import { LabeledInput } from '@/components/ui/Input';
 import { copyDayEntries } from '@/db/repos/diary';
+import { toast } from '@/components/ui/toast';
 import { formatDayHeader, shiftDate, type LocalDate } from '@/lib/dates';
 
 interface CopyDaySheetProps {
@@ -34,9 +35,11 @@ export function CopyDaySheet({ open, fromDate, onClose }: CopyDaySheetProps) {
       if (n === 0) {
         setResult('Nothing to copy — the source day has no entries.');
       } else {
-        setResult(
-          `Copied ${n} ${n === 1 ? 'entry' : 'entries'} to ${formatDayHeader(target)}.`,
-        );
+        onClose();
+        toast({
+          message: `Copied ${n} ${n === 1 ? 'entry' : 'entries'} to ${formatDayHeader(target)}`,
+          variant: 'success',
+        });
       }
     } finally {
       setBusy(false);

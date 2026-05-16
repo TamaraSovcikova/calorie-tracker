@@ -3,8 +3,10 @@ import { Trash2 } from 'lucide-react';
 import { Sheet } from '@/components/ui/Sheet';
 import { Button } from '@/components/ui/Button';
 import { QuantityStep } from './QuantityStep';
+import { QuickAddForm, type QuickAddValues } from './QuickAddForm';
 import { computeMacros, type QuantityMode, type QuantityState } from './foodMath';
-import { softDeleteDiaryEntry, updateDiaryEntry } from '@/db/repos/diary';
+import { restoreDiaryEntry, softDeleteDiaryEntry, updateDiaryEntry } from '@/db/repos/diary';
+import { toast } from '@/components/ui/toast';
 import { getFood } from '@/db/repos/foods';
 import { LogMealStep } from '@/features/meals/LogMealStep';
 import { useMealResolved } from '@/features/meals/useMealResolved';
@@ -31,10 +33,58 @@ export function EditEntrySheet({ open, entry, onClose }: EditEntrySheetProps) {
   if (!entry) {
     return <Sheet open={open} onClose={onClose} title="Edit entry"><div /></Sheet>;
   }
-  return entry.kind === 'meal' ? (
-    <EditMealEntryInner entry={entry} open={open} onClose={onClose} />
-  ) : (
-    <EditFoodEntryInner entry={entry} open={open} onClose={onClose} />
+  if (entry.kind === 'meal') {
+    return <EditMealEntryInner entry={entry} open={open} onClose={onClose} />;
+  }
+  if (entry.kind === 'quick') {
+    return <EditQuickEntryInner entry={entry} open={open} onClose={onClose} />;
+  }
+  return <EditFoodEntryInner entry={entry} open={open} onClose={onClose} />;
+}
+
+function EditQuickEntryInner({
+  entry,
+  open,
+  onClose,
+}: {
+  entry: DiaryEntry;
+  open: boolean;
+  onClose: () => void;
+}) {
+  const handleSave = async (v: QuickAddValues) => {
+    await updateDiaryEntry(entry.id, {
+      kcal: v.kcal,
+      protein: v.protein,
+      carbs: v.carbs,
+      fat: v.fat,
+    });
+    onClose();
+  };
+
+  const handleDelete = async () => {
+    const id = entry.id;
+    await softDeleteDiaryEntry(id);
+    onClose();
+    toast({
+      message: 'Entry removed',
+      action: { label: 'Undo', onClick: () => void restoreDiaryEntry(id) },
+    });
+  };
+
+  return (
+    <Sheet open={open} onClose={onClose} title="Edit quick add">
+      <QuickAddForm
+        initial={{
+          kcal: entry.kcal,
+          protein: entry.protein,
+          carbs: entry.carbs,
+          fat: entry.fat,
+        }}
+        saveLabel="Save changes"
+        onSave={handleSave}
+        onDelete={handleDelete}
+      />
+    </Sheet>
   );
 }
 
@@ -79,8 +129,13 @@ function EditFoodEntryInner({
   };
 
   const handleDelete = async () => {
-    await softDeleteDiaryEntry(entry.id);
+    const id = entry.id;
+    await softDeleteDiaryEntry(id);
     onClose();
+    toast({
+      message: 'Entry removed',
+      action: { label: 'Undo', onClick: () => void restoreDiaryEntry(id) },
+    });
   };
 
   return (
@@ -128,8 +183,13 @@ function EditMealEntryInner({
   };
 
   const handleDelete = async () => {
-    await softDeleteDiaryEntry(entry.id);
+    const id = entry.id;
+    await softDeleteDiaryEntry(id);
     onClose();
+    toast({
+      message: 'Entry removed',
+      action: { label: 'Undo', onClick: () => void restoreDiaryEntry(id) },
+    });
   };
 
   return (

@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/Button';
 import { LabeledInput } from '@/components/ui/Input';
 import { MiniChart, type ChartPoint } from './MiniChart';
 import { deleteWeight, logWeight, useWeightLog } from '@/db/repos/weight';
+import { toast } from '@/components/ui/toast';
 import { fromLocalDate, todayLocal } from '@/lib/dates';
 import { kgToLb, lbToKg } from '@/lib/units';
 import type { Profile } from '@/db/types';
@@ -50,9 +51,21 @@ export function WeightLogSection({ profile }: WeightLogSectionProps) {
     try {
       await logWeight(date, isImperial ? lbToKg(num) : num);
       setValue('');
+      toast({ message: 'Weight logged', variant: 'success' });
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleDelete = async (w: { id: string; date: string; weight_kg: number; note?: string }) => {
+    await deleteWeight(w.id);
+    toast({
+      message: 'Weigh-in removed',
+      action: {
+        label: 'Undo',
+        onClick: () => void logWeight(w.date, w.weight_kg, w.note),
+      },
+    });
   };
 
   const recent = log ? [...log].slice(-5).reverse() : [];
@@ -133,7 +146,7 @@ export function WeightLogSection({ profile }: WeightLogSectionProps) {
                   </span>
                   <button
                     type="button"
-                    onClick={() => void deleteWeight(w.id)}
+                    onClick={() => void handleDelete(w)}
                     aria-label="Delete weighing"
                     className="text-muted-foreground hover:text-destructive"
                   >

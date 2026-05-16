@@ -1,6 +1,8 @@
 import { useRef, useState } from 'react';
 import { Download, Upload, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
+import { toast } from '@/components/ui/toast';
 import { SettingCard } from './SettingCard';
 import { db } from '@/db/dexie';
 
@@ -43,7 +45,8 @@ async function exportAll(): Promise<ExportShape> {
 export function DataSection() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState<'export' | 'import' | 'clear' | null>(null);
-  const [message, setMessage] = useState<string | null>(null);
+  const [confirmWipe, setConfirmWipe] = useState(false);
+  const [pendingImport, setPendingImport] = useState<File | null>(null);
 
   const handleExport = async () => {
     setBusy('export');
@@ -58,7 +61,7 @@ export function DataSection() {
       a.download = `calorie-tracker-${new Date().toISOString().slice(0, 10)}.json`;
       a.click();
       URL.revokeObjectURL(url);
-      setMessage('Backup downloaded.');
+      toast({ message: 'Backup downloaded', variant: 'success' });
     } finally {
       setBusy(null);
     }
@@ -66,7 +69,6 @@ export function DataSection() {
 
   const handleImportFile = async (file: File) => {
     setBusy('import');
-    setMessage(null);
     try {
       const text = await file.text();
       const data = JSON.parse(text) as ExportShape;
@@ -105,22 +107,20 @@ export function DataSection() {
             await db.weight_log.bulkPut(data.weight_log as never);
         },
       );
-      setMessage('Restore complete.');
+      toast({ message: 'Backup restored', variant: 'success' });
     } catch (err) {
-      setMessage(`Restore failed: ${err instanceof Error ? err.message : 'unknown'}`);
+      toast({
+        message: `Restore failed: ${err instanceof Error ? err.message : 'unknown error'}`,
+        variant: 'error',
+        duration: 6000,
+      });
     } finally {
       setBusy(null);
     }
   };
 
-  const handleClear = async () => {
-    if (
-      !confirm(
-        'Wipe ALL local data? This deletes your diary, meals, products, weight log, and goals on this device.',
-      )
-    ) {
-      return;
-    }
+  const doWipe = async () => {
+    setConfirmWipe(false);
     setBusy('clear');
     try {
       await db.delete();
@@ -162,7 +162,7 @@ export function DataSection() {
         className="hidden"
         onChange={(e) => {
           const file = e.target.files?.[0];
-          if (file) void handleImportFile(file);
+          if (file) setPendingImport(file);
           e.target.value = '';
         }}
       />
@@ -170,16 +170,35 @@ export function DataSection() {
         type="button"
         variant="ghost"
         block
-        onClick={handleClear}
+        onClick={() => setConfirmWipe(true)}
         disabled={busy !== null}
         className="text-destructive"
       >
         <Trash2 className="h-4 w-4" />
         Wipe local data
       </Button>
-      {message && (
-        <p className="text-xs text-muted-foreground">{message}</p>
-      )}
+
+      <ConfirmDialog
+        open={pendingImport !== null}
+        title="Restore from backup?"
+        message="Restoring a backup replaces ALL data currently on this device — diary, meals, products, weight log, and goals. This cannot be undone."
+        confirmLabel="Restore"
+        onCancel={() => setPendingImport(null)}
+        onConfirm={() => {
+          const file = pendingImport;
+          setPendingImport(null);
+          if (file) void handleImportFile(file);
+        }}
+      />
+      <ConfirmDialog
+        open={confirmWipe}
+        title="Wipe all local data?"
+        message="This deletes your diary, meals, products, weight log, and goals on this device. This cannot be undone."
+        confirmLabel="Wipe data"
+        destructive
+        onCancel={() => setConfirmWipe(false)}
+        onConfirm={() => void doWipe()}
+      />
     </SettingCard>
   );
 }

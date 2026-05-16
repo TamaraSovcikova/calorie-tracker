@@ -110,7 +110,8 @@ export interface DiaryEntry {
   user_id: ID;
   date: LocalDate;
   section: MealSection;
-  kind: 'food' | 'meal';
+  /** 'quick' = a bare calorie/macro entry with no underlying food or meal. */
+  kind: 'food' | 'meal' | 'quick';
   food_id?: ID;
   meal_id?: ID;
   qty: number;

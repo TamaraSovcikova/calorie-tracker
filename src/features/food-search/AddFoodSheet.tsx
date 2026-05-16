@@ -5,6 +5,8 @@ import { Tabs } from '@/components/ui/Tabs';
 import { FoodSearchPanel } from './FoodSearchPanel';
 import { QuantityStep } from './QuantityStep';
 import { ManualEntryForm } from './ManualEntryForm';
+import { QuickAddForm, type QuickAddValues } from './QuickAddForm';
+import { formatKcal } from '@/lib/macros';
 
 // ZXing is ~600 kB; only load it when the user opens the Scan tab.
 const BarcodeScanner = lazy(() =>
@@ -12,6 +14,7 @@ const BarcodeScanner = lazy(() =>
 );
 import { computeMacros, type QuantityState } from './foodMath';
 import { createDiaryEntry } from '@/db/repos/diary';
+import { toast } from '@/components/ui/toast';
 import { db } from '@/db/dexie';
 import { lookupBarcode, OffRateLimitError } from '@/lib/off-api';
 import { MealPicker } from '@/features/meals/MealPicker';
@@ -35,7 +38,14 @@ type Step =
   | { kind: 'meal-portion'; meal: Meal }
   | { kind: 'manual'; presetName?: string; presetBarcode?: string };
 
-type Tab = 'search' | 'scan' | 'meals';
+type Tab = 'search' | 'scan' | 'meals' | 'quick';
+
+const SECTION_LABEL: Record<MealSection, string> = {
+  breakfast: 'Breakfast',
+  lunch: 'Lunch',
+  dinner: 'Dinner',
+  snacks: 'Snacks',
+};
 
 export function AddFoodSheet({ open, onClose, date, section }: AddFoodSheetProps) {
   const [tab, setTab] = useState<Tab>('search');
@@ -61,10 +71,30 @@ export function AddFoodSheet({ open, onClose, date, section }: AddFoodSheetProps
   const handlePickMeal = (meal: Meal) =>
     setStep({ kind: 'meal-portion', meal });
 
+  const handleQuickAdd = async (v: QuickAddValues) => {
+    await createDiaryEntry({
+      date,
+      section,
+      kind: 'quick',
+      qty: 1,
+      unit: 'kcal',
+      kcal: v.kcal,
+      protein: v.protein,
+      carbs: v.carbs,
+      fat: v.fat,
+    });
+    toast({
+      message: `${formatKcal(v.kcal)} kcal added to ${SECTION_LABEL[section]}`,
+      variant: 'success',
+    });
+    handleClose();
+  };
+
   const handleSaveQuantity = async (state: QuantityState) => {
     if (step.kind !== 'quantity') return;
     const macros = computeMacros(step.food, state);
     if (macros.grams <= 0) return;
+    const foodName = step.food.name;
     await createDiaryEntry({
       date,
       section,
@@ -77,7 +107,14 @@ export function AddFoodSheet({ open, onClose, date, section }: AddFoodSheetProps
       carbs: macros.carbs,
       fat: macros.fat,
     });
-    handleClose();
+    toast({
+      message: `${foodName} added to ${SECTION_LABEL[section]}`,
+      variant: 'success',
+    });
+    // Stay open on the search panel so several items can be logged in a row.
+    setStep({ kind: 'pick' });
+    setTab('search');
+    setScanError(null);
   };
 
   // Stable identity — BarcodeScanner has this in its camera-effect deps,
@@ -122,6 +159,7 @@ export function AddFoodSheet({ open, onClose, date, section }: AddFoodSheetProps
               { value: 'search', label: 'Search' },
               { value: 'scan', label: 'Scan' },
               { value: 'meals', label: 'Meals' },
+              { value: 'quick', label: 'Quick' },
             ]}
           />
         </div>
@@ -151,6 +189,7 @@ export function AddFoodSheet({ open, onClose, date, section }: AddFoodSheetProps
           </>
         )}
         {tab === 'meals' && <MealPicker onPick={handlePickMeal} />}
+        {tab === 'quick' && <QuickAddForm onSave={handleQuickAdd} />}
       </div>
     );
   } else if (step.kind === 'looking-up') {
@@ -181,7 +220,10 @@ export function AddFoodSheet({ open, onClose, date, section }: AddFoodSheetProps
         date={date}
         section={section}
         onBack={() => setStep({ kind: 'pick' })}
-        onDone={handleClose}
+        onDone={() => {
+          setStep({ kind: 'pick' });
+          setTab('meals');
+        }}
       />
     );
   } else {
@@ -237,6 +279,10 @@ function MealPortionStep({
       protein: totals.protein,
       carbs: totals.carbs,
       fat: totals.fat,
+    });
+    toast({
+      message: `${meal.name} added to ${SECTION_LABEL[section]}`,
+      variant: 'success',
     });
     onDone();
   };

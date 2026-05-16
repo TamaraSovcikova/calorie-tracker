@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { format } from 'date-fns';
 import { ChevronLeft, ChevronRight, CopyPlus, Loader2 } from 'lucide-react';
 import { PageHeader } from '@/components/PageHeader';
 import { MacroSummary } from '@/features/diary/MacroSummary';
@@ -9,7 +10,14 @@ import { AddFoodSheet } from '@/features/food-search/AddFoodSheet';
 import { EditEntrySheet } from '@/features/food-search/EditEntrySheet';
 import { ExerciseSection } from '@/features/exercise/ExerciseSection';
 import { useFitbitDailySync } from '@/features/fitbit/useFitbitDailySync';
-import { formatDayHeader, isToday, shiftDate, todayLocal, type LocalDate } from '@/lib/dates';
+import {
+  formatDayHeader,
+  fromLocalDate,
+  isToday,
+  shiftDate,
+  todayLocal,
+  type LocalDate,
+} from '@/lib/dates';
 import {
   groupBySection,
   sumTotals,
@@ -36,10 +44,30 @@ export function DiaryPage() {
   const [addingTo, setAddingTo] = useState<MealSection | null>(null);
   const [editing, setEditing] = useState<DiaryEntry | null>(null);
   const [copyOpen, setCopyOpen] = useState(false);
+  const dateInputRef = useRef<HTMLInputElement>(null);
 
   const goToDate = (next: LocalDate) => {
     navigate(isToday(next) ? '/diary' : `/diary/${next}`);
   };
+
+  const openDatePicker = () => {
+    const input = dateInputRef.current;
+    if (!input) return;
+    // showPicker() is the reliable way to open the native picker from a
+    // gesture; fall back to focus+click on older engines.
+    if (typeof input.showPicker === 'function') {
+      try {
+        input.showPicker();
+        return;
+      } catch {
+        /* fall through */
+      }
+    }
+    input.focus();
+    input.click();
+  };
+
+  const onToday = isToday(currentDate);
 
   const loading = entries === undefined;
   const totals = entries ? sumTotals(entries) : ZERO_TOTALS;
@@ -52,9 +80,19 @@ export function DiaryPage() {
     <>
       <PageHeader
         title={formatDayHeader(currentDate)}
-        subtitle={isToday(currentDate) ? currentDate : undefined}
+        subtitle={format(fromLocalDate(currentDate), 'EEEE, d MMMM yyyy')}
+        onTitleClick={openDatePicker}
         trailing={
           <div className="flex items-center gap-1">
+            {!onToday && (
+              <button
+                type="button"
+                onClick={() => goToDate(todayLocal())}
+                className="tap-target rounded-full border border-border px-3 py-1 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+              >
+                Today
+              </button>
+            )}
             <button
               type="button"
               onClick={() => setCopyOpen(true)}
@@ -81,6 +119,17 @@ export function DiaryPage() {
             </button>
           </div>
         }
+      />
+      <input
+        ref={dateInputRef}
+        type="date"
+        value={currentDate}
+        onChange={(e) => {
+          if (e.target.value) goToDate(e.target.value);
+        }}
+        tabIndex={-1}
+        aria-hidden="true"
+        className="pointer-events-none absolute left-4 top-12 h-0 w-0 opacity-0"
       />
 
       <div className="mx-auto max-w-md space-y-3 px-4 py-4">

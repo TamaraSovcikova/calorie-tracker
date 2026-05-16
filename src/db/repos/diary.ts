@@ -9,7 +9,7 @@ import { MEAL_SECTIONS } from '../types';
 export interface CreateDiaryEntryInput {
   date: LocalDate;
   section: MealSection;
-  kind: 'food' | 'meal';
+  kind: 'food' | 'meal' | 'quick';
   food_id?: string;
   meal_id?: string;
   qty: number;
@@ -48,6 +48,14 @@ export async function updateDiaryEntry(
 
 export async function softDeleteDiaryEntry(id: string): Promise<void> {
   await db.diary_entries.update(id, { deleted_at: new Date().toISOString() });
+}
+
+/** Reverse a soft-delete — clears the tombstone so the entry reappears. */
+export async function restoreDiaryEntry(id: string): Promise<void> {
+  await db.diary_entries.update(id, {
+    deleted_at: undefined,
+    updated_at: new Date().toISOString(),
+  });
 }
 
 /**

@@ -10,6 +10,7 @@ interface DiaryRowProps {
 }
 
 function entryDisplayQty(entry: DiaryEntry): string {
+  if (entry.kind === 'quick') return 'Calorie entry';
   if (entry.kind === 'meal') {
     const mult = entry.portion_multiplier ?? 1;
     if (mult === 1) return '1 serving';
@@ -32,7 +33,13 @@ export function DiaryRow({ entry, primaryMacro, onClick }: DiaryRowProps) {
     return undefined;
   }, [entry.id, entry.food_id, entry.meal_id]);
 
-  const name = target?.name ?? (entry.kind === 'meal' ? 'Meal' : 'Food');
+  const name =
+    target?.name ??
+    (entry.kind === 'meal'
+      ? 'Meal'
+      : entry.kind === 'quick'
+        ? 'Quick add'
+        : 'Food');
   const macroVal =
     primaryMacro === 'protein'
       ? entry.protein
