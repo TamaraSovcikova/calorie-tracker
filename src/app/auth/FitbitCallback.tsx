@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
@@ -18,23 +18,25 @@ export function FitbitCallback() {
   );
   const [error, setError] = useState<string | null>(null);
 
+  // OAuth authorization codes are single-use and the PKCE verifier is
+  // consumed on first read. React StrictMode runs effects twice in dev,
+  // which would make the second run fail spuriously — guard with a ref so
+  // the exchange happens exactly once per mount.
+  const exchangeStarted = useRef(false);
+
   useEffect(() => {
-    let cancelled = false;
+    if (exchangeStarted.current) return;
+    exchangeStarted.current = true;
     (async () => {
       try {
         await completeFitbitAuth(params);
-        if (cancelled) return;
         setStatus('ok');
         setTimeout(() => navigate('/settings', { replace: true }), 900);
       } catch (err) {
-        if (cancelled) return;
         setStatus('error');
         setError(err instanceof Error ? err.message : 'Unknown error');
       }
     })();
-    return () => {
-      cancelled = true;
-    };
   }, [params, navigate]);
 
   return (

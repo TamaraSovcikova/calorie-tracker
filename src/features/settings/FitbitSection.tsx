@@ -7,7 +7,9 @@ import {
   beginFitbitAuth,
   disconnectFitbit,
   getFitbitClientId,
+  getGoogleClientSecret,
   setFitbitClientId,
+  setGoogleClientSecret,
 } from '@/lib/fitbit-api';
 import { useFitbitTokens } from '@/db/repos/fitbitTokens';
 import { format, formatDistanceToNow } from 'date-fns';
@@ -15,20 +17,33 @@ import { format, formatDistanceToNow } from 'date-fns';
 export function FitbitSection() {
   const tokens = useFitbitTokens(); // undefined while loading, null when none
   const [draftId, setDraftId] = useState(() => getFitbitClientId() ?? '');
+  const [draftSecret, setDraftSecret] = useState(
+    () => getGoogleClientSecret() ?? '',
+  );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Track the saved client ID separately so we can show the "saved" pill.
+  // Track the saved values separately so we can show the "saved" state.
   const [savedId, setSavedId] = useState(() => getFitbitClientId() ?? '');
-  useEffect(() => setSavedId(getFitbitClientId() ?? ''), []);
+  const [savedSecret, setSavedSecret] = useState(
+    () => getGoogleClientSecret() ?? '',
+  );
+  useEffect(() => {
+    setSavedId(getFitbitClientId() ?? '');
+    setSavedSecret(getGoogleClientSecret() ?? '');
+  }, []);
 
   const connected = tokens !== null && tokens !== undefined;
   const isLoading = tokens === undefined;
+  const credsReady = Boolean(savedId && savedSecret);
 
-  const handleSaveId = () => {
-    const next = draftId.trim();
-    setFitbitClientId(next || null);
-    setSavedId(next);
+  const handleSaveCreds = () => {
+    const id = draftId.trim();
+    const secret = draftSecret.trim();
+    setFitbitClientId(id || null);
+    setGoogleClientSecret(secret || null);
+    setSavedId(id);
+    setSavedSecret(secret);
   };
 
   const handleConnect = async () => {
@@ -56,12 +71,22 @@ export function FitbitSection() {
       title="Fitbit (via Google Health)"
       description="Auto-import daily activity calories into the diary's exercise section. Reads your Fitbit data through the new Google Health API."
     >
-      {/* Client ID input — required for OAuth to work */}
+      {/* Client ID + Secret — both required (Google web clients are
+          confidential clients; the token exchange needs the secret). */}
       <LabeledInput
         label="Google OAuth Client ID"
         placeholder="…apps.googleusercontent.com"
         value={draftId}
         onChange={(e) => setDraftId(e.target.value)}
+        autoComplete="off"
+        spellCheck={false}
+      />
+      <LabeledInput
+        label="Google OAuth Client Secret"
+        type="password"
+        placeholder={savedSecret ? '•••••••• (saved)' : 'GOCSPX-…'}
+        value={draftSecret}
+        onChange={(e) => setDraftSecret(e.target.value)}
         autoComplete="off"
         spellCheck={false}
       />
@@ -77,11 +102,17 @@ export function FitbitSection() {
         </a>
         <Button
           size="sm"
-          variant={draftId.trim() !== savedId ? 'primary' : 'secondary'}
-          onClick={handleSaveId}
-          disabled={draftId.trim() === savedId}
+          variant={
+            draftId.trim() !== savedId || draftSecret.trim() !== savedSecret
+              ? 'primary'
+              : 'secondary'
+          }
+          onClick={handleSaveCreds}
+          disabled={
+            draftId.trim() === savedId && draftSecret.trim() === savedSecret
+          }
         >
-          Save Client ID
+          Save credentials
         </Button>
       </div>
 
@@ -124,7 +155,7 @@ export function FitbitSection() {
             variant="primary"
             block
             onClick={handleConnect}
-            disabled={busy || !savedId}
+            disabled={busy || !credsReady}
           >
             {busy ? (
               <>
@@ -139,10 +170,10 @@ export function FitbitSection() {
             )}
           </Button>
         )}
-        {!savedId && (
+        {!credsReady && (
           <p className="mt-2 flex items-start gap-1.5 text-xs text-muted-foreground">
             <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-            Save your Fitbit Client ID first.
+            Save both your Client ID and Client Secret first.
           </p>
         )}
         {error && (

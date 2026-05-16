@@ -28,6 +28,7 @@ const TOKEN_URL = 'https://oauth2.googleapis.com/token';
 const API_BASE = 'https://health.googleapis.com/v4';
 
 const CLIENT_ID_LS = 'calorie-tracker:google-client-id';
+const CLIENT_SECRET_LS = 'calorie-tracker:google-client-secret';
 const LEGACY_CLIENT_ID_LS = 'calorie-tracker:fitbit-client-id'; // migrate from
 const PKCE_LS = 'calorie-tracker:fitbit-pkce';
 const REDIRECT_PATH = '/auth/fitbit/callback';
@@ -58,6 +59,29 @@ export function setFitbitClientId(id: string | null): void {
   if (typeof localStorage === 'undefined') return;
   if (!id || !id.trim()) localStorage.removeItem(CLIENT_ID_LS);
   else localStorage.setItem(CLIENT_ID_LS, id.trim());
+}
+
+/**
+ * Google "Web application" OAuth clients are confidential clients — the
+ * token endpoint requires the client secret in addition to PKCE. For a
+ * personal single-user app, keeping the secret in the browser is an
+ * acceptable trade-off (the only person who can see it is the owner; an
+ * attacker would still need her Google account to get any data). When the
+ * Cloudflare Worker is deployed this exchange could be moved server-side.
+ */
+export function getGoogleClientSecret(): string | null {
+  if (typeof localStorage === 'undefined') return null;
+  return (
+    localStorage.getItem(CLIENT_SECRET_LS) ||
+    import.meta.env.VITE_GOOGLE_CLIENT_SECRET ||
+    null
+  );
+}
+
+export function setGoogleClientSecret(secret: string | null): void {
+  if (typeof localStorage === 'undefined') return;
+  if (!secret || !secret.trim()) localStorage.removeItem(CLIENT_SECRET_LS);
+  else localStorage.setItem(CLIENT_SECRET_LS, secret.trim());
 }
 
 // ---------- PKCE helpers ----------
@@ -192,6 +216,8 @@ export async function completeFitbitAuth(searchParams: URLSearchParams): Promise
     code_verifier: pkce.verifier,
     redirect_uri: pkce.redirectUri,
   });
+  const clientSecret = getGoogleClientSecret();
+  if (clientSecret) body.set('client_secret', clientSecret);
 
   const res = await fetch(TOKEN_URL, {
     method: 'POST',
@@ -233,6 +259,9 @@ async function refreshTokens(): Promise<void> {
     refresh_token: tokens.refresh_token,
     client_id: clientId,
   });
+  const clientSecret = getGoogleClientSecret();
+  if (clientSecret) body.set('client_secret', clientSecret);
+
   const res = await fetch(TOKEN_URL, {
     method: 'POST',
     headers: { 'content-type': 'application/x-www-form-urlencoded' },
