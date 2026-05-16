@@ -17,19 +17,6 @@ export default [
       parserOptions: {
         ecmaFeatures: { jsx: true },
       },
-      globals: {
-        window: 'readonly',
-        document: 'readonly',
-        navigator: 'readonly',
-        localStorage: 'readonly',
-        sessionStorage: 'readonly',
-        fetch: 'readonly',
-        console: 'readonly',
-        setTimeout: 'readonly',
-        clearTimeout: 'readonly',
-        setInterval: 'readonly',
-        clearInterval: 'readonly',
-      },
     },
     plugins: {
       '@typescript-eslint': tseslint,
@@ -39,6 +26,14 @@ export default [
     rules: {
       ...tseslint.configs.recommended.rules,
       ...reactHooks.configs.recommended.rules,
+      // TypeScript itself resolves identifiers and ambient/lib types
+      // (DOM, WebWorker, @cloudflare/workers-types). The eslint core
+      // no-undef rule understands none of that and produces only false
+      // positives on a TS project — typescript-eslint recommends turning
+      // it off. The base no-unused-vars is likewise superseded by the
+      // typescript-eslint version below.
+      'no-undef': 'off',
+      'no-unused-vars': 'off',
       'react-refresh/only-export-components': [
         'warn',
         { allowConstantExport: true },
