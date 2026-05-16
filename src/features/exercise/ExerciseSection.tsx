@@ -65,12 +65,26 @@ export function ExerciseSection({ date }: ExerciseSectionProps) {
                       {e.duration_min} min
                     </div>
                   )}
+                  {e.needs_profile && (
+                    <div className="mt-0.5 text-xs text-amber-600 dark:text-amber-400">
+                      Add weight, height, age &amp; sex in Settings → Profile
+                      to estimate calories burned.
+                    </div>
+                  )}
                 </div>
                 <div className="shrink-0 text-right tabular-nums">
-                  <div className="text-sm font-semibold">
-                    −{formatKcal(e.kcal_burned)}
-                  </div>
-                  <div className="text-[11px] text-muted-foreground">kcal</div>
+                  {e.needs_profile ? (
+                    <div className="text-sm text-muted-foreground">—</div>
+                  ) : (
+                    <>
+                      <div className="text-sm font-semibold">
+                        −{formatKcal(e.kcal_burned)}
+                      </div>
+                      <div className="text-[11px] text-muted-foreground">
+                        kcal
+                      </div>
+                    </>
+                  )}
                 </div>
               </button>
             </li>

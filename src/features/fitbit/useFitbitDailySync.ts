@@ -44,22 +44,27 @@ async function syncFitbitForDate(
     dailyBmr,
     date,
   );
+  // null = profile incomplete, so we can't estimate activity calories.
+  const needsProfile = activity === null;
 
   const userId = currentUserId();
   const id = `fitbit:${userId}:${date}`;
   const now = new Date().toISOString();
   const existing = await db.exercise_entries.get(id);
-  const name = summary.steps
-    ? `Fitbit activity · ${summary.steps.toLocaleString()} steps`
-    : 'Fitbit activity';
+  const stepsLabel = summary.steps
+    ? ` · ${summary.steps.toLocaleString()} steps`
+    : '';
   const row: ExerciseEntry = {
     id,
     user_id: userId,
     date,
     source: 'fitbit',
-    name,
+    name: needsProfile
+      ? `Fitbit${stepsLabel}`
+      : `Fitbit activity${stepsLabel}`,
     duration_min: undefined,
-    kcal_burned: activity,
+    kcal_burned: activity ?? 0,
+    needs_profile: needsProfile || undefined,
     created_at: existing?.created_at ?? now,
     updated_at: now,
   };

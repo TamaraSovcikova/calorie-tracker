@@ -105,6 +105,7 @@ CREATE TABLE IF NOT EXISTS exercise_entries (
   name          TEXT NOT NULL,
   duration_min  REAL,
   kcal_burned   REAL NOT NULL,
+  needs_profile INTEGER,  -- 1 when a Fitbit row has no calorie estimate
   created_at    TEXT NOT NULL,
   updated_at    TEXT NOT NULL,
   deleted_at    TEXT

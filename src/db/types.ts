@@ -135,6 +135,10 @@ export interface ExerciseEntry {
   name: string;
   duration_min?: number;
   kcal_burned: number;
+  /** True for a Fitbit row whose calorie estimate is unavailable because
+   *  the profile lacks the stats needed to estimate resting burn. The UI
+   *  shows a "set up profile" hint instead of a (wrong) kcal figure. */
+  needs_profile?: boolean;
 
   created_at: ISOTimestamp;
   updated_at: ISOTimestamp;

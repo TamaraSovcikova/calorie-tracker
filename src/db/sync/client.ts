@@ -308,6 +308,7 @@ class SyncEngine {
       'eat_back_burned',
       'fitbit_connected',
       'onboarded',
+      'needs_profile',
     ]) {
       if (typeof r[k] === 'number') r[k] = r[k] === 1;
     }

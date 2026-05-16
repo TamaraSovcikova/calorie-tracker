@@ -44,16 +44,17 @@ export function elapsedDayFraction(date: LocalDate): number {
 }
 
 /**
- * Activity calories for a date. If BMR can't be estimated (incomplete
- * profile) we can't separate resting from activity — fall back to the
- * raw total so the user still sees a number, and surface a hint in the UI.
+ * Activity calories for a date, or null when BMR can't be estimated
+ * (incomplete profile). We deliberately do NOT fall back to the raw
+ * total — showing total burn (~1,600+) as "activity from 5k steps" is
+ * plainly wrong. The UI shows steps + a "set up profile" hint instead.
  */
 export function activeCaloriesForDate(
   totalBurned: number,
   dailyBmr: number | null,
   date: LocalDate,
-): number {
-  if (dailyBmr === null) return Math.round(totalBurned);
+): number | null {
+  if (dailyBmr === null) return null;
   const restingSoFar = dailyBmr * elapsedDayFraction(date);
   return Math.round(Math.max(0, totalBurned - restingSoFar));
 }

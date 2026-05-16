@@ -117,6 +117,7 @@ const COLUMNS: Record<TableName, string[]> = {
     'name',
     'duration_min',
     'kcal_burned',
+    'needs_profile',
     'created_at',
     'updated_at',
     'deleted_at',
