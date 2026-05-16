@@ -346,14 +346,27 @@ function civilDateTime(date: LocalDate, endOfDay: boolean): CivilDateTime {
   };
 }
 
-/** First finite numeric leaf inside a rollup point (skipping the dates). */
+/** Coerce a number or numeric string to a finite number, else null.
+ *  Google returns int64 fields (e.g. steps countSum) as JSON strings. */
+function coerceNumber(v: unknown): number | null {
+  if (typeof v === 'number' && Number.isFinite(v)) return v;
+  if (typeof v === 'string') {
+    const n = parseFloat(v);
+    if (Number.isFinite(n)) return n;
+  }
+  return null;
+}
+
+/** First numeric leaf inside a rollup point (skipping the date fields). */
 function extractRollupValue(point: RollupDataPoint): number {
   for (const [key, val] of Object.entries(point)) {
     if (key === 'civilStartTime' || key === 'civilEndTime') continue;
-    if (typeof val === 'number' && Number.isFinite(val)) return val;
+    const direct = coerceNumber(val);
+    if (direct !== null) return direct;
     if (val && typeof val === 'object') {
       for (const inner of Object.values(val as Record<string, unknown>)) {
-        if (typeof inner === 'number' && Number.isFinite(inner)) return inner;
+        const n = coerceNumber(inner);
+        if (n !== null) return n;
       }
     }
   }
