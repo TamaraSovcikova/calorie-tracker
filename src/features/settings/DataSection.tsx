@@ -133,7 +133,7 @@ export function DataSection() {
   return (
     <SettingCard
       title="Data"
-      description="Local-only — your data never leaves the device until cloud sync (Phase 11)."
+      description="Export or restore a full local backup. Cloud sync (above) keeps devices in step; this is for one-off backups."
     >
       <div className="grid grid-cols-2 gap-2">
         <Button

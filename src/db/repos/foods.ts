@@ -5,6 +5,9 @@ import { currentUserId } from '../userId';
 import type { CustomUnit, Food } from '../types';
 
 export interface CreateFoodInput {
+  // createFood is only used for user-entered products; 'off' is kept for
+  // the manual-entry-from-a-failed-barcode path. USDA / curated foods are
+  // bulk-written directly, not through here.
   source: 'off' | 'custom';
   off_barcode?: string;
   name: string;
@@ -78,4 +81,33 @@ export async function searchLocalFoods(query: string, limit = 20): Promise<Food[
       return a.updated_at < b.updated_at ? 1 : -1;
     })
     .slice(0, limit);
+}
+
+/**
+ * Prune cached OFF / USDA food rows that haven't been touched in a while
+ * and aren't referenced by any diary entry or saved meal. Every search
+ * caches its hits into Dexie, so without this the table (and every sync
+ * payload) grows unbounded. My Products and curated foods are never
+ * pruned. Runs once at startup.
+ */
+export async function pruneStaleSearchCache(maxAgeDays = 60): Promise<void> {
+  const cutoff = new Date(Date.now() - maxAgeDays * 86_400_000).toISOString();
+  const referenced = new Set<string>();
+  await db.diary_entries.each((e) => {
+    if (e.food_id) referenced.add(e.food_id);
+  });
+  await db.meal_items.each((it) => {
+    if (it.food_id) referenced.add(it.food_id);
+  });
+  const stale = await db.foods
+    .where('user_id')
+    .equals(currentUserId())
+    .filter(
+      (f) =>
+        (f.source === 'off' || f.source === 'usda') &&
+        f.updated_at < cutoff &&
+        !referenced.has(f.id),
+    )
+    .primaryKeys();
+  if (stale.length > 0) await db.foods.bulkDelete(stale as string[]);
 }

@@ -9,9 +9,11 @@ export function AboutSection() {
         <div className="text-muted-foreground">Version</div>
         <div className="text-right tabular-nums">{VERSION}</div>
         <div className="text-muted-foreground">Cloud sync</div>
-        <div className="text-right">Coming in Phase 11</div>
-        <div className="text-muted-foreground">Fitbit</div>
-        <div className="text-right">Coming in Phase 12</div>
+        <div className="text-right">Cloudflare Workers + D1</div>
+        <div className="text-muted-foreground">Activity</div>
+        <div className="text-right">Fitbit via Google Health</div>
+        <div className="text-muted-foreground">Food data</div>
+        <div className="text-right">Curated · USDA · OFF</div>
       </div>
       <p className="text-xs text-muted-foreground">
         Open Food Facts product database is licensed under ODbL.

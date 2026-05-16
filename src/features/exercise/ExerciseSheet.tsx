@@ -130,8 +130,8 @@ export function ExerciseSheet({ open, date, entry, onClose }: ExerciseSheetProps
             />
           </div>
           <p className="text-xs text-muted-foreground">
-            Fitbit auto-sync arrives in Phase 12 — until then enter the burn
-            yourself or paste from your watch.
+            Fitbit activity syncs automatically when connected. Use this to
+            log workouts manually, or to record a burn from another source.
           </p>
         </div>
         <div className="border-t border-border bg-card p-4">

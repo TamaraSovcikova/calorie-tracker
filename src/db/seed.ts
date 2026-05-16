@@ -11,6 +11,7 @@
 
 import { db } from './dexie';
 import { ensureProfile } from './repos/profile';
+import { pruneStaleSearchCache } from './repos/foods';
 import { currentUserId } from './userId';
 import { CURATED_FOODS, CURATED_VERSION } from './curatedFoods';
 import type { Food } from './types';
@@ -53,6 +54,8 @@ export async function ensureCuratedFoods(): Promise<void> {
 export async function ensureSeed(): Promise<void> {
   await ensureProfile();
   await ensureCuratedFoods();
+  // Background cleanup of stale OFF/USDA search cache — don't block startup.
+  void pruneStaleSearchCache().catch(() => undefined);
 
   // Dev convenience: skip onboarding so `pnpm dev` lands in the diary.
   if (!import.meta.env.DEV) return;

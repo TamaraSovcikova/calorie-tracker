@@ -119,6 +119,10 @@ export async function recentFoodsInSection(
   limit = 10,
 ): Promise<string[]> {
   const userId = currentUserId();
+  // The '0000-00-00' / '9999-99-99' bounds aren't real dates — they're
+  // lexical sentinels that bracket every YYYY-MM-DD string for this
+  // [user_id, date, section] compound index. Safe because dates are stored
+  // as fixed-width ISO strings, so a lexical compare equals a date compare.
   const rows = await db.diary_entries
     .where('[user_id+date+section]')
     .between([userId, '0000-00-00', section], [userId, '9999-99-99', section])

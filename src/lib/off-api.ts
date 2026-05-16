@@ -15,7 +15,6 @@
  * Settings (the user pastes OFF credentials).
  */
 
-import { v4 as uuid } from 'uuid';
 import type { Food } from '@/db/types';
 import { currentUserId } from '@/db/userId';
 
@@ -211,14 +210,4 @@ export async function lookupBarcode(
     return null;
   }
   return food;
-}
-
-/** Used by features/food-search/useFoodSearch to assign deterministic ids. */
-export function offIdFromBarcode(code: string): string {
-  return `off:${code}`;
-}
-
-/** Generate a sync-ready id for new locally-created foods. */
-export function newLocalFoodId(): string {
-  return uuid();
 }
