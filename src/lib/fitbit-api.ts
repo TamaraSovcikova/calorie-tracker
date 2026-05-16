@@ -83,15 +83,43 @@ interface PkceState {
   verifier: string;
   state: string;
   redirectUri: string;
+  createdAt: number;
 }
+
+const PKCE_TTL_MS = 10 * 60 * 1000;
 
 function getRedirectUri(): string {
   return `${window.location.origin}${REDIRECT_PATH}`;
 }
 
+function storePkce(state: PkceState): void {
+  // localStorage rather than sessionStorage — Chrome's tightened cross-site
+  // storage rules can wipe sessionStorage across an OAuth redirect chain.
+  // localStorage survives, and we mitigate replay risk with the createdAt
+  // TTL check below.
+  localStorage.setItem(PKCE_LS, JSON.stringify(state));
+}
+
+function readPkce(): PkceState | null {
+  const raw = localStorage.getItem(PKCE_LS);
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw) as PkceState;
+    if (typeof parsed.createdAt !== 'number') return null;
+    if (Date.now() - parsed.createdAt > PKCE_TTL_MS) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function clearPkce(): void {
+  localStorage.removeItem(PKCE_LS);
+}
+
 /**
  * Build the Google authorize URL and stash the verifier + state in
- * sessionStorage for the callback to pick up.
+ * localStorage for the callback to pick up.
  *
  * `access_type=offline` + `prompt=consent` are critical — without them
  * Google won'\''t issue a refresh_token at all, and we'\''d be locked into
@@ -107,10 +135,7 @@ export async function beginFitbitAuth(): Promise<string> {
 
   const challenge = base64UrlEncode(await sha256(verifier));
 
-  sessionStorage.setItem(
-    PKCE_LS,
-    JSON.stringify({ verifier, state, redirectUri } satisfies PkceState),
-  );
+  storePkce({ verifier, state, redirectUri, createdAt: Date.now() });
 
   const params = new URLSearchParams({
     response_type: 'code',
@@ -145,10 +170,9 @@ export async function completeFitbitAuth(searchParams: URLSearchParams): Promise
   }
   if (!code || !state) throw new Error('Missing code or state in callback URL');
 
-  const raw = sessionStorage.getItem(PKCE_LS);
-  if (!raw) throw new Error('PKCE verifier missing — start the flow again');
-  const pkce = JSON.parse(raw) as PkceState;
-  sessionStorage.removeItem(PKCE_LS);
+  const pkce = readPkce();
+  if (!pkce) throw new Error('PKCE verifier missing or expired — start the flow again');
+  clearPkce();
 
   if (state !== pkce.state) throw new Error('OAuth state mismatch — possible CSRF');
 
