@@ -14,7 +14,7 @@ export type ISOTimestamp = string;
 export type MealSection = 'breakfast' | 'lunch' | 'dinner' | 'snacks';
 export const MEAL_SECTIONS: MealSection[] = ['breakfast', 'lunch', 'dinner', 'snacks'];
 
-export type FoodSource = 'off' | 'custom' | 'usda';
+export type FoodSource = 'off' | 'custom' | 'usda' | 'curated';
 
 /**
  * For 'usda' rows, the more specific dataType from FoodData Central.

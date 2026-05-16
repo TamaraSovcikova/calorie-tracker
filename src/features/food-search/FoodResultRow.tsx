@@ -10,10 +10,13 @@ interface FoodResultRowProps {
 
 interface Pill {
   label: string;
-  variant: 'usda' | 'usda-branded' | 'off' | 'custom';
+  variant: 'usda' | 'usda-branded' | 'off' | 'custom' | 'curated';
 }
 
 function pillFor(food: Food): Pill | null {
+  if (food.source === 'curated') {
+    return { label: 'Common', variant: 'curated' };
+  }
   if (food.source === 'custom') {
     return { label: 'Mine', variant: 'custom' };
   }
@@ -30,6 +33,7 @@ function pillFor(food: Food): Pill | null {
 }
 
 const PILL_CLASSES: Record<Pill['variant'], string> = {
+  curated: 'bg-primary/15 text-primary',
   usda: 'bg-primary/10 text-primary',
   'usda-branded': 'bg-muted text-muted-foreground',
   off: 'bg-muted text-muted-foreground',

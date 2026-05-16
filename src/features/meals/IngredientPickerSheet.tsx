@@ -3,10 +3,7 @@ import { Sheet } from '@/components/ui/Sheet';
 import { FoodSearchPanel } from '@/features/food-search/FoodSearchPanel';
 import { QuantityStep } from '@/features/food-search/QuantityStep';
 import { ManualEntryForm } from '@/features/food-search/ManualEntryForm';
-import { Loader2 } from 'lucide-react';
 import { computeMacros, type QuantityState } from '@/features/food-search/foodMath';
-import { enrichUsdaFoodWithPortions } from '@/lib/usda-api';
-import { db } from '@/db/dexie';
 import type { Food } from '@/db/types';
 import type { MealItemInput } from '@/db/repos/meals';
 
@@ -19,7 +16,6 @@ interface IngredientPickerSheetProps {
 
 type Step =
   | { kind: 'pick' }
-  | { kind: 'loading-food' }
   | { kind: 'quantity'; food: Food }
   | { kind: 'manual'; presetName?: string };
 
@@ -36,16 +32,7 @@ export function IngredientPickerSheet({
     reset();
   };
 
-  const handlePick = async (food: Food) => {
-    if (food.source === 'usda' && food.custom_units.length === 0) {
-      setStep({ kind: 'loading-food' });
-      const enriched = await enrichUsdaFoodWithPortions(food);
-      await db.foods.put(enriched).catch(() => undefined);
-      setStep({ kind: 'quantity', food: enriched });
-      return;
-    }
-    setStep({ kind: 'quantity', food });
-  };
+  const handlePick = (food: Food) => setStep({ kind: 'quantity', food });
   const handleManualEntry = (name: string) =>
     setStep({ kind: 'manual', presetName: name || undefined });
   const handleManualCreated = (food: Food) =>
@@ -72,16 +59,6 @@ export function IngredientPickerSheet({
         onPick={handlePick}
         onManualEntry={handleManualEntry}
       />
-    );
-  } else if (step.kind === 'loading-food') {
-    title = 'Loading…';
-    content = (
-      <div className="flex flex-1 flex-col items-center justify-center gap-3 p-12 text-center">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-        <div className="text-sm text-muted-foreground">
-          Fetching portion sizes…
-        </div>
-      </div>
     );
   } else if (step.kind === 'quantity') {
     title = step.food.name;

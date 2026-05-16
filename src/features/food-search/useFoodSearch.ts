@@ -71,8 +71,9 @@ function scoreFoodMatch(food: Food, q: string): number {
     else if (words.some((w) => w.startsWith(q))) score += 200;
     else if (name.includes(q)) score += 80;
   }
-  if (food.source === 'custom') score += 300;
-  if (food.usda_data_type === 'foundation') score += 250;
+  if (food.source === 'curated') score += 450;
+  else if (food.source === 'custom') score += 300;
+  else if (food.usda_data_type === 'foundation') score += 250;
   else if (food.usda_data_type === 'sr_legacy') score += 200;
   else if (food.usda_data_type === 'survey') score += 40;
   return score;
@@ -206,8 +207,10 @@ export function useFoodSearch(
 
     const myProducts = local.filter((f) => f.source === 'custom');
 
-    // Common foods = USDA Foundation/SR/Survey (live) + cached USDA non-branded
-    // matches we already had locally.
+    // Common foods = bundled curated staples + USDA Foundation/SR/Survey
+    // (live) + cached USDA non-branded matches. The relevance sort below
+    // floats curated foods to the top of this group.
+    const curated = local.filter((f) => f.source === 'curated');
     const cachedUsdaCommon = local.filter(
       (f) =>
         f.source === 'usda' &&
@@ -215,7 +218,7 @@ export function useFoodSearch(
         !usdaIds.has(f.id),
     );
     const liveUsdaCommon = usda.filter((f) => f.usda_data_type !== 'branded');
-    const common = [...liveUsdaCommon, ...cachedUsdaCommon];
+    const common = [...curated, ...liveUsdaCommon, ...cachedUsdaCommon];
 
     // Packaged = USDA Branded + OFF (live and cached), de-duped.
     const cachedPackaged = local.filter(
