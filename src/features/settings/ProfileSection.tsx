@@ -154,8 +154,12 @@ export function ProfileSection({ profile }: ProfileSectionProps) {
           <Select
             value={form.sex}
             onChange={(e) => {
-              update('sex', e.target.value);
-              setTimeout(commit, 0);
+              const v = e.target.value as Sex | '';
+              update('sex', v);
+              // Persist the new value directly — going via `commit` would
+              // read stale form state (the update above has not applied yet)
+              // and write the previous value back.
+              void updateProfile({ sex: (v || undefined) as Sex | undefined });
             }}
           >
             <option value="">—</option>
@@ -202,8 +206,11 @@ export function ProfileSection({ profile }: ProfileSectionProps) {
         <Select
           value={form.activity}
           onChange={(e) => {
-            update('activity', e.target.value);
-            setTimeout(commit, 0);
+            const v = e.target.value as ActivityLevel | '';
+            update('activity', v);
+            void updateProfile({
+              activity_level: (v || undefined) as ActivityLevel | undefined,
+            });
           }}
         >
           <option value="">—</option>
