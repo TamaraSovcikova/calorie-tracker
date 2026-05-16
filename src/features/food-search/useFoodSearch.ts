@@ -50,6 +50,34 @@ export interface FoodSearchResult {
 
 const DEBOUNCE_MS = 350;
 
+/**
+ * Relevance score for ranking search results. Higher = shown first.
+ *
+ * Two main levers:
+ *  - how well the name matches the query (exact > prefix > word > contains)
+ *  - dataset quality: USDA Foundation / SR Legacy are clean generic foods
+ *    ("Egg, whole"), Survey FNDDS includes composite dishes ("Egg
+ *    Benedict", "Bagels, egg") which should rank below the generics.
+ */
+function scoreFoodMatch(food: Food, q: string): number {
+  if (!q) return 0;
+  const name = food.name.toLowerCase();
+  let score = 0;
+  if (name === q) score += 1000;
+  else if (name.startsWith(q)) score += 500;
+  else {
+    const words = name.split(/[^a-z0-9]+/).filter(Boolean);
+    if (words.includes(q)) score += 400;
+    else if (words.some((w) => w.startsWith(q))) score += 200;
+    else if (name.includes(q)) score += 80;
+  }
+  if (food.source === 'custom') score += 300;
+  if (food.usda_data_type === 'foundation') score += 250;
+  else if (food.usda_data_type === 'sr_legacy') score += 200;
+  else if (food.usda_data_type === 'survey') score += 40;
+  return score;
+}
+
 export function useFoodSearch(
   query: string,
   section?: MealSection,
@@ -169,8 +197,9 @@ export function useFoodSearch(
     };
   }, [debouncedQuery, showPackaged]);
 
-  // ---------- Group + dedupe ----------
+  // ---------- Group + dedupe + rank ----------
   const grouped = useMemo(() => {
+    const q = debouncedQuery.toLowerCase().trim();
     const localIds = new Set(local.map((f) => f.id));
     const usdaIds = new Set(usda.map((f) => f.id));
     const offIds = new Set(off.map((f) => f.id));
@@ -203,13 +232,15 @@ export function useFoodSearch(
 
     // Strip myProducts from common/packaged to avoid double-listing.
     const myIds = new Set(myProducts.map((f) => f.id));
+    const byRelevance = (a: Food, b: Food) =>
+      scoreFoodMatch(b, q) - scoreFoodMatch(a, q);
     return {
       myProducts,
-      common: common.filter((f) => !myIds.has(f.id)),
-      packaged: packaged.filter((f) => !myIds.has(f.id)),
+      common: common.filter((f) => !myIds.has(f.id)).sort(byRelevance),
+      packaged: packaged.filter((f) => !myIds.has(f.id)).sort(byRelevance),
       _localIds: localIds,
     };
-  }, [local, usda, off, showPackaged]);
+  }, [local, usda, off, showPackaged, debouncedQuery]);
 
   return useMemo(
     () => ({

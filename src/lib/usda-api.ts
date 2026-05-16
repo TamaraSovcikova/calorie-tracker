@@ -155,6 +155,15 @@ function dataTypeKey(rawDataType: string | undefined): UsdaDataType {
   }
 }
 
+/**
+ * Map USDA foodPortions to our CustomUnit[] (label + grams-per-1-unit).
+ *
+ * USDA portions look like { amount: 1, modifier: "large", gramWeight: 50 }
+ * or { amount: 2, measureUnit: {name:"slice"}, gramWeight: 56 }. gramWeight
+ * is the weight of the WHOLE portion (amount x unit), so per-unit grams =
+ * gramWeight / amount. The label is the human unit name ("large", "slice",
+ * "cup, chopped"), stripped of any leading count.
+ */
 function portionsToCustomUnits(portions: UsdaPortion[] | undefined): CustomUnit[] {
   if (!portions || portions.length === 0) return [];
   const out: CustomUnit[] = [];
@@ -162,23 +171,27 @@ function portionsToCustomUnits(portions: UsdaPortion[] | undefined): CustomUnit[
   for (const p of portions) {
     const grams = p.gramWeight;
     if (typeof grams !== 'number' || grams <= 0) continue;
-    let label = (p.portionDescription || p.modifier || '').trim();
-    if (!label && p.measureUnit?.name) {
-      const amount = p.amount ?? 1;
-      label = `${amount} ${p.measureUnit.name}`;
-    }
-    if (!label) continue;
-    // Common cleanup: drop redundant prefixes
-    label = label.replace(/^\d+\s*[a-zA-Z]*\s+/, (m) =>
-      // keep if it's a meaningful descriptor like "1 cup", drop bare "1 "
-      /^\d+\s+(cup|tbsp|tsp|oz|ml|g|piece|slice|medium|large|small)/i.test(m) ? m : '',
-    );
-    label = label.slice(0, 60);
+    const amount = p.amount && p.amount > 0 ? p.amount : 1;
+
+    let label = (
+      p.modifier ||
+      p.portionDescription ||
+      p.measureUnit?.name ||
+      ''
+    ).trim();
+    // Drop a leading count ("1 cup" -> "cup", "2 slices" -> "slices") and
+    // the literal placeholder USDA sometimes uses.
+    label = label.replace(/^\d+(\.\d+)?\s*/, '').trim();
+    if (!label || label.toLowerCase() === 'undetermined') continue;
+    if (label.length > 40) label = label.slice(0, 40);
+
+    const gramsPerUnit = Math.round((grams / amount) * 10) / 10;
+    if (gramsPerUnit <= 0) continue;
     const key = label.toLowerCase();
     if (seen.has(key)) continue;
     seen.add(key);
-    out.push({ label, grams: Math.round(grams * 10) / 10 });
-    if (out.length >= 8) break;
+    out.push({ label, grams: gramsPerUnit });
+    if (out.length >= 12) break;
   }
   return out;
 }
@@ -303,6 +316,51 @@ export async function probeUsdaKey(apiKey: string): Promise<boolean> {
 /** Stable id helper, matches off-api's pattern. */
 export function usdaIdFromFdcId(fdcId: number | string): string {
   return `usda:${fdcId}`;
+}
+
+interface UsdaFoodDetail {
+  fdcId?: number;
+  foodPortions?: UsdaPortion[];
+}
+
+/**
+ * USDA's /foods/search results do NOT include foodPortions — only the
+ * per-food detail endpoint does. This fetches the detail for one food and
+ * returns its portions ("1 large", "1 slice", "1 cup", ...) as CustomUnits.
+ *
+ * Called lazily when the user actually picks a USDA food, so search stays
+ * one request and we only pay the detail call for foods being logged.
+ */
+export async function fetchUsdaFoodPortions(
+  fdcId: string,
+  apiKey: string,
+): Promise<CustomUnit[]> {
+  if (!fdcId || !apiKey) return [];
+  const params = new URLSearchParams({ api_key: apiKey, format: 'full' });
+  const res = await fetch(`${BASE}/food/${encodeURIComponent(fdcId)}?${params}`);
+  if (!res.ok) return [];
+  const data = (await res.json()) as UsdaFoodDetail;
+  return portionsToCustomUnits(data.foodPortions);
+}
+
+/**
+ * Enrich a USDA-sourced Food with its natural portion units. No-op for
+ * non-USDA foods or foods that already have units. Returns the same object
+ * when nothing changed, or a new object with custom_units populated.
+ */
+export async function enrichUsdaFoodWithPortions(food: Food): Promise<Food> {
+  if (food.source !== 'usda') return food;
+  if (food.custom_units.length > 0) return food;
+  const apiKey = getUsdaApiKey();
+  if (!apiKey) return food;
+  const fdcId = food.id.replace(/^usda:/, '');
+  try {
+    const units = await fetchUsdaFoodPortions(fdcId, apiKey);
+    if (units.length === 0) return food;
+    return { ...food, custom_units: units, updated_at: new Date().toISOString() };
+  } catch {
+    return food;
+  }
 }
 
 /** uuid re-export so call sites importing one symbol are tidy. */

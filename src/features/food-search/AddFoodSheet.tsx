@@ -14,6 +14,7 @@ import { computeMacros, type QuantityState } from './foodMath';
 import { createDiaryEntry } from '@/db/repos/diary';
 import { db } from '@/db/dexie';
 import { lookupBarcode, OffRateLimitError } from '@/lib/off-api';
+import { enrichUsdaFoodWithPortions } from '@/lib/usda-api';
 import { MealPicker } from '@/features/meals/MealPicker';
 import { LogMealStep } from '@/features/meals/LogMealStep';
 import { multiplyTotals } from '@/features/meals/mealMath';
@@ -31,6 +32,7 @@ interface AddFoodSheetProps {
 type Step =
   | { kind: 'pick' }
   | { kind: 'looking-up'; barcode: string }
+  | { kind: 'loading-food' }
   | { kind: 'quantity'; food: Food }
   | { kind: 'meal-portion'; meal: Meal }
   | { kind: 'manual'; presetName?: string; presetBarcode?: string };
@@ -53,7 +55,19 @@ export function AddFoodSheet({ open, onClose, date, section }: AddFoodSheetProps
     reset();
   };
 
-  const handlePick = (food: Food) => setStep({ kind: 'quantity', food });
+  const handlePick = async (food: Food) => {
+    // USDA search results arrive without portion units — fetch them from
+    // the detail endpoint so the quantity step can offer "1 large",
+    // "1 slice", etc. Non-USDA foods (or already-enriched ones) skip this.
+    if (food.source === 'usda' && food.custom_units.length === 0) {
+      setStep({ kind: 'loading-food' });
+      const enriched = await enrichUsdaFoodWithPortions(food);
+      await db.foods.put(enriched).catch(() => undefined);
+      setStep({ kind: 'quantity', food: enriched });
+      return;
+    }
+    setStep({ kind: 'quantity', food });
+  };
   const handleManualEntry = (name: string) =>
     setStep({ kind: 'manual', presetName: name || undefined });
   const handleManualCreated = (food: Food) =>
@@ -159,6 +173,16 @@ export function AddFoodSheet({ open, onClose, date, section }: AddFoodSheetProps
         <div className="text-sm">
           Searching Open Food Facts for{' '}
           <span className="font-mono">{step.barcode}</span>
+        </div>
+      </div>
+    );
+  } else if (step.kind === 'loading-food') {
+    title = 'Loading…';
+    content = (
+      <div className="flex flex-1 flex-col items-center justify-center gap-3 p-12 text-center">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        <div className="text-sm text-muted-foreground">
+          Fetching portion sizes…
         </div>
       </div>
     );
