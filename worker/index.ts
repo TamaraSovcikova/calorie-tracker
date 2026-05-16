@@ -61,6 +61,38 @@ export default {
       return new Response(null, { status: 204, headers: CORS_HEADERS });
     }
 
+    // Google Health API proxy. health.googleapis.com sends no CORS
+    // headers so the browser can't call it directly — forward the
+    // request server-side, passing the user's Google bearer token
+    // through unchanged. The Google token is the only auth needed; this
+    // proxy only ever targets one fixed host.
+    if (url.pathname.startsWith('/gh-api/')) {
+      const target =
+        'https://health.googleapis.com' +
+        url.pathname.replace(/^\/gh-api/, '') +
+        url.search;
+      // Forward only the headers Google needs — copying Host would point
+      // the upstream request back at the worker.
+      const fwdHeaders = new Headers();
+      const auth = req.headers.get('authorization');
+      if (auth) fwdHeaders.set('authorization', auth);
+      const ct = req.headers.get('content-type');
+      if (ct) fwdHeaders.set('content-type', ct);
+      const isBodyless = req.method === 'GET' || req.method === 'HEAD';
+      const resp = await fetch(target, {
+        method: req.method,
+        headers: fwdHeaders,
+        body: isBodyless ? undefined : await req.arrayBuffer(),
+      });
+      const headers = new Headers(resp.headers);
+      headers.set('Access-Control-Allow-Origin', '*');
+      return new Response(resp.body, {
+        status: resp.status,
+        statusText: resp.statusText,
+        headers,
+      });
+    }
+
     if (url.pathname.startsWith('/api/')) {
       // /api/health — unauthenticated, lets the client probe reachability.
       if (url.pathname === '/api/health' && req.method === 'GET') {

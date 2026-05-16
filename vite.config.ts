@@ -72,5 +72,17 @@ export default defineConfig({
       '.workers.dev',
       '.pages.dev',
     ],
+    proxy: {
+      // Google Health API (health.googleapis.com) doesn't send CORS
+      // headers, so the browser can't call it directly. In dev the Vite
+      // server proxies /gh-api/* to it; in production the Cloudflare
+      // Worker does the same. The client always uses the relative
+      // /gh-api path so the code is environment-agnostic.
+      '/gh-api': {
+        target: 'https://health.googleapis.com',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/gh-api/, ''),
+      },
+    },
   },
 });

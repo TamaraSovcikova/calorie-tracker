@@ -25,7 +25,9 @@ import type { LocalDate } from '@/lib/dates';
 
 const AUTH_BASE = 'https://accounts.google.com/o/oauth2/v2/auth';
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
-const API_BASE = 'https://health.googleapis.com/v4';
+// Relative path — health.googleapis.com has no CORS, so we go through a
+// same-origin proxy (Vite dev server in dev, Cloudflare Worker in prod).
+const API_BASE = '/gh-api/v4';
 
 const CLIENT_ID_LS = 'calorie-tracker:google-client-id';
 const CLIENT_SECRET_LS = 'calorie-tracker:google-client-secret';
