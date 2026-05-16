@@ -6,6 +6,7 @@ import { SettingCard } from './SettingCard';
 import {
   beginFitbitAuth,
   disconnectFitbit,
+  getConnectedAccountEmail,
   getFitbitClientId,
   getGoogleClientSecret,
   setFitbitClientId,
@@ -127,6 +128,22 @@ export function FitbitSection() {
             <div className="flex items-center gap-2 text-sm">
               <Watch className="h-4 w-4 text-primary" />
               <span className="font-medium">Connected</span>
+            </div>
+            {(() => {
+              const email = getConnectedAccountEmail() ?? tokens?.fitbit_user_id;
+              return email ? (
+                <div className="rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs">
+                  <span className="text-muted-foreground">Google account: </span>
+                  <span className="font-medium">{email}</span>
+                </div>
+              ) : (
+                <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+                  Account unknown — reconnect to record which Google account
+                  is linked (we added the email scope).
+                </div>
+              );
+            })()}
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
               {isExpired ? (
                 <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-700 dark:text-amber-300">
                   Token expired — will refresh on next fetch

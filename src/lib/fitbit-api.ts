@@ -36,8 +36,34 @@ const PKCE_LS = 'calorie-tracker:fitbit-pkce';
 const REDIRECT_PATH = '/auth/fitbit/callback';
 
 const SCOPES = [
+  'openid',
+  'email',
   'https://www.googleapis.com/auth/googlehealth.activity_and_fitness.readonly',
 ].join(' ');
+
+const ACCOUNT_EMAIL_LS = 'calorie-tracker:google-account-email';
+
+/** The email of the Google account currently connected, if known. */
+export function getConnectedAccountEmail(): string | null {
+  if (typeof localStorage === 'undefined') return null;
+  return localStorage.getItem(ACCOUNT_EMAIL_LS);
+}
+
+/** Decode the email claim out of an OpenID id_token JWT (no verification —
+ *  we trust it because it came straight from Google's token endpoint over
+ *  TLS in response to our own PKCE exchange). */
+function emailFromIdToken(idToken: string | undefined): string | null {
+  if (!idToken) return null;
+  try {
+    const payload = idToken.split('.')[1];
+    if (!payload) return null;
+    const json = atob(payload.replace(/-/g, '+').replace(/_/g, '/'));
+    const claims = JSON.parse(json) as { email?: string };
+    return claims.email ?? null;
+  } catch {
+    return null;
+  }
+}
 
 // ---------- Client ID storage ----------
 
@@ -239,12 +265,15 @@ export async function completeFitbitAuth(searchParams: URLSearchParams): Promise
       'Google did not return a refresh token. Revoke the app at https://myaccount.google.com/permissions and try again.',
     );
   }
+  const email = emailFromIdToken(data.id_token);
+  if (email) localStorage.setItem(ACCOUNT_EMAIL_LS, email);
+
   await putFitbitTokens({
     access_token: data.access_token,
     refresh_token: data.refresh_token,
     expires_at: new Date(Date.now() + data.expires_in * 1000).toISOString(),
     scope: data.scope,
-    fitbit_user_id: undefined,
+    fitbit_user_id: email ?? undefined,
   });
 }
 
@@ -424,6 +453,9 @@ export async function getDailySummary(date: LocalDate): Promise<FitbitDailySumma
 }
 
 export async function disconnectFitbit(): Promise<void> {
+  if (typeof localStorage !== 'undefined') {
+    localStorage.removeItem(ACCOUNT_EMAIL_LS);
+  }
   await deleteFitbitTokens();
 }
 
