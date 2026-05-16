@@ -16,7 +16,9 @@ function buildDefaultProfile(userId: string): Profile {
     carbs_g: 220,
     fat_g: 65,
     primary_macro: 'protein',
-    eat_back_burned: true,
+    // Off by default: the Fitbit/exercise row shows activity calories but
+    // doesn't inflate the target. The user can opt in under Goals.
+    eat_back_burned: false,
     units: 'metric',
     theme: 'system',
     plan: 'free',

@@ -1,46 +1,65 @@
 /**
- * Pulls Fitbit's daily activity summary for the diary's current date and
- * upserts a single "Fitbit · Activity" row in the exercise_entries table.
+ * Pulls Fitbit's daily activity from Google Health for the diary's current
+ * date and upserts a single "Fitbit activity" row in exercise_entries.
+ *
+ * The stored kcal is ACTIVITY calories — Google's total daily burn minus
+ * the estimated resting burn (BMR) — so the number reflects movement, not
+ * metabolism. See features/fitbit/activityCalories.
  *
  * Behaviour:
- *   - Runs once when the date or token changes.
- *   - Cached for 5 minutes per date (avoids hammering the API as the user
- *     navigates).
- *   - Stable id `fitbit:{user_id}:{date}` so repeat upserts always merge
- *     into the same row.
- *   - When Fitbit reports 0 activity calories we still write a 0-row so
- *     the diary's burned-cal calculation reflects reality on rest days.
+ *   - Runs when the date, tokens, or profile change.
+ *   - 5-minute per-date cache to avoid hammering the API while navigating.
+ *   - Stable id `fitbit:{user_id}:{date}` so repeat upserts merge.
+ *   - Writes a row even at 0 kcal so the diary reflects rest days.
  */
 
 import { useEffect } from 'react';
 import { db } from '@/db/dexie';
 import { currentUserId } from '@/db/userId';
 import { useFitbitTokens } from '@/db/repos/fitbitTokens';
+import { useProfile } from '@/db/repos/profile';
 import { getDailySummary } from '@/lib/fitbit-api';
+import {
+  activeCaloriesForDate,
+  profileDailyBmr,
+} from './activityCalories';
 import type { LocalDate } from '@/lib/dates';
-import type { ExerciseEntry } from '@/db/types';
+import type { ExerciseEntry, Profile } from '@/db/types';
 
 const CACHE_MS = 5 * 60 * 1000;
-const lastFetched = new Map<string, number>(); // key: `${userId}:${date}`
+const lastFetched = new Map<string, number>();
 
 function cacheKey(date: LocalDate): string {
   return `${currentUserId()}:${date}`;
 }
 
-async function syncFitbitForDate(date: LocalDate): Promise<void> {
+async function syncFitbitForDate(
+  date: LocalDate,
+  profile: Profile | undefined,
+): Promise<void> {
   const summary = await getDailySummary(date);
+  const dailyBmr = profileDailyBmr(profile);
+  const activity = activeCaloriesForDate(
+    summary.totalCaloriesBurned,
+    dailyBmr,
+    date,
+  );
+
   const userId = currentUserId();
   const id = `fitbit:${userId}:${date}`;
   const now = new Date().toISOString();
   const existing = await db.exercise_entries.get(id);
+  const name = summary.steps
+    ? `Fitbit activity · ${summary.steps.toLocaleString()} steps`
+    : 'Fitbit activity';
   const row: ExerciseEntry = {
     id,
     user_id: userId,
     date,
     source: 'fitbit',
-    name: 'Fitbit activity',
+    name,
     duration_min: undefined,
-    kcal_burned: Math.round(summary.activityCalories),
+    kcal_burned: activity,
     created_at: existing?.created_at ?? now,
     updated_at: now,
   };
@@ -49,6 +68,7 @@ async function syncFitbitForDate(date: LocalDate): Promise<void> {
 
 export function useFitbitDailySync(date: LocalDate): void {
   const tokens = useFitbitTokens();
+  const profile = useProfile();
   const connected = !!tokens;
 
   useEffect(() => {
@@ -60,10 +80,10 @@ export function useFitbitDailySync(date: LocalDate): void {
     let cancelled = false;
     (async () => {
       try {
-        await syncFitbitForDate(date);
+        await syncFitbitForDate(date, profile);
         if (!cancelled) lastFetched.set(key, Date.now());
       } catch (err) {
-        // Don't bubble — the diary still works without Fitbit. Console only.
+        // Diary works fine without Fitbit — console-warn only.
         console.warn('Fitbit sync failed for', date, err);
       }
     })();
@@ -71,5 +91,7 @@ export function useFitbitDailySync(date: LocalDate): void {
     return () => {
       cancelled = true;
     };
-  }, [date, connected]);
+    // profile is intentionally in deps so a later profile edit (which
+    // changes the BMR estimate) re-runs the activity calculation.
+  }, [date, connected, profile]);
 }

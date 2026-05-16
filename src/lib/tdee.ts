@@ -28,15 +28,18 @@ export const ACTIVITY_LABELS: Record<ActivityLevel, string> = {
   very_active: 'Very active (physical job / 2x daily)',
 };
 
-export interface TdeeInput {
+export interface BmrInput {
   sex: Sex;
   ageYears: number;
   weightKg: number;
   heightCm: number;
+}
+
+export interface TdeeInput extends BmrInput {
   activity: ActivityLevel;
 }
 
-export function bmr({ sex, ageYears, weightKg, heightCm }: TdeeInput): number {
+export function bmr({ sex, ageYears, weightKg, heightCm }: BmrInput): number {
   const base = 10 * weightKg + 6.25 * heightCm - 5 * ageYears;
   return sex === 'male' ? base + 5 : base - 161;
 }

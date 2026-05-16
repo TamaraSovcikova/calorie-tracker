@@ -310,9 +310,10 @@ async function ensureValidAccessToken(): Promise<string> {
 
 export interface FitbitDailySummary {
   date: LocalDate;
-  caloriesOut: number;
-  caloriesBMR: number;
-  activityCalories: number;
+  /** Raw total from Google Health = resting (BMR) + all activity. The
+   *  diary converts this to activity-only via features/fitbit/
+   *  activityCalories before storing. */
+  totalCaloriesBurned: number;
   steps?: number;
 }
 
@@ -440,9 +441,7 @@ export async function getDailySummary(
     }));
     return {
       date,
-      caloriesOut: Math.round(calories.value),
-      caloriesBMR: 0,
-      activityCalories: Math.round(calories.value),
+      totalCaloriesBurned: Math.round(calories.value),
       steps: steps.value > 0 ? Math.round(steps.value) : undefined,
     };
   };
