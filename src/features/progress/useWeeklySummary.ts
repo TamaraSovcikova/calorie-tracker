@@ -19,10 +19,13 @@ export interface WeeklySummary {
   daysHitTarget: number; // count of days within ±10% of kcal target
 }
 
-export function useWeeklySummary(kcalTarget: number): WeeklySummary | undefined {
+export function useWeeklySummary(
+  kcalTarget: number,
+  rangeDays = 7,
+): WeeklySummary | undefined {
   return useLiveQuery(async () => {
     const today = todayLocal();
-    const startDate = shiftDate(today, -6);
+    const startDate = shiftDate(today, -(rangeDays - 1));
     const userId = currentUserId();
     const rows = await db.diary_entries
       .where('[user_id+date]')
@@ -31,8 +34,8 @@ export function useWeeklySummary(kcalTarget: number): WeeklySummary | undefined 
       .toArray();
 
     const byDate = new Map<LocalDate, DailySummary>();
-    for (let i = 0; i < 7; i++) {
-      const d = shiftDate(today, -6 + i);
+    for (let i = 0; i < rangeDays; i++) {
+      const d = shiftDate(today, -(rangeDays - 1) + i);
       byDate.set(d, {
         date: d,
         kcal: 0,
@@ -69,5 +72,5 @@ export function useWeeklySummary(kcalTarget: number): WeeklySummary | undefined 
         : 0;
 
     return { days, avgKcal, avgProtein, daysHitTarget };
-  }, [kcalTarget]);
+  }, [kcalTarget, rangeDays]);
 }

@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS profiles (
   carbs_g           REAL    NOT NULL,
   fat_g             REAL    NOT NULL,
   primary_macro     TEXT    NOT NULL,
+  goal_weight_kg    REAL,
   eat_back_burned   INTEGER NOT NULL,
   units             TEXT    NOT NULL,
   theme             TEXT    NOT NULL,

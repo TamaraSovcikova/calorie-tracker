@@ -33,3 +33,31 @@ export function computeStreak(loggedDates: LocalDate[]): number {
   }
   return count;
 }
+
+export interface StreakStats {
+  /** Consecutive logged days ending today/yesterday. */
+  current: number;
+  /** Longest consecutive run ever. */
+  longest: number;
+  /** Total distinct days with at least one entry. */
+  totalDays: number;
+}
+
+/** Current streak plus longest-ever run and total days logged. */
+export function computeStreakStats(loggedDates: LocalDate[]): StreakStats {
+  const today = todayLocal();
+  const unique = [...new Set(loggedDates)].filter((d) => d <= today).sort();
+  let longest = 0;
+  let run = 0;
+  let prev: LocalDate | null = null;
+  for (const d of unique) {
+    run = prev !== null && shiftDate(prev, 1) === d ? run + 1 : 1;
+    if (run > longest) longest = run;
+    prev = d;
+  }
+  return {
+    current: computeStreak(loggedDates),
+    longest,
+    totalDays: unique.length,
+  };
+}

@@ -61,6 +61,7 @@ const COLUMNS: Record<TableName, string[]> = {
     'carbs_g',
     'fat_g',
     'primary_macro',
+    'goal_weight_kg',
     'eat_back_burned',
     'units',
     'theme',

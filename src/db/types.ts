@@ -52,6 +52,8 @@ export interface Profile {
   carbs_g: number;
   fat_g: number;
   primary_macro: 'protein' | 'carbs' | 'fat';
+  /** Optional target weight, used for the projection on the weight chart. */
+  goal_weight_kg?: number;
 
   eat_back_burned: boolean;
   units: UnitSystem;

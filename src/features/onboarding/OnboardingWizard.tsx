@@ -163,9 +163,7 @@ function OnboardingWizard({ profile }: { profile: Profile }) {
             draft={draft}
             update={update}
             tdeePreview={tdeePreview}
-            applyTdee={() =>
-              tdeePreview && update('kcal_target', String(tdeePreview))
-            }
+            onPickKcal={(kcal) => update('kcal_target', String(kcal))}
             onNext={goNext}
             onBack={goBack}
           />
@@ -285,18 +283,24 @@ function GoalsStep({
   );
 }
 
+const GOAL_OPTIONS = [
+  { key: 'lose', label: 'Lose', delta: -500, sub: '−500 deficit' },
+  { key: 'maintain', label: 'Maintain', delta: 0, sub: 'TDEE' },
+  { key: 'gain', label: 'Gain', delta: 400, sub: '+400 surplus' },
+] as const;
+
 function ProfileStep({
   draft,
   update,
   tdeePreview,
-  applyTdee,
+  onPickKcal,
   onNext,
   onBack,
 }: {
   draft: Draft;
   update: <K extends keyof Draft>(k: K, v: Draft[K]) => void;
   tdeePreview: number | null;
-  applyTdee: () => void;
+  onPickKcal: (kcal: number) => void;
   onNext: () => void;
   onBack: () => void;
 }) {
@@ -392,20 +396,43 @@ function ProfileStep({
           <div className="rounded-xl border border-primary/30 bg-primary/5 p-4">
             <div className="flex items-center gap-1.5 text-xs uppercase tracking-wide text-primary">
               <Sparkles className="h-3.5 w-3.5" />
-              Suggested daily calories
+              Maintenance {formatKcal(tdeePreview)} kcal — pick a goal
             </div>
-            <div className="mt-1 flex items-baseline justify-between">
-              <span className="text-2xl font-semibold tabular-nums">
-                {formatKcal(tdeePreview)}
-                <span className="ml-1 text-sm text-muted-foreground">kcal</span>
-              </span>
-              <Button size="sm" variant="primary" onClick={applyTdee}>
-                Use this
-              </Button>
+            <div className="mt-2 grid grid-cols-3 gap-2">
+              {GOAL_OPTIONS.map((g) => {
+                const kcal = Math.max(1000, tdeePreview + g.delta);
+                const active = parseFloat(draft.kcal_target) === kcal;
+                return (
+                  <button
+                    key={g.key}
+                    type="button"
+                    onClick={() => onPickKcal(kcal)}
+                    className={
+                      active
+                        ? 'rounded-lg border border-primary bg-primary px-2 py-2 text-center text-primary-foreground'
+                        : 'rounded-lg border border-border bg-card px-2 py-2 text-center hover:border-primary'
+                    }
+                  >
+                    <div className="text-xs font-medium">{g.label}</div>
+                    <div className="text-base font-semibold tabular-nums">
+                      {formatKcal(kcal)}
+                    </div>
+                    <div
+                      className={
+                        active
+                          ? 'text-[10px] text-primary-foreground/80'
+                          : 'text-[10px] text-muted-foreground'
+                      }
+                    >
+                      {g.sub}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Based on Mifflin-St Jeor × your activity level. Subtract ~500 to
-              lose weight, add ~300 to gain.
+            <p className="mt-2 text-xs text-muted-foreground">
+              Based on Mifflin-St Jeor × your activity level. Tap a goal to set
+              your target — you can fine-tune it on the next screen.
             </p>
           </div>
         )}

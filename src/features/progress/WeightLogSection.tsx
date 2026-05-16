@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/Button';
 import { LabeledInput } from '@/components/ui/Input';
 import { MiniChart, type ChartPoint } from './MiniChart';
 import { deleteWeight, logWeight, useWeightLog } from '@/db/repos/weight';
+import { updateProfile } from '@/db/repos/profile';
 import { toast } from '@/components/ui/toast';
 import { fromLocalDate, todayLocal } from '@/lib/dates';
 import { kgToLb, lbToKg } from '@/lib/units';
@@ -17,6 +18,35 @@ interface WeightLogSectionProps {
   profile: Profile;
 }
 
+type Projection =
+  | { state: 'reached' }
+  | { state: 'off-track' }
+  | { state: 'on-track'; etaMs: number };
+
+/**
+ * Estimate when the weight trend reaches the goal, from the slope of the
+ * 7-day moving average across the visible range. Returns null when there's
+ * too little data to draw a line through.
+ */
+function projectGoal(points: ChartPoint[], goal: number): Projection | null {
+  const avg = points.filter((p) => p.yAvg !== undefined);
+  if (avg.length < 2) return null;
+  const first = avg[0];
+  const last = avg[avg.length - 1];
+  const dxMs = last.x - first.x;
+  if (dxMs <= 0) return null;
+  const remaining = goal - last.yAvg!;
+  if (Math.abs(remaining) < 0.1) return { state: 'reached' };
+  const slopePerMs = (last.yAvg! - first.yAvg!) / dxMs;
+  if (
+    Math.abs(slopePerMs) < 1e-13 ||
+    Math.sign(slopePerMs) !== Math.sign(remaining)
+  ) {
+    return { state: 'off-track' };
+  }
+  return { state: 'on-track', etaMs: last.x + remaining / slopePerMs };
+}
+
 export function WeightLogSection({ profile }: WeightLogSectionProps) {
   const log = useWeightLog();
   const isImperial = profile.units === 'imperial';
@@ -25,6 +55,32 @@ export function WeightLogSection({ profile }: WeightLogSectionProps) {
   const [date, setDate] = useState(todayLocal());
   const [saving, setSaving] = useState(false);
   const [range, setRange] = useState<RangeKey>('3M');
+  const [goalInput, setGoalInput] = useState(() =>
+    profile.goal_weight_kg != null
+      ? (isImperial
+          ? kgToLb(profile.goal_weight_kg)
+          : profile.goal_weight_kg
+        ).toFixed(1)
+      : '',
+  );
+
+  const commitGoal = () => {
+    const trimmed = goalInput.trim();
+    if (!trimmed) {
+      void updateProfile({ goal_weight_kg: undefined });
+      return;
+    }
+    const num = parseFloat(trimmed);
+    if (!Number.isFinite(num) || num <= 0) return;
+    void updateProfile({ goal_weight_kg: isImperial ? lbToKg(num) : num });
+  };
+
+  const goalDisplay =
+    profile.goal_weight_kg != null
+      ? isImperial
+        ? kgToLb(profile.goal_weight_kg)
+        : profile.goal_weight_kg
+      : undefined;
 
   const points: ChartPoint[] = useMemo(() => {
     if (!log) return [];
@@ -69,6 +125,7 @@ export function WeightLogSection({ profile }: WeightLogSectionProps) {
   };
 
   const recent = log ? [...log].slice(-5).reverse() : [];
+  const projection = goalDisplay != null ? projectGoal(points, goalDisplay) : null;
 
   return (
     <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">
@@ -122,14 +179,38 @@ export function WeightLogSection({ profile }: WeightLogSectionProps) {
         ))}
       </div>
 
+      <div className="mt-3 w-36">
+        <LabeledInput
+          label="Goal weight"
+          type="number"
+          inputMode="decimal"
+          step="any"
+          min="0"
+          value={goalInput}
+          onChange={(e) => setGoalInput(e.target.value)}
+          onBlur={commitGoal}
+          trailing={unit}
+        />
+      </div>
+
       <div className="mt-3">
         <MiniChart
           points={points}
           colorVar="primary"
+          target={goalDisplay}
           formatX={(ms) => format(ms, 'd MMM')}
           formatY={(n) => `${n.toFixed(1)}${unit}`}
         />
       </div>
+      {goalDisplay != null && projection && (
+        <p className="mt-2 text-xs text-muted-foreground">
+          {projection.state === 'reached'
+            ? `You're at your ${goalInput} ${unit} goal.`
+            : projection.state === 'off-track'
+              ? `Weight isn't trending toward your ${goalInput} ${unit} goal yet.`
+              : `On track to reach ${goalInput} ${unit} around ${format(projection.etaMs, 'MMM yyyy')}.`}
+        </p>
+      )}
 
       {recent.length > 0 && (
         <div className="mt-4">

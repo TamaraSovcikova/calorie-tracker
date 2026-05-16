@@ -1,8 +1,9 @@
 import { useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { format } from 'date-fns';
-import { ChevronLeft, ChevronRight, CopyPlus, Loader2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, CopyPlus, Flame, Loader2 } from 'lucide-react';
 import { PageHeader } from '@/components/PageHeader';
+import { useStreak } from '@/features/progress/useStreak';
 import { MacroSummary } from '@/features/diary/MacroSummary';
 import { DiarySectionView } from '@/features/diary/DiarySection';
 import { CopyDaySheet } from '@/features/diary/CopyDaySheet';
@@ -36,6 +37,7 @@ export function DiaryPage() {
   const profile = useProfile();
   const entries = useDiaryDay(currentDate);
   const exercise = useExerciseDay(currentDate);
+  const streak = useStreak();
 
   // If Fitbit is connected, pulls daily calories burned and upserts an
   // exercise_entry row in the background. No-op when not connected.
@@ -133,6 +135,14 @@ export function DiaryPage() {
       />
 
       <div className="mx-auto max-w-md space-y-3 px-4 py-4">
+        {streak.current > 0 && (
+          <div className="flex justify-end">
+            <span className="inline-flex items-center gap-1 rounded-full bg-orange-500/10 px-2.5 py-1 text-xs font-medium text-orange-600 dark:text-orange-400">
+              <Flame className="h-3.5 w-3.5" />
+              {streak.current}-day streak
+            </span>
+          </div>
+        )}
         {profile && (
           <MacroSummary profile={profile} totals={totals} burnedKcal={burned} />
         )}

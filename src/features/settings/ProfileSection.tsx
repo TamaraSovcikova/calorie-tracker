@@ -225,9 +225,9 @@ export function ProfileSection({ profile }: ProfileSectionProps) {
           <div className="mt-2 grid grid-cols-3 gap-2">
             {(
               [
-                { key: 'cut', label: 'Cut', delta: -500, sub: '-500 deficit' },
+                { key: 'lose', label: 'Lose', delta: -500, sub: '−500 deficit' },
                 { key: 'maintain', label: 'Maintain', delta: 0, sub: 'TDEE' },
-                { key: 'bulk', label: 'Bulk', delta: 400, sub: '+400 surplus' },
+                { key: 'gain', label: 'Gain', delta: 400, sub: '+400 surplus' },
               ] as const
             ).map((g) => {
               const kcal = Math.max(1000, previewTdee + g.delta);
@@ -261,8 +261,8 @@ export function ProfileSection({ profile }: ProfileSectionProps) {
             })}
           </div>
           <p className="mt-2 text-xs text-muted-foreground">
-            Mifflin-St Jeor × activity multiplier. Cut ≈ 0.45 kg/week loss;
-            bulk ≈ lean gain. Tap one to set it as your calorie target.
+            Mifflin-St Jeor × activity multiplier. Lose ≈ 0.45 kg/week loss;
+            gain ≈ lean gain. Tap one to set it as your calorie target.
           </p>
         </div>
       )}
