@@ -316,15 +316,14 @@ export interface FitbitDailySummary {
   steps?: number;
 }
 
-interface CivilDate {
-  year: number;
-  month: number;
-  day: number;
+interface CivilDateTime {
+  date: { year: number; month: number; day: number };
+  time: { hours: number; minutes: number; seconds: number; nanos: number };
 }
 
 interface RollupDataPoint {
-  civilStartTime?: CivilDate;
-  civilEndTime?: CivilDate;
+  civilStartTime?: CivilDateTime;
+  civilEndTime?: CivilDateTime;
   // Plus one data-type-specific object, e.g. steps: { steps_sum: 8500 } or
   // totalCalories: { total_calories_sum: 2300 }. Names vary per data type,
   // so extractRollupValue scans instead of hard-coding them.
@@ -336,8 +335,15 @@ interface DailyRollupResponse {
   nextPageToken?: string;
 }
 
-function civilDate(d: Date): CivilDate {
-  return { year: d.getFullYear(), month: d.getMonth() + 1, day: d.getDate() };
+/** Build a CivilDateTime for the given local date — start or end of day. */
+function civilDateTime(date: LocalDate, endOfDay: boolean): CivilDateTime {
+  const [year, month, day] = date.split('-').map(Number);
+  return {
+    date: { year, month, day },
+    time: endOfDay
+      ? { hours: 23, minutes: 59, seconds: 59, nanos: 0 }
+      : { hours: 0, minutes: 0, seconds: 0, nanos: 0 },
+  };
 }
 
 /** First finite numeric leaf inside a rollup point (skipping the dates). */
@@ -363,18 +369,19 @@ interface RollupResult {
 /**
  * Query the dailyRollUp endpoint for one local date.
  *   POST /v4/users/me/dataTypes/{dataType}/dataPoints:dailyRollUp
- *   body: { range: {start, end}, windowSizeDays: 1 }
- * end is exclusive, so [date, date+1) yields exactly one rollup point.
+ *   body: { range: { start: CivilDateTime, end: CivilDateTime }, windowSizeDays }
+ * start = 00:00:00 and end = 23:59:59 of the SAME date, windowSizeDays 1.
  */
 async function fetchDailyRollup(
   token: string,
   dataType: string,
   date: LocalDate,
 ): Promise<RollupResult> {
-  const start = new Date(`${date}T00:00:00`);
-  const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
   const body = {
-    range: { start: civilDate(start), end: civilDate(end) },
+    range: {
+      start: civilDateTime(date, false),
+      end: civilDateTime(date, true),
+    },
     windowSizeDays: 1,
     pageSize: 10,
   };
