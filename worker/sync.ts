@@ -253,10 +253,29 @@ export async function handleSync(req: Request, env: Env): Promise<Response> {
   // pulls so the client's own writes round-trip back consistently.
   const pushStatements: D1PreparedStatement[] = [];
   for (const table of TABLES) {
+    if (table === 'meal_items') continue; // handled below with cleanup
     const rows = push[table];
     if (rows && Array.isArray(rows)) {
       pushStatements.push(...buildPushStatements(env.DB, table, rows));
     }
+  }
+  // meal_items are a child collection: for every pushed meal, delete its
+  // existing server items first, then insert the pushed set. A plain
+  // upsert would leave removed ingredients orphaned and let an edited
+  // meal accumulate every item it ever had.
+  const pushedMeals = push.meals;
+  if (Array.isArray(pushedMeals) && pushedMeals.length > 0) {
+    const del = env.DB.prepare('DELETE FROM meal_items WHERE meal_id = ?');
+    for (const m of pushedMeals) {
+      const id = (m as Row).id;
+      if (typeof id === 'string') pushStatements.push(del.bind(id));
+    }
+  }
+  const pushedItems = push.meal_items;
+  if (Array.isArray(pushedItems) && pushedItems.length > 0) {
+    pushStatements.push(
+      ...buildPushStatements(env.DB, 'meal_items', pushedItems),
+    );
   }
   if (pushStatements.length > 0) await env.DB.batch(pushStatements);
 

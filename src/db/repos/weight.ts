@@ -1,5 +1,4 @@
 import { useLiveQuery } from 'dexie-react-hooks';
-import { v4 as uuid } from 'uuid';
 import { db } from '../dexie';
 import { currentUserId } from '../userId';
 import type { LocalDate } from '@/lib/dates';
@@ -7,7 +6,15 @@ import type { WeightEntry } from '../types';
 
 /**
  * One weigh-in per date — upserts on (user_id, date).
+ *
+ * The row id is DETERMINISTIC (`w:{user}:{date}`), not a random uuid, so
+ * the same date logged on two devices produces the same id. Without this
+ * each device makes a different-id row and sync hits the server's
+ * UNIQUE(user_id, date) index, aborting the whole batch.
  */
+function weightId(userId: string, date: LocalDate): string {
+  return `w:${userId}:${date}`;
+}
 export async function logWeight(
   date: LocalDate,
   weightKg: number,
@@ -28,7 +35,7 @@ export async function logWeight(
     return { ...existing, weight_kg: weightKg, note, updated_at: now };
   }
   const entry: WeightEntry = {
-    id: uuid(),
+    id: weightId(userId, date),
     user_id: userId,
     date,
     weight_kg: weightKg,

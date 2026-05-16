@@ -15,6 +15,7 @@ import { db } from '../dexie';
 import type {
   DiaryEntry,
   ExerciseEntry,
+  FitbitTokens,
   Food,
   Meal,
   MealItem,
@@ -38,6 +39,7 @@ const TABLES = [
   'diary_entries',
   'exercise_entries',
   'weight_log',
+  'fitbit_tokens',
 ] as const;
 type TableName = (typeof TABLES)[number];
 
@@ -210,6 +212,9 @@ class SyncEngine {
     out.weight_log = (await db.weight_log.toArray()).filter(
       (r: WeightEntry) => r.updated_at > since('weight_log'),
     );
+    out.fitbit_tokens = (await db.fitbit_tokens.toArray()).filter(
+      (r: FitbitTokens) => r.updated_at > since('fitbit_tokens'),
+    );
 
     return out;
   }
@@ -227,6 +232,7 @@ class SyncEngine {
         db.diary_entries,
         db.exercise_entries,
         db.weight_log,
+        db.fitbit_tokens,
       ],
       async () => {
         if (pull.profiles?.length) {
@@ -239,16 +245,20 @@ class SyncEngine {
             'id',
           );
         }
+
+        // meal_items are a child collection — replace the full item set per
+        // changed meal so ingredient removals propagate (a plain bulkPut
+        // would leave deleted items behind). Must run BEFORE the meals
+        // upsert so the local meal's PRE-sync updated_at is the comparison
+        // point. Only replace when the incoming meal version is strictly
+        // newer than what's stored locally.
+        await this.applyPulledMealItems(
+          (pull.meal_items as Array<MealItem & { meal_updated_at?: string }>) ?? [],
+          (pull.meals as Meal[]) ?? [],
+        );
+
         if (pull.meals?.length) {
           await this.upsertWithLww(db.meals, pull.meals as Meal[], 'id');
-        }
-        if (pull.meal_items?.length) {
-          // Strip the synthetic meal_updated_at — Dexie's MealItem doesn't have it.
-          const items = (pull.meal_items as Array<MealItem & { meal_updated_at?: string }>).map(
-            ({ meal_updated_at: _ignore, ...rest }) => rest,
-          );
-          // meal_items don't carry their own updated_at — replace blindly.
-          await db.meal_items.bulkPut(items);
         }
         if (pull.diary_entries?.length) {
           await this.upsertWithLww(
@@ -271,8 +281,49 @@ class SyncEngine {
             'id',
           );
         }
+        if (pull.fitbit_tokens?.length) {
+          await this.upsertWithLww(
+            db.fitbit_tokens,
+            pull.fitbit_tokens as FitbitTokens[],
+            'user_id',
+          );
+        }
       },
     );
+  }
+
+  /** Replace local meal_items for each changed meal with the pulled set,
+   *  but only when the pulled meal version is newer than the local one. */
+  private async applyPulledMealItems(
+    rawItems: Array<MealItem & { meal_updated_at?: string }>,
+    pulledMeals: Meal[],
+  ): Promise<void> {
+    interface Group {
+      items: MealItem[];
+      mealUpdatedAt: string;
+    }
+    const byMeal = new Map<string, Group>();
+    for (const it of rawItems) {
+      const { meal_updated_at, ...rest } = it;
+      const stamp = meal_updated_at ?? '';
+      const g = byMeal.get(rest.meal_id) ?? { items: [], mealUpdatedAt: stamp };
+      g.items.push(rest);
+      if (stamp > g.mealUpdatedAt) g.mealUpdatedAt = stamp;
+      byMeal.set(rest.meal_id, g);
+    }
+    // Meals that changed but ended up with zero ingredients (emptied) won't
+    // appear in rawItems — pick them up from the pulled meals list.
+    for (const m of pulledMeals) {
+      if (!byMeal.has(m.id)) {
+        byMeal.set(m.id, { items: [], mealUpdatedAt: m.updated_at });
+      }
+    }
+    for (const [mealId, g] of byMeal) {
+      const localMeal = await db.meals.get(mealId);
+      if (localMeal && g.mealUpdatedAt <= localMeal.updated_at) continue;
+      await db.meal_items.where('meal_id').equals(mealId).delete();
+      if (g.items.length) await db.meal_items.bulkPut(g.items);
+    }
   }
 
   private deserialiseFood = (f: Food & { custom_units: unknown }): Food => {
