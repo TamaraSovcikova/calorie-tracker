@@ -10,7 +10,9 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { LabeledInput } from '@/components/ui/Input';
+import { Sheet } from '@/components/ui/Sheet';
 import { IngredientPickerSheet } from './IngredientPickerSheet';
+import { QuantityStep } from '@/features/food-search/QuantityStep';
 import { useMealResolved } from './useMealResolved';
 import { computeMealTotals } from './mealMath';
 import { computeMacros } from '@/features/food-search/foodMath';
@@ -57,6 +59,7 @@ export function MealEditor({ mode }: MealEditorProps) {
   const [notes, setNotes] = useState('');
   const [items, setItems] = useState<DraftItem[]>([]);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [editingKey, setEditingKey] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   // Hydrate from existing meal once it loads.
@@ -96,6 +99,13 @@ export function MealEditor({ mode }: MealEditorProps) {
 
   const removeIngredient = (uiKey: string) =>
     setItems((curr) => curr.filter((i) => i.uiKey !== uiKey));
+
+  const editIngredient = (uiKey: string, qty: number, unit: string) =>
+    setItems((curr) =>
+      curr.map((i) => (i.uiKey === uiKey ? { ...i, qty, unit } : i)),
+    );
+
+  const editingDraft = items.find((i) => i.uiKey === editingKey) ?? null;
 
   const handleSave = async () => {
     const trimmed = name.trim();
@@ -244,6 +254,7 @@ export function MealEditor({ mode }: MealEditorProps) {
                 <IngredientRow
                   key={it.uiKey}
                   draft={it}
+                  onEdit={() => setEditingKey(it.uiKey)}
                   onRemove={() => removeIngredient(it.uiKey)}
                 />
               ))}
@@ -270,15 +281,83 @@ export function MealEditor({ mode }: MealEditorProps) {
         onClose={() => setPickerOpen(false)}
         onPicked={addIngredient}
       />
+      <EditIngredientSheet
+        draft={editingDraft}
+        onClose={() => setEditingKey(null)}
+        onSave={(uiKey, qty, unit) => {
+          editIngredient(uiKey, qty, unit);
+          setEditingKey(null);
+        }}
+      />
     </div>
+  );
+}
+
+/** Sheet to change the quantity/unit of an ingredient already in the meal. */
+function EditIngredientSheet({
+  draft,
+  onClose,
+  onSave,
+}: {
+  draft: DraftItem | null;
+  onClose: () => void;
+  onSave: (uiKey: string, qty: number, unit: string) => void;
+}) {
+  const [food, setFood] = useState<Food | undefined>(draft?.food);
+  useEffect(() => {
+    if (!draft) return;
+    if (draft.food) {
+      setFood(draft.food);
+      return;
+    }
+    let cancelled = false;
+    void db.foods.get(draft.food_id).then((f) => {
+      if (!cancelled && f) setFood(f);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [draft]);
+
+  return (
+    <Sheet
+      open={draft !== null}
+      onClose={onClose}
+      title={food?.name ?? 'Ingredient'}
+    >
+      {draft && food ? (
+        <QuantityStep
+          food={food}
+          initial={itemToQuantity({
+            id: '',
+            meal_id: '',
+            food_id: draft.food_id,
+            qty: draft.qty,
+            unit: draft.unit,
+          })}
+          saveLabel="Update ingredient"
+          onBack={onClose}
+          onSave={(state) => {
+            const macros = computeMacros(food, state);
+            onSave(draft.uiKey, state.qty, macros.unit);
+          }}
+        />
+      ) : (
+        <div className="p-8 text-center text-sm text-muted-foreground">
+          Loading…
+        </div>
+      )}
+    </Sheet>
   );
 }
 
 function IngredientRow({
   draft,
+  onEdit,
   onRemove,
 }: {
   draft: DraftItem;
+  onEdit: () => void;
   onRemove: () => void;
 }) {
   // Lazy-load food in case it wasn't included in the initial hydrate.
@@ -305,14 +384,19 @@ function IngredientRow({
     : null;
 
   return (
-    <li className="flex items-center justify-between gap-3 px-3 py-2.5">
-      <div className="min-w-0 flex-1">
+    <li className="flex items-center justify-between gap-1 px-1 py-1">
+      <button
+        type="button"
+        onClick={onEdit}
+        className="min-w-0 flex-1 rounded-lg px-2 py-1.5 text-left hover:bg-muted/50 active:bg-muted"
+      >
         <div className="truncate text-sm font-medium">{food?.name ?? '…'}</div>
         <div className="mt-0.5 truncate text-xs text-muted-foreground tabular-nums">
           {formatGrams(draft.qty)} {draft.unit}
           {macros && ` · ${formatKcal(macros.kcal)} kcal`}
+          <span className="text-muted-foreground/60"> · tap to edit</span>
         </div>
-      </div>
+      </button>
       <button
         type="button"
         onClick={onRemove}

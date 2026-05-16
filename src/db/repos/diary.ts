@@ -50,6 +50,37 @@ export async function softDeleteDiaryEntry(id: string): Promise<void> {
   await db.diary_entries.update(id, { deleted_at: new Date().toISOString() });
 }
 
+/**
+ * Copy every (non-deleted) entry from one date onto another date — for the
+ * "I ate the same as yesterday" / meal-prep case. Returns the count copied.
+ * Copies are fresh rows (new ids, new timestamps); the source day is left
+ * untouched.
+ */
+export async function copyDayEntries(
+  from: LocalDate,
+  to: LocalDate,
+): Promise<number> {
+  if (from === to) return 0;
+  const userId = currentUserId();
+  const source = await db.diary_entries
+    .where('[user_id+date]')
+    .equals([userId, from])
+    .filter((e) => !e.deleted_at)
+    .toArray();
+  if (source.length === 0) return 0;
+  const now = new Date().toISOString();
+  const copies: DiaryEntry[] = source.map((e) => ({
+    ...e,
+    id: uuid(),
+    date: to,
+    created_at: now,
+    updated_at: now,
+    deleted_at: undefined,
+  }));
+  await db.diary_entries.bulkPut(copies);
+  return copies.length;
+}
+
 /** Live list of all diary entries on a given date, grouped by section. */
 export function useDiaryDay(date: LocalDate): DiaryEntry[] | undefined {
   return useLiveQuery(

@@ -1,9 +1,10 @@
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, CopyPlus, Loader2 } from 'lucide-react';
 import { PageHeader } from '@/components/PageHeader';
 import { MacroSummary } from '@/features/diary/MacroSummary';
 import { DiarySectionView } from '@/features/diary/DiarySection';
+import { CopyDaySheet } from '@/features/diary/CopyDaySheet';
 import { AddFoodSheet } from '@/features/food-search/AddFoodSheet';
 import { EditEntrySheet } from '@/features/food-search/EditEntrySheet';
 import { ExerciseSection } from '@/features/exercise/ExerciseSection';
@@ -34,11 +35,13 @@ export function DiaryPage() {
 
   const [addingTo, setAddingTo] = useState<MealSection | null>(null);
   const [editing, setEditing] = useState<DiaryEntry | null>(null);
+  const [copyOpen, setCopyOpen] = useState(false);
 
   const goToDate = (next: LocalDate) => {
     navigate(isToday(next) ? '/diary' : `/diary/${next}`);
   };
 
+  const loading = entries === undefined;
   const totals = entries ? sumTotals(entries) : ZERO_TOTALS;
   const grouped = entries
     ? groupBySection(entries)
@@ -52,6 +55,14 @@ export function DiaryPage() {
         subtitle={isToday(currentDate) ? currentDate : undefined}
         trailing={
           <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => setCopyOpen(true)}
+              className="tap-target rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground"
+              aria-label="Copy this day to another date"
+            >
+              <CopyPlus className="h-5 w-5" />
+            </button>
             <button
               type="button"
               onClick={() => goToDate(shiftDate(currentDate, -1))}
@@ -77,18 +88,27 @@ export function DiaryPage() {
           <MacroSummary profile={profile} totals={totals} burnedKcal={burned} />
         )}
 
-        {MEAL_SECTIONS.map((section) => (
-          <DiarySectionView
-            key={section}
-            section={section}
-            entries={grouped[section]}
-            primaryMacro={profile?.primary_macro ?? 'protein'}
-            onAdd={(s) => setAddingTo(s)}
-            onEntryClick={(e) => setEditing(e)}
-          />
-        ))}
+        {loading ? (
+          <div className="flex items-center justify-center gap-2 py-12 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Loading {formatDayHeader(currentDate).toLowerCase()}…
+          </div>
+        ) : (
+          <>
+            {MEAL_SECTIONS.map((section) => (
+              <DiarySectionView
+                key={section}
+                section={section}
+                entries={grouped[section]}
+                primaryMacro={profile?.primary_macro ?? 'protein'}
+                onAdd={(s) => setAddingTo(s)}
+                onEntryClick={(e) => setEditing(e)}
+              />
+            ))}
 
-        <ExerciseSection date={currentDate} />
+            <ExerciseSection date={currentDate} />
+          </>
+        )}
       </div>
 
       <AddFoodSheet
@@ -101,6 +121,11 @@ export function DiaryPage() {
         open={editing !== null}
         entry={editing}
         onClose={() => setEditing(null)}
+      />
+      <CopyDaySheet
+        open={copyOpen}
+        fromDate={currentDate}
+        onClose={() => setCopyOpen(false)}
       />
     </>
   );
