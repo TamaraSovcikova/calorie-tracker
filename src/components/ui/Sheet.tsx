@@ -14,10 +14,14 @@ interface SheetProps {
   fullScreenMobile?: boolean;
 }
 
+const FOCUSABLE =
+  'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
+
 /**
- * Bottom-sheet on mobile, centred dialog on desktop. Plain Tailwind + portal.
- * No focus trap library — we render at document.body and rely on the close
- * button + escape key. Good enough for v1.
+ * Bottom-sheet on mobile, centred dialog on desktop. Plain Tailwind +
+ * portal. Escape / backdrop close, background scroll lock, and a focus
+ * trap: focus moves into the sheet on open, Tab cycles within it, and
+ * focus is restored to the trigger element on close.
  */
 export function Sheet({
   open,
@@ -32,16 +36,49 @@ export function Sheet({
 
   useEffect(() => {
     if (!open) return;
+    const sheet = ref.current;
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+
+    // Move focus into the sheet (first focusable, else the container).
+    const focusables = sheet
+      ? Array.from(sheet.querySelectorAll<HTMLElement>(FOCUSABLE))
+      : [];
+    (focusables[0] ?? sheet)?.focus();
+
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') {
+        onClose();
+        return;
+      }
+      if (e.key !== 'Tab' || !sheet) return;
+      // Focus trap: keep Tab cycling within the sheet.
+      const items = Array.from(sheet.querySelectorAll<HTMLElement>(FOCUSABLE));
+      if (items.length === 0) {
+        e.preventDefault();
+        return;
+      }
+      const first = items[0];
+      const last = items[items.length - 1];
+      const active = document.activeElement;
+      if (e.shiftKey && (active === first || !sheet.contains(active))) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && (active === last || !sheet.contains(active))) {
+        e.preventDefault();
+        first.focus();
+      }
     };
     window.addEventListener('keydown', onKey);
-    // Lock background scroll
-    const prev = document.body.style.overflow;
+
+    // Lock background scroll.
+    const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
+
     return () => {
       window.removeEventListener('keydown', onKey);
-      document.body.style.overflow = prev;
+      document.body.style.overflow = prevOverflow;
+      // Restore focus to whatever triggered the sheet.
+      previouslyFocused?.focus?.();
     };
   }, [open, onClose]);
 
@@ -61,8 +98,9 @@ export function Sheet({
       />
       <div
         ref={ref}
+        tabIndex={-1}
         className={cn(
-          'relative flex w-full flex-col bg-card text-card-foreground shadow-2xl',
+          'relative flex w-full flex-col bg-card text-card-foreground shadow-2xl outline-none',
           fullScreenMobile
             ? 'h-[92vh] rounded-t-2xl sm:h-auto sm:max-h-[88vh] sm:max-w-md sm:rounded-2xl'
             : 'max-h-[88vh] rounded-t-2xl sm:max-w-md sm:rounded-2xl',

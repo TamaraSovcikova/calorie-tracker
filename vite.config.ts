@@ -52,6 +52,18 @@ export default defineConfig({
               },
             },
           },
+          {
+            // USDA FoodData Central search responses.
+            urlPattern: ({ url }) => url.hostname === 'api.nal.usda.gov',
+            handler: 'StaleWhileRevalidate',
+            options: {
+              cacheName: 'usda-cache',
+              expiration: {
+                maxEntries: 300,
+                maxAgeSeconds: 24 * 60 * 60,
+              },
+            },
+          },
         ],
       },
       devOptions: {

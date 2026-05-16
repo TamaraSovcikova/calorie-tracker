@@ -1,6 +1,7 @@
-import { NavLink, Outlet } from 'react-router-dom';
-import { BookOpen, ChefHat, LineChart, Settings } from 'lucide-react';
+import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { AlertTriangle, BookOpen, ChefHat, LineChart, Settings } from 'lucide-react';
 import { cn } from '@/lib/cn';
+import { useSyncStatus } from '@/db/sync/client';
 
 const NAV_ITEMS = [
   { to: '/diary', label: 'Diary', icon: BookOpen },
@@ -10,8 +11,20 @@ const NAV_ITEMS = [
 ] as const;
 
 export function Layout() {
+  const sync = useSyncStatus();
+  const navigate = useNavigate();
   return (
     <div className="flex h-full flex-col bg-background">
+      {sync.status === 'error' && (
+        <button
+          type="button"
+          onClick={() => navigate('/settings')}
+          className="flex w-full items-center justify-center gap-1.5 bg-destructive/90 px-3 py-1.5 text-xs font-medium text-destructive-foreground"
+        >
+          <AlertTriangle className="h-3.5 w-3.5" />
+          Cloud sync failed — tap to check Settings
+        </button>
+      )}
       <main className="flex-1 overflow-y-auto pb-20">
         <Outlet />
       </main>
