@@ -194,26 +194,32 @@ function buildUpsertSql(table: TableName): string {
   `;
 }
 
-async function applyPush(
+/** Build (but don't run) the upsert statements for one table's pushed rows.
+ *  handleSync collects these across all tables into a single atomic batch. */
+function buildPushStatements(
   db: D1Database,
   table: TableName,
   rows: Row[],
-): Promise<void> {
-  if (rows.length === 0) return;
+): D1PreparedStatement[] {
+  if (rows.length === 0) return [];
   const sql = buildUpsertSql(table);
   const cols = COLUMNS[table];
   const stmt = db.prepare(sql);
-  const batched = rows.map((row) => {
+  return rows.map((row) => {
     if (table === 'meal_items' && !('meal_updated_at' in row)) {
-      // Client-side meal_items don't carry meal_updated_at; the meal sync
-      // layer fills it in before sending. Default to "now" if missing.
+      // Client meal_items don't carry meal_updated_at; the meal sync layer
+      // fills it in before sending. Default to "now" if missing.
       row.meal_updated_at = new Date().toISOString();
     }
     return stmt.bind(...cols.map((c) => normaliseValue(row[c])));
   });
-  await db.batch(batched);
 }
 
+const PULL_PAGE = 2000;
+const PULL_HARD_CAP = 100_000;
+
+/** Pull every row with updated_at > since, paging within this call so a
+ *  truncated result page can never advance the cursor past unpulled rows. */
 async function pullSince(
   db: D1Database,
   table: TableName,
@@ -221,13 +227,20 @@ async function pullSince(
 ): Promise<{ rows: Row[]; until: string }> {
   const updatedAt = UPDATED_AT_COLUMN[table];
   const cols = COLUMNS[table];
-  const sql = `SELECT ${cols.join(', ')} FROM ${table} WHERE ${updatedAt} > ? ORDER BY ${updatedAt} ASC`;
-  const result = await db.prepare(sql).bind(since).all<Row>();
-  const rows = result.results ?? [];
-  const until = rows.length
-    ? (rows[rows.length - 1][updatedAt] as string)
+  const sql = `SELECT ${cols.join(', ')} FROM ${table} WHERE ${updatedAt} > ? ORDER BY ${updatedAt} ASC LIMIT ${PULL_PAGE}`;
+  const all: Row[] = [];
+  let cursor = since;
+  for (;;) {
+    const result = await db.prepare(sql).bind(cursor).all<Row>();
+    const page = result.results ?? [];
+    all.push(...page);
+    if (page.length < PULL_PAGE || all.length >= PULL_HARD_CAP) break;
+    cursor = page[page.length - 1][updatedAt] as string;
+  }
+  const until = all.length
+    ? (all[all.length - 1][updatedAt] as string)
     : since;
-  return { rows, until };
+  return { rows: all, until };
 }
 
 export async function handleSync(req: Request, env: Env): Promise<Response> {
@@ -235,13 +248,17 @@ export async function handleSync(req: Request, env: Env): Promise<Response> {
   const since = body.since ?? {};
   const push = body.push ?? {};
 
-  // Apply pushes first so the same client's writes are reflected in the pull.
+  // Apply every pushed row across all tables in ONE atomic D1 batch, so a
+  // mid-sync failure can't leave a partial apply. Pushes go in before the
+  // pulls so the client's own writes round-trip back consistently.
+  const pushStatements: D1PreparedStatement[] = [];
   for (const table of TABLES) {
     const rows = push[table];
     if (rows && Array.isArray(rows)) {
-      await applyPush(env.DB, table, rows);
+      pushStatements.push(...buildPushStatements(env.DB, table, rows));
     }
   }
+  if (pushStatements.length > 0) await env.DB.batch(pushStatements);
 
   // Then collect pulls.
   const pull: Partial<Record<TableName, Row[]>> = {};

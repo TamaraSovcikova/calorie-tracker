@@ -92,16 +92,17 @@ export function ExerciseSection({ date }: ExerciseSectionProps) {
         </ul>
       )}
 
+      {/* One sheet, keyed so it remounts fresh between add and each edit
+          (no stale form carried over). */}
       <ExerciseSheet
-        open={adding}
-        date={date}
-        onClose={() => setAdding(false)}
-      />
-      <ExerciseSheet
-        open={editingEntry !== undefined}
+        key={editingEntry ? `edit-${editingEntry.id}` : 'add'}
+        open={adding || editingEntry !== undefined}
         date={date}
         entry={editingEntry}
-        onClose={() => setEditingEntry(undefined)}
+        onClose={() => {
+          setAdding(false);
+          setEditingEntry(undefined);
+        }}
       />
     </section>
   );

@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState } from 'react';
+import { lazy, Suspense, useCallback, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { Sheet } from '@/components/ui/Sheet';
 import { Tabs } from '@/components/ui/Tabs';
@@ -80,8 +80,10 @@ export function AddFoodSheet({ open, onClose, date, section }: AddFoodSheetProps
     handleClose();
   };
 
-  // For meal save we need the resolved meal totals; do it inline in render via hook.
-  const handleBarcode = async (code: string) => {
+  // Stable identity — BarcodeScanner has this in its camera-effect deps,
+  // so a fresh closure each render would tear down and re-acquire the
+  // camera stream (flicker). Only stable setState calls are referenced.
+  const handleBarcode = useCallback(async (code: string) => {
     setScanError(null);
     setStep({ kind: 'looking-up', barcode: code });
     try {
@@ -104,7 +106,7 @@ export function AddFoodSheet({ open, onClose, date, section }: AddFoodSheetProps
       }
       setStep({ kind: 'manual', presetBarcode: code });
     }
-  };
+  }, []);
 
   let title: string;
   let content: React.ReactNode;
