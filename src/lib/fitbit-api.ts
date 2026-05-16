@@ -146,7 +146,13 @@ export async function beginFitbitAuth(): Promise<string> {
     state,
     redirect_uri: redirectUri,
     access_type: 'offline',
-    prompt: 'consent',
+    // `select_account` forces Google'\''s account chooser so the user can
+    // pick the right personal account — without it Google auto-uses the
+    // browser'\''s first account (authuser=0), which for multi-account
+    // users is often a Workspace account that 403s on unverified apps.
+    // `consent` still forces the consent screen so a refresh_token is
+    // always issued.
+    prompt: 'select_account consent',
     include_granted_scopes: 'true',
   });
   return `${AUTH_BASE}?${params.toString()}`;
