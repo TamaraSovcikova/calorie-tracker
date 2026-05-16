@@ -13,6 +13,12 @@ export type ISOTimestamp = string;
 
 export type MealSection = 'breakfast' | 'lunch' | 'dinner' | 'snacks';
 export const MEAL_SECTIONS: MealSection[] = ['breakfast', 'lunch', 'dinner', 'snacks'];
+export const MEAL_SECTION_LABELS: Record<MealSection, string> = {
+  breakfast: 'Breakfast',
+  lunch: 'Lunch',
+  dinner: 'Dinner',
+  snacks: 'Snacks',
+};
 
 export type FoodSource = 'off' | 'custom' | 'usda' | 'curated';
 

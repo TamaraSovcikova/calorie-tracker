@@ -2,13 +2,16 @@ import { useState } from 'react';
 import { ArrowLeft, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input, LabeledInput } from '@/components/ui/Input';
-import { createFood } from '@/db/repos/foods';
+import { createFood, updateFood } from '@/db/repos/foods';
 import type { CustomUnit, Food } from '@/db/types';
 
 interface ManualEntryFormProps {
   initialName?: string;
   initialBarcode?: string;
+  /** When set, the form edits this existing custom food instead of creating one. */
+  food?: Food;
   onBack: () => void;
+  /** Fired with the created/updated food. */
   onCreated: (food: Food) => void;
 }
 
@@ -25,19 +28,33 @@ interface FormState {
 export function ManualEntryForm({
   initialName = '',
   initialBarcode,
+  food,
   onBack,
   onCreated,
 }: ManualEntryFormProps) {
-  const [form, setForm] = useState<FormState>({
-    name: initialName,
-    brand: '',
-    kcal: '',
-    protein: '',
-    carbs: '',
-    fat: '',
-    serving_g: '',
-  });
-  const [units, setUnits] = useState<CustomUnit[]>([]);
+  const isEdit = food !== undefined;
+  const [form, setForm] = useState<FormState>(() =>
+    food
+      ? {
+          name: food.name,
+          brand: food.brand ?? '',
+          kcal: String(food.kcal_100),
+          protein: String(food.protein_100),
+          carbs: String(food.carbs_100),
+          fat: String(food.fat_100),
+          serving_g: food.serving_g != null ? String(food.serving_g) : '',
+        }
+      : {
+          name: initialName,
+          brand: '',
+          kcal: '',
+          protein: '',
+          carbs: '',
+          fat: '',
+          serving_g: '',
+        },
+  );
+  const [units, setUnits] = useState<CustomUnit[]>(food?.custom_units ?? []);
   const [newLabel, setNewLabel] = useState('');
   const [newGrams, setNewGrams] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -73,9 +90,7 @@ export function ManualEntryForm({
     }
     setSaving(true);
     try {
-      const food = await createFood({
-        source: 'custom',
-        off_barcode: initialBarcode,
+      const fields = {
         name: form.name.trim(),
         brand: form.brand.trim() || undefined,
         kcal_100: kcal,
@@ -84,8 +99,18 @@ export function ManualEntryForm({
         fat_100: fat,
         serving_g,
         custom_units: units,
-      });
-      onCreated(food);
+      };
+      if (food) {
+        await updateFood(food.id, fields);
+        onCreated({ ...food, ...fields });
+      } else {
+        const created = await createFood({
+          source: 'custom',
+          off_barcode: initialBarcode,
+          ...fields,
+        });
+        onCreated(created);
+      }
     } finally {
       setSaving(false);
     }
@@ -102,9 +127,13 @@ export function ManualEntryForm({
           <ArrowLeft className="h-4 w-4" />
           Back
         </button>
-        <h2 className="mt-1 text-lg font-semibold">Add a new product</h2>
+        <h2 className="mt-1 text-lg font-semibold">
+          {isEdit ? 'Edit product' : 'Add a new product'}
+        </h2>
         <p className="text-xs text-muted-foreground">
-          Saved to your "My Products" library — always surfaces top of search.
+          {isEdit
+            ? 'Changes apply to future logs; entries already in your diary keep their saved values.'
+            : 'Saved to your foods library — always surfaces top of search.'}
         </p>
       </div>
 
@@ -229,7 +258,7 @@ export function ManualEntryForm({
           disabled={saving}
           onClick={handleSave}
         >
-          {saving ? 'Saving…' : 'Save product'}
+          {saving ? 'Saving…' : isEdit ? 'Save changes' : 'Save product'}
         </Button>
       </div>
     </div>

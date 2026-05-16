@@ -42,6 +42,14 @@ export async function softDeleteFood(id: string): Promise<void> {
   await db.foods.update(id, { deleted_at: new Date().toISOString() });
 }
 
+/** Reverse a soft-delete — clears the tombstone so the food reappears. */
+export async function restoreFood(id: string): Promise<void> {
+  await db.foods.update(id, {
+    deleted_at: undefined,
+    updated_at: new Date().toISOString(),
+  });
+}
+
 export async function getFood(id: string): Promise<Food | undefined> {
   return db.foods.get(id);
 }

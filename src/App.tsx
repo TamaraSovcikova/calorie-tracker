@@ -1,7 +1,7 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { Layout } from '@/components/Layout';
 import { DiaryPage } from '@/app/diary/DiaryPage';
-import { MealsPage } from '@/app/meals/MealsPage';
+import { LibraryPage } from '@/app/library/LibraryPage';
 import { ProgressPage } from '@/app/progress/ProgressPage';
 import { SettingsPage } from '@/app/settings/SettingsPage';
 import { MealEditor } from '@/features/meals/MealEditor';
@@ -25,7 +25,8 @@ export default function App() {
           <Route path="/" element={<Navigate to="/diary" replace />} />
           <Route path="/diary" element={<DiaryPage />} />
           <Route path="/diary/:date" element={<DiaryPage />} />
-          <Route path="/meals" element={<MealsPage />} />
+          <Route path="/library" element={<LibraryPage />} />
+          <Route path="/meals" element={<Navigate to="/library" replace />} />
           <Route path="/progress" element={<ProgressPage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="*" element={<Navigate to="/diary" replace />} />

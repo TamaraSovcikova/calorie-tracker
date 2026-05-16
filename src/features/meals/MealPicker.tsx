@@ -30,7 +30,7 @@ export function MealPicker({ onPick }: MealPickerProps) {
         <ChefHat className="mx-auto h-10 w-10 text-muted-foreground" strokeWidth={1.5} />
         <h3 className="mt-3 text-base font-medium">No saved meals yet</h3>
         <p className="mt-1 text-sm text-muted-foreground">
-          Build a meal in the Meals tab, then log it here.
+          Build a meal in the Library tab, then log it here.
         </p>
       </div>
     );

@@ -1,11 +1,11 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { AlertTriangle, BookOpen, ChefHat, LineChart, Settings } from 'lucide-react';
+import { AlertTriangle, BookOpen, Library, LineChart, Settings } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { useSyncStatus } from '@/db/sync/client';
 
 const NAV_ITEMS = [
   { to: '/diary', label: 'Diary', icon: BookOpen },
-  { to: '/meals', label: 'Meals', icon: ChefHat },
+  { to: '/library', label: 'Library', icon: Library },
   { to: '/progress', label: 'Progress', icon: LineChart },
   { to: '/settings', label: 'Settings', icon: Settings },
 ] as const;

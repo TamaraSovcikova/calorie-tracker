@@ -123,7 +123,7 @@ export function MealEditor({ mode }: MealEditorProps) {
         await updateMeal(id, { name: trimmed, notes: notes.trim() || undefined });
         await replaceMealItems(id, itemInputs);
       }
-      navigate('/meals');
+      navigate('/library');
     } finally {
       setSaving(false);
     }
@@ -133,7 +133,7 @@ export function MealEditor({ mode }: MealEditorProps) {
     if (!id) return;
     if (!confirm(`Delete meal "${name}"?`)) return;
     await softDeleteMeal(id);
-    navigate('/meals');
+    navigate('/library');
   };
 
   const handleDuplicate = async () => {
@@ -154,8 +154,8 @@ export function MealEditor({ mode }: MealEditorProps) {
       <div className="p-6 text-center text-sm text-muted-foreground">
         Meal not found.
         <div className="mt-3">
-          <Button variant="ghost" onClick={() => navigate('/meals')}>
-            Back to meals
+          <Button variant="ghost" onClick={() => navigate('/library')}>
+            Back to library
           </Button>
         </div>
       </div>
@@ -167,7 +167,7 @@ export function MealEditor({ mode }: MealEditorProps) {
       <header className="sticky top-0 z-30 flex items-center justify-between gap-2 border-b border-border bg-background/95 p-3 backdrop-blur">
         <button
           type="button"
-          onClick={() => navigate('/meals')}
+          onClick={() => navigate('/library')}
           className="tap-target flex items-center gap-1 rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground"
         >
           <ArrowLeft className="h-5 w-5" />
