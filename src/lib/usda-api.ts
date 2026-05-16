@@ -255,6 +255,25 @@ export function usdaHitToFood(hit: UsdaHit): Food | null {
 
 // ---------- Search ----------
 
+/**
+ * api.nal.usda.gov occasionally serves the FoodData Central website HTML
+ * instead of API JSON (rate-limit / CDN flakiness). res.json() would then
+ * throw an opaque "Unexpected token <" — parse the text ourselves and
+ * raise a clear, retryable error instead.
+ */
+async function parseJsonOrThrow(res: Response): Promise<unknown> {
+  const text = await res.text();
+  const trimmed = text.trimStart();
+  if (trimmed.startsWith('<')) {
+    throw new Error('USDA returned a non-JSON page (likely rate-limited)');
+  }
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error('USDA returned an unparseable response');
+  }
+}
+
 export interface SearchUsdaOptions {
   signal?: AbortSignal;
   /** Restrict to generic datasets — used when the user has hidden packaged. */
@@ -276,12 +295,14 @@ export async function searchUsda(
     ? ['Foundation', 'SR Legacy', 'Survey (FNDDS)']
     : ['Foundation', 'SR Legacy', 'Survey (FNDDS)', 'Branded'];
 
-  const params = new URLSearchParams({
-    api_key: apiKey,
-    query,
-    pageSize: '25',
-    dataType: dataTypes.join(','),
-  });
+  // dataType MUST be repeated params, not comma-joined: URLSearchParams
+  // encodes a comma as %2C and FDC's array parser does not recognise the
+  // encoded delimiter, returning 400.
+  const params = new URLSearchParams();
+  params.set('api_key', apiKey);
+  params.set('query', query);
+  params.set('pageSize', '25');
+  for (const dt of dataTypes) params.append('dataType', dt);
 
   const res = await fetch(`${BASE}/foods/search?${params}`, {
     signal: options.signal,
@@ -290,7 +311,7 @@ export async function searchUsda(
   if (res.status === 429) throw new UsdaRateLimitError(60_000);
   if (!res.ok) throw new Error(`USDA HTTP ${res.status}`);
 
-  const data = (await res.json()) as UsdaSearchResponse;
+  const data = (await parseJsonOrThrow(res)) as UsdaSearchResponse;
   if (!Array.isArray(data.foods)) return [];
   return data.foods
     .map(usdaHitToFood)
@@ -325,8 +346,9 @@ interface UsdaFoodDetail {
 
 /**
  * USDA's /foods/search results do NOT include foodPortions — only the
- * per-food detail endpoint does. This fetches the detail for one food and
- * returns its portions ("1 large", "1 slice", "1 cup", ...) as CustomUnits.
+ * per-food detail does. Uses the batch /foods?fdcIds= endpoint (the
+ * singular /food/{id} route is unreliable and 404s); for one id it
+ * returns a one-element array.
  *
  * Called lazily when the user actually picks a USDA food, so search stays
  * one request and we only pay the detail call for foods being logged.
@@ -336,11 +358,22 @@ export async function fetchUsdaFoodPortions(
   apiKey: string,
 ): Promise<CustomUnit[]> {
   if (!fdcId || !apiKey) return [];
-  const params = new URLSearchParams({ api_key: apiKey, format: 'full' });
-  const res = await fetch(`${BASE}/food/${encodeURIComponent(fdcId)}?${params}`);
+  const params = new URLSearchParams();
+  params.set('api_key', apiKey);
+  params.append('fdcIds', fdcId);
+  params.set('format', 'full');
+  const res = await fetch(`${BASE}/foods?${params}`);
   if (!res.ok) return [];
-  const data = (await res.json()) as UsdaFoodDetail;
-  return portionsToCustomUnits(data.foodPortions);
+  let data: unknown;
+  try {
+    data = await parseJsonOrThrow(res);
+  } catch {
+    return [];
+  }
+  const detail = (Array.isArray(data) ? data[0] : undefined) as
+    | UsdaFoodDetail
+    | undefined;
+  return portionsToCustomUnits(detail?.foodPortions);
 }
 
 /**

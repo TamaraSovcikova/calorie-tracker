@@ -23,9 +23,14 @@ interface MacroSummaryProps {
 export function MacroSummary({ profile, totals, burnedKcal = 0 }: MacroSummaryProps) {
   const [expanded, setExpanded] = useState(false);
 
-  const target = effectiveKcalTarget(profile, burnedKcal);
-  const remaining = Math.max(0, Math.round(target - totals.kcal));
-  const ringValue = pct(totals.kcal, target);
+  // The headline "Daily target" always shows the fixed base goal so it
+  // never appears to drift. `effective` (base + burned, when eat-back is
+  // on) only drives the remaining/over and the ring fill.
+  const baseTarget = profile.kcal_target;
+  const effective = effectiveKcalTarget(profile, burnedKcal);
+  const remaining = Math.max(0, Math.round(effective - totals.kcal));
+  const ringValue = pct(totals.kcal, effective);
+  const eatBack = profile.eat_back_burned && burnedKcal > 0;
   const primary = profile.primary_macro;
 
   return (
@@ -48,12 +53,12 @@ export function MacroSummary({ profile, totals, burnedKcal = 0 }: MacroSummaryPr
             Daily target
           </div>
           <div className="text-lg font-semibold tabular-nums">
-            {formatKcal(target)} kcal
+            {formatKcal(baseTarget)} kcal
           </div>
           <div className="mt-1 text-sm text-muted-foreground tabular-nums">
-            {totals.kcal > target ? (
+            {totals.kcal > effective ? (
               <span className="text-destructive">
-                {formatKcal(totals.kcal - target)} over
+                {formatKcal(totals.kcal - effective)} over
               </span>
             ) : (
               <>
@@ -64,9 +69,10 @@ export function MacroSummary({ profile, totals, burnedKcal = 0 }: MacroSummaryPr
               </>
             )}
           </div>
-          {burnedKcal > 0 && profile.eat_back_burned && (
+          {eatBack && (
             <div className="mt-1 text-xs text-muted-foreground">
-              +{formatKcal(burnedKcal)} from exercise
+              +{formatKcal(burnedKcal)} exercise → {formatKcal(effective)} kcal
+              available
             </div>
           )}
           <div className="mt-2">
