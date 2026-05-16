@@ -5,13 +5,16 @@ import { LabeledInput } from '@/components/ui/Input';
 import { SettingCard } from './SettingCard';
 import {
   beginFitbitAuth,
+  debugGoogleHealth,
   disconnectFitbit,
   getConnectedAccountEmail,
   getFitbitClientId,
   getGoogleClientSecret,
   setFitbitClientId,
   setGoogleClientSecret,
+  type FitbitDebugResult,
 } from '@/lib/fitbit-api';
+import { todayLocal } from '@/lib/dates';
 import { useFitbitTokens } from '@/db/repos/fitbitTokens';
 import { format, formatDistanceToNow } from 'date-fns';
 
@@ -62,6 +65,25 @@ export function FitbitSection() {
   const handleDisconnect = async () => {
     if (!confirm('Disconnect Fitbit? Re-authorise any time.')) return;
     await disconnectFitbit();
+  };
+
+  const [debugResult, setDebugResult] = useState<FitbitDebugResult | null>(null);
+  const [debugBusy, setDebugBusy] = useState(false);
+  const handleDebug = async () => {
+    setDebugBusy(true);
+    setDebugResult(null);
+    try {
+      setDebugResult(await debugGoogleHealth(todayLocal()));
+    } catch (err) {
+      setDebugResult({
+        date: todayLocal(),
+        account: getConnectedAccountEmail(),
+        totalCalories: err instanceof Error ? err.message : 'error',
+        steps: '—',
+      });
+    } finally {
+      setDebugBusy(false);
+    }
   };
 
   const expiresAt = tokens ? new Date(tokens.expires_at) : null;
@@ -156,6 +178,39 @@ export function FitbitSection() {
                 </span>
               )}
             </div>
+            <Button
+              type="button"
+              variant="secondary"
+              block
+              onClick={handleDebug}
+              disabled={debugBusy}
+            >
+              {debugBusy ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Testing fetch…
+                </>
+              ) : (
+                'Test data fetch (diagnostic)'
+              )}
+            </Button>
+            {debugResult && (
+              <div className="space-y-1 rounded-lg border border-border bg-muted/30 p-3 text-[11px]">
+                <div className="font-medium">Diagnostic — {debugResult.date}</div>
+                <div className="break-all">
+                  <span className="text-muted-foreground">account: </span>
+                  {debugResult.account ?? '(unknown)'}
+                </div>
+                <div className="break-all">
+                  <span className="text-muted-foreground">total-calories: </span>
+                  {debugResult.totalCalories}
+                </div>
+                <div className="break-all">
+                  <span className="text-muted-foreground">steps: </span>
+                  {debugResult.steps}
+                </div>
+              </div>
+            )}
             <Button
               type="button"
               variant="ghost"
