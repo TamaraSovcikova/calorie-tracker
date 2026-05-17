@@ -3,65 +3,74 @@
 @tailwind utilities;
 
 @layer base {
+  /*
+   * Design tokens. Minimalist, light-first: off-white canvas, white cards,
+   * layered cool greys, one calm green accent. The pet's cartoon art is the
+   * app's source of saturated colour — the UI itself stays soft and quiet.
+   */
   :root {
-    --background: 0 0% 100%;
-    --foreground: 240 10% 3.9%;
+    color-scheme: light;
+
+    --background: 220 20% 98%;
+    --foreground: 222 16% 20%;
 
     --card: 0 0% 100%;
-    --card-foreground: 240 10% 3.9%;
+    --card-foreground: 222 16% 20%;
 
-    --primary: 142 71% 45%;
+    --primary: 150 44% 41%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 240 4.8% 95.9%;
-    --secondary-foreground: 240 5.9% 10%;
+    --secondary: 220 16% 95%;
+    --secondary-foreground: 222 16% 24%;
 
-    --muted: 240 4.8% 95.9%;
-    --muted-foreground: 240 3.8% 46.1%;
+    --muted: 220 16% 95.5%;
+    --muted-foreground: 220 9% 48%;
 
-    --accent: 240 4.8% 95.9%;
-    --accent-foreground: 240 5.9% 10%;
+    --accent: 150 30% 94%;
+    --accent-foreground: 150 40% 26%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
+    --destructive: 5 72% 59%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 240 5.9% 90%;
-    --input: 240 5.9% 90%;
-    --ring: 142 71% 45%;
+    --border: 220 15% 91%;
+    --input: 220 14% 88%;
+    --ring: 150 44% 41%;
 
-    --kcal: 24 95% 53%;
-    --protein: 217 91% 60%;
-    --carbs: 41 96% 60%;
-    --fat: 271 81% 65%;
+    --kcal: 24 78% 56%;
+    --protein: 214 60% 57%;
+    --carbs: 38 74% 56%;
+    --fat: 262 44% 62%;
 
-    --radius: 0.75rem;
+    --radius: 0.875rem;
   }
 
   .dark {
-    --background: 240 10% 3.9%;
-    --foreground: 0 0% 98%;
+    color-scheme: dark;
 
-    --card: 240 7% 8%;
-    --card-foreground: 0 0% 98%;
+    --background: 222 18% 11%;
+    --foreground: 220 16% 92%;
 
-    --primary: 142 71% 45%;
-    --primary-foreground: 240 10% 3.9%;
+    --card: 222 16% 15%;
+    --card-foreground: 220 16% 92%;
 
-    --secondary: 240 3.7% 15.9%;
-    --secondary-foreground: 0 0% 98%;
+    --primary: 150 46% 48%;
+    --primary-foreground: 222 18% 11%;
 
-    --muted: 240 3.7% 15.9%;
-    --muted-foreground: 240 5% 64.9%;
+    --secondary: 222 13% 22%;
+    --secondary-foreground: 220 16% 92%;
 
-    --accent: 240 3.7% 15.9%;
-    --accent-foreground: 0 0% 98%;
+    --muted: 222 13% 21%;
+    --muted-foreground: 220 11% 62%;
 
-    --destructive: 0 62.8% 50%;
-    --destructive-foreground: 0 0% 98%;
+    --accent: 150 24% 24%;
+    --accent-foreground: 150 36% 82%;
 
-    --border: 240 3.7% 15.9%;
-    --input: 240 3.7% 15.9%;
-    --ring: 142 71% 45%;
+    --destructive: 5 64% 56%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 222 12% 24%;
+    --input: 222 12% 27%;
+    --ring: 150 46% 48%;
   }
 
   * {
