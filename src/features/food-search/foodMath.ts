@@ -29,6 +29,13 @@ export interface ResolvedMacros {
   unit: string;
 }
 
+/** Map a stored {qty, unit} pair (diary entry / meal item) back to a state. */
+export function unitToQuantityState(qty: number, unit: string): QuantityState {
+  if (unit === 'g' || unit === 'ml') return { mode: 'g', qty };
+  if (unit === 'serving') return { mode: 'serving', qty };
+  return { mode: `unit:${unit}` as QuantityMode, qty };
+}
+
 export function customUnitFromMode(food: Food, mode: QuantityMode): CustomUnit | null {
   if (!mode.startsWith('unit:')) return null;
   const label = mode.slice('unit:'.length);

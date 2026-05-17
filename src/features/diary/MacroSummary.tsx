@@ -75,6 +75,15 @@ export function MacroSummary({ profile, totals, burnedKcal = 0 }: MacroSummaryPr
               available
             </div>
           )}
+          {burnedKcal > 0 && (
+            <div className="mt-1 text-xs text-muted-foreground tabular-nums">
+              Net {formatKcal(totals.kcal - burnedKcal)} kcal
+              <span className="text-muted-foreground/70">
+                {' '}
+                ({formatKcal(totals.kcal)} eaten − {formatKcal(burnedKcal)} burned)
+              </span>
+            </div>
+          )}
           <div className="mt-2">
             <MacroBar
               label={MACRO_LABELS[primary]}

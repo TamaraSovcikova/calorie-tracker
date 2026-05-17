@@ -34,17 +34,23 @@ export function DiarySectionView({
         ? totals.carbs
         : totals.fat;
 
+  const hasEntries = entries.length > 0;
+
   return (
     <section className="rounded-2xl border border-border bg-card shadow-sm">
       <header className="flex items-center justify-between gap-3 px-4 py-3">
         <div className="min-w-0">
           <h2 className="text-base font-medium">{SECTION_TITLES[section]}</h2>
-          <p className="mt-0.5 text-xs text-muted-foreground tabular-nums">
-            <span className="font-medium text-foreground">{formatKcal(totals.kcal)}</span>{' '}
-            kcal
-            <span className="mx-1.5">·</span>
-            {Math.round(primaryVal)}g {MACRO_LABELS[primaryMacro]}
-          </p>
+          {hasEntries && (
+            <p className="mt-0.5 text-xs text-muted-foreground tabular-nums">
+              <span className="font-medium text-foreground">
+                {formatKcal(totals.kcal)}
+              </span>{' '}
+              kcal
+              <span className="mx-1.5">·</span>
+              {Math.round(primaryVal)}g {MACRO_LABELS[primaryMacro]}
+            </p>
+          )}
         </div>
         <button
           type="button"
@@ -56,11 +62,7 @@ export function DiarySectionView({
           Add
         </button>
       </header>
-      {entries.length === 0 ? (
-        <div className="px-4 pb-4">
-          <p className="text-sm text-muted-foreground">No entries yet.</p>
-        </div>
-      ) : (
+      {hasEntries && (
         <ul className="divide-y divide-border px-2 pb-2">
           {entries.map((e) => (
             <li key={e.id}>

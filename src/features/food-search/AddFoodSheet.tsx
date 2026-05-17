@@ -12,8 +12,14 @@ import { formatKcal } from '@/lib/macros';
 const BarcodeScanner = lazy(() =>
   import('./BarcodeScanner').then((m) => ({ default: m.BarcodeScanner })),
 );
-import { computeMacros, type QuantityState } from './foodMath';
-import { createDiaryEntry } from '@/db/repos/diary';
+import {
+  computeMacros,
+  customUnitFromMode,
+  defaultQuantity,
+  unitToQuantityState,
+  type QuantityState,
+} from './foodMath';
+import { createDiaryEntry, lastQuantityForFood } from '@/db/repos/diary';
 import { toast } from '@/components/ui/toast';
 import { db } from '@/db/dexie';
 import { lookupBarcode, OffRateLimitError } from '@/lib/off-api';
@@ -34,9 +40,26 @@ interface AddFoodSheetProps {
 type Step =
   | { kind: 'pick' }
   | { kind: 'looking-up'; barcode: string }
-  | { kind: 'quantity'; food: Food }
+  | { kind: 'quantity'; food: Food; initial?: QuantityState }
   | { kind: 'meal-portion'; meal: Meal }
   | { kind: 'manual'; presetName?: string; presetBarcode?: string };
+
+/** Re-use the last logged quantity for a food, validated against the food's
+ *  current units; falls back to a sensible default otherwise. */
+function rememberedQuantity(
+  food: Food,
+  last: { qty: number; unit: string } | undefined,
+): QuantityState {
+  if (!last || !(last.qty > 0)) return defaultQuantity(food);
+  const state = unitToQuantityState(last.qty, last.unit);
+  if (state.mode === 'serving' && !(food.serving_g && food.serving_g > 0)) {
+    return defaultQuantity(food);
+  }
+  if (state.mode.startsWith('unit:') && !customUnitFromMode(food, state.mode)) {
+    return defaultQuantity(food);
+  }
+  return state;
+}
 
 type Tab = 'search' | 'scan' | 'meals' | 'quick';
 
@@ -63,7 +86,10 @@ export function AddFoodSheet({ open, onClose, date, section }: AddFoodSheetProps
     reset();
   };
 
-  const handlePick = (food: Food) => setStep({ kind: 'quantity', food });
+  const handlePick = async (food: Food) => {
+    const last = await lastQuantityForFood(food.id);
+    setStep({ kind: 'quantity', food, initial: rememberedQuantity(food, last) });
+  };
   const handleManualEntry = (name: string) =>
     setStep({ kind: 'manual', presetName: name || undefined });
   const handleManualCreated = (food: Food) =>
@@ -208,6 +234,7 @@ export function AddFoodSheet({ open, onClose, date, section }: AddFoodSheetProps
     content = (
       <QuantityStep
         food={step.food}
+        initial={step.initial}
         onBack={() => setStep({ kind: 'pick' })}
         onSave={handleSaveQuantity}
       />

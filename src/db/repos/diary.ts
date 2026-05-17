@@ -152,6 +152,22 @@ export async function listLoggedDates(): Promise<LocalDate[]> {
   return [...set].sort();
 }
 
+/** The qty + unit of the most recent entry for a food, for pre-filling the
+ *  add-quantity step so a daily food doesn't need re-entering each time. */
+export async function lastQuantityForFood(
+  foodId: string,
+): Promise<{ qty: number; unit: string } | undefined> {
+  const rows = await db.diary_entries
+    .where('user_id')
+    .equals(currentUserId())
+    .filter((e) => !e.deleted_at && e.kind === 'food' && e.food_id === foodId)
+    .toArray();
+  if (rows.length === 0) return undefined;
+  let latest = rows[0];
+  for (const r of rows) if (r.created_at > latest.created_at) latest = r;
+  return { qty: latest.qty, unit: latest.unit };
+}
+
 /** Recent foods logged into a given section, most recent first, deduped. */
 export async function recentFoodsInSection(
   section: MealSection,
