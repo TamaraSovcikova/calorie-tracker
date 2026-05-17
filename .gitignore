@@ -22,6 +22,8 @@ dist-ssr
 # os
 .DS_Store
 Thumbs.db
+# Windows "downloaded file" metadata streams (created when copying via WSL)
+*:Zone.Identifier
 
 # logs
 npm-debug.log*

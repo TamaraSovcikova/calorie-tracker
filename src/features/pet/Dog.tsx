@@ -9,6 +9,7 @@ import hungryUrl from '@/assets/pet/dog-hungry.webp';
 import peckishUrl from '@/assets/pet/dog-peckish.webp';
 import sadUrl from '@/assets/pet/dog-sad.webp';
 import sleepingUrl from '@/assets/pet/dog-sleeping.webp';
+import stretchingUrl from '@/assets/pet/dog-stretching.webp';
 import stuffedUrl from '@/assets/pet/dog-stuffed.webp';
 
 const POSE_SRC: Record<DogPose, string> = {
@@ -22,6 +23,7 @@ const POSE_SRC: Record<DogPose, string> = {
   sad: sadUrl,
   sleeping: sleepingUrl,
   greeting: greetingUrl,
+  stretching: stretchingUrl,
 };
 
 /** Poses with extra pep get the livelier bob instead of calm breathing. */

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/cn';
 import { Dog } from './Dog';
 import type { DogPose } from './petLogic';
@@ -46,6 +46,9 @@ export function DogPlayground({ pose, className }: DogPlaygroundProps) {
   const stageRect = useRef<DOMRect | null>(null);
   const grab = useRef({ x: 0, y: 0 });
   const ptr = useRef({ x: 0, y: 0, px: 0, py: 0 });
+
+  // A transient "beat" pose (e.g. a stretch) shown over the base pose.
+  const [beat, setBeat] = useState<DogPose | null>(null);
 
   // Keep the restful flag readable inside the long-lived loops.
   const restfulRef = useRef(RESTFUL.has(pose));
@@ -137,9 +140,28 @@ export function DogPlayground({ pose, className }: DogPlaygroundProps) {
     };
     roam();
 
+    // Occasional stretch beat — a brief play-bow, then back to the base pose.
+    let beatTimer: ReturnType<typeof setTimeout>;
+    let beatClear: ReturnType<typeof setTimeout>;
+    const stretchBeat = () => {
+      beatTimer = setTimeout(
+        () => {
+          if (onFloor.current && !dragging.current && !restfulRef.current) {
+            setBeat('stretching');
+            beatClear = setTimeout(() => setBeat(null), 2400);
+          }
+          stretchBeat();
+        },
+        7000 + Math.random() * 7000,
+      );
+    };
+    stretchBeat();
+
     return () => {
       cancelAnimationFrame(raf);
       clearTimeout(roamTimer);
+      clearTimeout(beatTimer);
+      clearTimeout(beatClear);
       ro.disconnect();
     };
   }, []);
@@ -204,7 +226,7 @@ export function DogPlayground({ pose, className }: DogPlaygroundProps) {
         style={{ width: DOG, height: DOG, willChange: 'transform' }}
         className="absolute left-0 top-0 touch-none cursor-grab active:cursor-grabbing"
       >
-        <Dog pose={pose} className="h-full w-full" />
+        <Dog pose={beat ?? pose} className="h-full w-full" />
       </div>
     </div>
   );

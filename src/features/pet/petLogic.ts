@@ -18,7 +18,9 @@ export type DogPose =
   | 'happy'
   | 'sad'
   | 'sleeping'
-  | 'greeting';
+  | 'greeting'
+  // Action-only pose — shown as a transient idle beat, never a logging state.
+  | 'stretching';
 
 export type WellbeingBand = 'thriving' | 'happy' | 'down' | 'sad';
 
@@ -139,5 +141,7 @@ export function dogStatusLine(pose: DogPose, name: string): string {
       return `${name} is fast asleep.`;
     case 'greeting':
       return `${name} is happy to see you!`;
+    case 'stretching':
+      return `${name} is having a good stretch.`;
   }
 }
