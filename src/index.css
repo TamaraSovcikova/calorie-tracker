@@ -4,37 +4,38 @@
 
 @layer base {
   /*
-   * Design tokens. Minimalist, light-first: off-white canvas, white cards,
-   * layered cool greys, one calm green accent. The pet's cartoon art is the
-   * app's source of saturated colour — the UI itself stays soft and quiet.
+   * Design tokens — warm, cozy, minimalist. Palette:
+   *   Porcelain  #FDFFF7  canvas        Charcoal   #50514F  ink
+   *   Verdigris  #2F9C95  primary/brand Rosy Taupe #B98B82  warm caution
+   * The pet's cartoon art carries the saturated colour; the UI stays soft.
    */
   :root {
     color-scheme: light;
 
-    --background: 220 20% 98%;
-    --foreground: 222 16% 20%;
+    --background: 70 50% 98%;
+    --foreground: 90 4% 28%;
 
     --card: 0 0% 100%;
-    --card-foreground: 222 16% 20%;
+    --card-foreground: 90 4% 28%;
 
-    --primary: 150 44% 41%;
+    --primary: 176 54% 40%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 220 16% 95%;
-    --secondary-foreground: 222 16% 24%;
+    --secondary: 72 20% 95%;
+    --secondary-foreground: 90 5% 28%;
 
-    --muted: 220 16% 95.5%;
-    --muted-foreground: 220 9% 48%;
+    --muted: 72 18% 95%;
+    --muted-foreground: 84 5% 46%;
 
-    --accent: 150 30% 94%;
-    --accent-foreground: 150 40% 26%;
+    --accent: 176 36% 93%;
+    --accent-foreground: 176 50% 24%;
 
-    --destructive: 5 72% 59%;
+    --destructive: 10 36% 58%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 220 15% 91%;
-    --input: 220 14% 88%;
-    --ring: 150 44% 41%;
+    --border: 72 16% 90%;
+    --input: 72 14% 87%;
+    --ring: 176 54% 40%;
 
     --kcal: 24 78% 56%;
     --protein: 214 60% 57%;
@@ -47,30 +48,30 @@
   .dark {
     color-scheme: dark;
 
-    --background: 222 18% 11%;
-    --foreground: 220 16% 92%;
+    --background: 90 5% 12%;
+    --foreground: 70 14% 90%;
 
-    --card: 222 16% 15%;
-    --card-foreground: 220 16% 92%;
+    --card: 90 5% 16%;
+    --card-foreground: 70 14% 90%;
 
-    --primary: 150 46% 48%;
-    --primary-foreground: 222 18% 11%;
+    --primary: 176 48% 47%;
+    --primary-foreground: 90 6% 12%;
 
-    --secondary: 222 13% 22%;
-    --secondary-foreground: 220 16% 92%;
+    --secondary: 90 5% 22%;
+    --secondary-foreground: 70 14% 90%;
 
-    --muted: 222 13% 21%;
-    --muted-foreground: 220 11% 62%;
+    --muted: 90 5% 21%;
+    --muted-foreground: 80 7% 60%;
 
-    --accent: 150 24% 24%;
-    --accent-foreground: 150 36% 82%;
+    --accent: 176 30% 24%;
+    --accent-foreground: 176 40% 80%;
 
-    --destructive: 5 64% 56%;
+    --destructive: 10 42% 56%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 222 12% 24%;
-    --input: 222 12% 27%;
-    --ring: 150 46% 48%;
+    --border: 90 5% 24%;
+    --input: 90 5% 27%;
+    --ring: 176 48% 47%;
   }
 
   * {
