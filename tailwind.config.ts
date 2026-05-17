@@ -78,23 +78,24 @@ const config: Config = {
           from: { opacity: '0', transform: 'scale(0.96)' },
           to: { opacity: '1', transform: 'scale(1)' },
         },
-        // The dog's idle "breathing" — a gentle scale pulse from the ground.
+        // The dog's calm idle — a clearly visible float + breath.
         breathe: {
-          '0%, 100%': { transform: 'scale(1)' },
-          '50%': { transform: 'scale(1.025)' },
+          '0%, 100%': { transform: 'translateY(0) scale(1)' },
+          '50%': { transform: 'translateY(-4%) scale(1.045)' },
         },
-        // A livelier idle bob for the happy/greeting states.
+        // A livelier bounce for the happy/greeting/eating states.
         bob: {
-          '0%, 100%': { transform: 'translateY(0)' },
-          '50%': { transform: 'translateY(-5%)' },
+          '0%, 100%': { transform: 'translateY(0) scale(1)' },
+          '30%': { transform: 'translateY(-11%) scale(1.05)' },
+          '60%': { transform: 'translateY(0) scale(0.97)' },
         },
       },
       animation: {
         'fade-in': 'fade-in 0.2s ease-out',
         'slide-up': 'slide-up 0.28s cubic-bezier(0.22, 1, 0.36, 1)',
         'pop-in': 'pop-in 0.2s cubic-bezier(0.22, 1, 0.36, 1)',
-        breathe: 'breathe 3.6s ease-in-out infinite',
-        bob: 'bob 1.1s ease-in-out infinite',
+        breathe: 'breathe 2.6s ease-in-out infinite',
+        bob: 'bob 0.85s ease-in-out infinite',
       },
     },
   },
