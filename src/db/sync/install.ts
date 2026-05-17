@@ -21,6 +21,7 @@ const TABLES = [
   db.diary_entries,
   db.exercise_entries,
   db.weight_log,
+  db.pet,
 ] as const;
 
 let installed = false;

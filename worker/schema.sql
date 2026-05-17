@@ -126,6 +126,18 @@ CREATE TABLE IF NOT EXISTS weight_log (
 CREATE UNIQUE INDEX IF NOT EXISTS weight_log_user_date ON weight_log (user_id, date);
 CREATE INDEX IF NOT EXISTS weight_log_updated_at ON weight_log (updated_at);
 
+CREATE TABLE IF NOT EXISTS pet (
+  user_id                   TEXT PRIMARY KEY,
+  name                      TEXT    NOT NULL,
+  breed                     TEXT,
+  coat                      TEXT,
+  wellbeing                 REAL    NOT NULL,
+  wellbeing_evaluated_date  TEXT    NOT NULL,
+  created_at                TEXT    NOT NULL,
+  updated_at                TEXT    NOT NULL
+);
+CREATE INDEX IF NOT EXISTS pet_updated_at ON pet (updated_at);
+
 CREATE TABLE IF NOT EXISTS fitbit_tokens (
   user_id         TEXT PRIMARY KEY,
   access_token    TEXT NOT NULL,

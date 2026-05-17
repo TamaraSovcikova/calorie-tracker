@@ -19,6 +19,7 @@ import type {
   Food,
   Meal,
   MealItem,
+  Pet,
   Profile,
   WeightEntry,
 } from '../types';
@@ -40,6 +41,7 @@ const TABLES = [
   'exercise_entries',
   'weight_log',
   'fitbit_tokens',
+  'pet',
 ] as const;
 type TableName = (typeof TABLES)[number];
 
@@ -215,6 +217,9 @@ class SyncEngine {
     out.fitbit_tokens = (await db.fitbit_tokens.toArray()).filter(
       (r: FitbitTokens) => r.updated_at > since('fitbit_tokens'),
     );
+    out.pet = (await db.pet.toArray()).filter(
+      (r: Pet) => r.updated_at > since('pet'),
+    );
 
     return out;
   }
@@ -233,6 +238,7 @@ class SyncEngine {
         db.exercise_entries,
         db.weight_log,
         db.fitbit_tokens,
+        db.pet,
       ],
       async () => {
         if (pull.profiles?.length) {
@@ -287,6 +293,9 @@ class SyncEngine {
             pull.fitbit_tokens as FitbitTokens[],
             'user_id',
           );
+        }
+        if (pull.pet?.length) {
+          await this.upsertWithLww(db.pet, pull.pet as Pet[], 'user_id');
         }
       },
     );

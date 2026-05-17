@@ -42,6 +42,7 @@ const TABLES = [
   'exercise_entries',
   'weight_log',
   'fitbit_tokens',
+  'pet',
 ] as const;
 type TableName = (typeof TABLES)[number];
 
@@ -142,6 +143,16 @@ const COLUMNS: Record<TableName, string[]> = {
     'created_at',
     'updated_at',
   ],
+  pet: [
+    'user_id',
+    'name',
+    'breed',
+    'coat',
+    'wellbeing',
+    'wellbeing_evaluated_date',
+    'created_at',
+    'updated_at',
+  ],
 };
 
 const PRIMARY_KEY: Record<TableName, string> = {
@@ -153,6 +164,7 @@ const PRIMARY_KEY: Record<TableName, string> = {
   exercise_entries: 'id',
   weight_log: 'id',
   fitbit_tokens: 'user_id',
+  pet: 'user_id',
 };
 
 const UPDATED_AT_COLUMN: Record<TableName, string> = {
@@ -164,6 +176,7 @@ const UPDATED_AT_COLUMN: Record<TableName, string> = {
   exercise_entries: 'updated_at',
   weight_log: 'updated_at',
   fitbit_tokens: 'updated_at',
+  pet: 'updated_at',
 };
 
 const EPOCH = '1970-01-01T00:00:00.000Z';

@@ -174,6 +174,25 @@ export interface WeightEntry {
  * the only line of defence is the bearer SYNC_TOKEN you set on the worker
  * + private Cloudflare account.
  */
+/**
+ * The virtual pet — one row per user. `wellbeing` is the long-arc 0-100
+ * consistency score (it replaces the streak); the moment-to-moment
+ * "fullness" is always derived from the diary, never stored.
+ */
+export interface Pet {
+  user_id: ID;
+  name: string;
+  /** Reserved for future appearance customisation; v1 ships one dog. */
+  breed?: string;
+  coat?: string;
+  /** 0-100 long-arc wellbeing score. */
+  wellbeing: number;
+  /** Last local date already folded into `wellbeing` (YYYY-MM-DD). */
+  wellbeing_evaluated_date: LocalDate;
+  created_at: ISOTimestamp;
+  updated_at: ISOTimestamp;
+}
+
 export interface FitbitTokens {
   user_id: ID;
   access_token: string;
