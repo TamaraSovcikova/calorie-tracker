@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { format } from 'date-fns';
 import { ChevronLeft, ChevronRight, CopyPlus, Flame, Loader2 } from 'lucide-react';
 import { PageHeader } from '@/components/PageHeader';
+import { CoachTip } from '@/components/ui/CoachTip';
 import { useStreak } from '@/features/progress/useStreak';
 import { MacroSummary } from '@/features/diary/MacroSummary';
 import { DiarySectionView } from '@/features/diary/DiarySection';
@@ -135,6 +136,11 @@ export function DiaryPage() {
       />
 
       <div className="mx-auto max-w-md space-y-3 px-4 py-4">
+        <CoachTip id="diary-basics">
+          Tap the date above to jump to any day. Use a section's{' '}
+          <span className="font-medium text-foreground">Add</span> button to
+          search, scan a barcode, or quick-add calories.
+        </CoachTip>
         {streak.current > 0 && (
           <div className="flex justify-end">
             <span className="inline-flex items-center gap-1 rounded-full bg-orange-500/10 px-2.5 py-1 text-xs font-medium text-orange-600 dark:text-orange-400">

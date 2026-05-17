@@ -3,6 +3,7 @@ import { Loader2, Plus, Search, Settings as SettingsIcon } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
+import { CoachTip } from '@/components/ui/CoachTip';
 import { useFoodSearch } from './useFoodSearch';
 import { FoodResultRow } from './FoodResultRow';
 import type { Food, MealSection } from '@/db/types';
@@ -117,6 +118,14 @@ export function FoodSearchPanel({
       )}
 
       <div className="flex-1 space-y-4 px-2 py-3">
+        {!hasQuery && (
+          <CoachTip id="add-food-tabs">
+            Use the tabs above: <span className="font-medium text-foreground">Scan</span>{' '}
+            a barcode, log a saved <span className="font-medium text-foreground">Meal</span>{' '}
+            in one tap, or <span className="font-medium text-foreground">Quick</span>-add
+            bare calories.
+          </CoachTip>
+        )}
         {showRecents && (
           <Group title={`Recent in ${SECTION_TITLES[section]}`}>
             {recents.map((f) => (

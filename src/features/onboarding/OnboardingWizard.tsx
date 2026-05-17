@@ -1,5 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowRight, CheckCircle2, Sparkles } from 'lucide-react';
+import {
+  ArrowRight,
+  BookOpen,
+  CheckCircle2,
+  Library,
+  LineChart,
+  Sparkles,
+  type LucideIcon,
+} from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { LabeledInput } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
@@ -29,7 +37,9 @@ export function OnboardingGate() {
 }
 
 type StepId = 'welcome' | 'goals' | 'profile' | 'macros' | 'done';
-const STEPS: StepId[] = ['welcome', 'goals', 'profile', 'macros', 'done'];
+// Profile (with its TDEE + goal picker) comes before the calorie target so
+// the goal pick can pre-fill it, rather than asking for a blind number first.
+const STEPS: StepId[] = ['welcome', 'profile', 'goals', 'macros', 'done'];
 
 function OnboardingWizard({ profile }: { profile: Profile }) {
   const [step, setStep] = useState<StepId>('welcome');
@@ -247,7 +257,7 @@ function GoalsStep({
       <header>
         <h1 className="text-2xl font-semibold">Daily calorie target</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          A starting number — we'll fine-tune it on the next screen.
+          Your goal pick set this — tweak it here, or enter your own number.
         </p>
       </header>
       <div className="mt-6 space-y-4">
@@ -282,6 +292,12 @@ function GoalsStep({
     </div>
   );
 }
+
+const MACRO_PRESETS = [
+  { key: 'balanced', label: 'Balanced', p: 0.3, c: 0.4, f: 0.3 },
+  { key: 'high-protein', label: 'High protein', p: 0.4, c: 0.35, f: 0.25 },
+  { key: 'low-carb', label: 'Low carb', p: 0.35, c: 0.2, f: 0.45 },
+] as const;
 
 const GOAL_OPTIONS = [
   { key: 'lose', label: 'Lose', delta: -500, sub: '−500 deficit' },
@@ -466,15 +482,35 @@ function MacrosStep({
   const target = parseFloat(kcal);
   const drift = target > 0 ? Math.abs(sum - target) / target : 0;
 
+  const applyPreset = (p: { p: number; c: number; f: number }) => {
+    if (!(target > 0)) return;
+    onChange('protein', String(Math.round((target * p.p) / 4)));
+    onChange('carbs', String(Math.round((target * p.c) / 4)));
+    onChange('fat', String(Math.round((target * p.f) / 9)));
+  };
+
   return (
     <div className="flex flex-1 flex-col">
       <header>
         <h1 className="text-2xl font-semibold">Macros</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          We've started you at a 30 / 40 / 30 split. Tweak as you like.
+          Pick a split to start from, then tweak the grams as you like.
         </p>
       </header>
-      <div className="mt-5 grid grid-cols-3 gap-2">
+      <div className="mt-4 flex flex-wrap gap-2">
+        {MACRO_PRESETS.map((preset) => (
+          <button
+            key={preset.key}
+            type="button"
+            onClick={() => applyPreset(preset)}
+            disabled={!(target > 0)}
+            className="rounded-full border border-border bg-muted/40 px-3 py-1.5 text-xs font-medium hover:border-primary disabled:opacity-50"
+          >
+            {preset.label}
+          </button>
+        ))}
+      </div>
+      <div className="mt-4 grid grid-cols-3 gap-2">
         <LabeledInput
           label="Protein"
           type="number"
@@ -522,18 +558,56 @@ function MacrosStep({
 function DoneStep({ onFinish, onBack }: { onFinish: () => void; onBack: () => void }) {
   return (
     <div className="flex flex-1 flex-col">
-      <div className="flex flex-1 flex-col items-center justify-center text-center">
+      <div className="flex flex-1 flex-col items-center justify-center">
         <div className="rounded-full bg-primary/10 p-4">
           <CheckCircle2 className="h-8 w-8 text-primary" />
         </div>
         <h1 className="mt-6 text-2xl font-semibold">All set</h1>
-        <p className="mt-2 max-w-xs text-sm text-muted-foreground">
-          Sync, Fitbit, weight tracking, and meal templates all live in the
-          tabs at the bottom. Time to log breakfast.
+        <p className="mt-2 max-w-xs text-center text-sm text-muted-foreground">
+          Here's where everything lives:
         </p>
+        <ul className="mt-5 w-full max-w-xs space-y-3">
+          <FeatureRow
+            icon={BookOpen}
+            title="Diary"
+            desc="Log meals, scan barcodes, quick-add calories."
+          />
+          <FeatureRow
+            icon={Library}
+            title="Library"
+            desc="Save meals and custom foods to reuse."
+          />
+          <FeatureRow
+            icon={LineChart}
+            title="Progress"
+            desc="Streak, weekly trends, and weight log."
+          />
+        </ul>
       </div>
       <NavButtons onBack={onBack} onNext={onFinish} nextLabel="Open diary" />
     </div>
+  );
+}
+
+function FeatureRow({
+  icon: Icon,
+  title,
+  desc,
+}: {
+  icon: LucideIcon;
+  title: string;
+  desc: string;
+}) {
+  return (
+    <li className="flex items-start gap-3">
+      <div className="shrink-0 rounded-lg bg-muted p-2">
+        <Icon className="h-4 w-4 text-foreground" />
+      </div>
+      <div className="min-w-0">
+        <div className="text-sm font-medium">{title}</div>
+        <div className="text-xs text-muted-foreground">{desc}</div>
+      </div>
+    </li>
   );
 }
 

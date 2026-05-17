@@ -1,7 +1,33 @@
+import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { AlertTriangle, BookOpen, Library, LineChart, Settings } from 'lucide-react';
+import {
+  AlertTriangle,
+  BookOpen,
+  CloudOff,
+  Library,
+  LineChart,
+  Settings,
+} from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { useSyncStatus } from '@/db/sync/client';
+
+/** Tracks the browser's online/offline state. */
+function useOnline(): boolean {
+  const [online, setOnline] = useState(() =>
+    typeof navigator === 'undefined' ? true : navigator.onLine,
+  );
+  useEffect(() => {
+    const on = () => setOnline(true);
+    const off = () => setOnline(false);
+    window.addEventListener('online', on);
+    window.addEventListener('offline', off);
+    return () => {
+      window.removeEventListener('online', on);
+      window.removeEventListener('offline', off);
+    };
+  }, []);
+  return online;
+}
 
 const NAV_ITEMS = [
   { to: '/diary', label: 'Diary', icon: BookOpen },
@@ -12,10 +38,17 @@ const NAV_ITEMS = [
 
 export function Layout() {
   const sync = useSyncStatus();
+  const online = useOnline();
   const navigate = useNavigate();
   return (
     <div className="flex h-full flex-col bg-background">
-      {sync.status === 'error' && (
+      {!online && (
+        <div className="flex w-full items-center justify-center gap-1.5 bg-muted px-3 py-1.5 text-xs font-medium text-muted-foreground">
+          <CloudOff className="h-3.5 w-3.5" />
+          Offline — changes save here and sync when you reconnect
+        </div>
+      )}
+      {online && sync.status === 'error' && (
         <button
           type="button"
           onClick={() => navigate('/settings')}
