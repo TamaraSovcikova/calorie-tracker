@@ -19,8 +19,15 @@ export type DogPose =
   | 'sad'
   | 'sleeping'
   | 'greeting'
-  // Action-only pose — shown as a transient idle beat, never a logging state.
-  | 'stretching';
+  // Action / expression poses — shown as transient idle beats, never
+  // logging states.
+  | 'stretching'
+  | 'bored'
+  | 'curious'
+  | 'love'
+  | 'playful'
+  | 'smile'
+  | 'surprised';
 
 export type WellbeingBand = 'thriving' | 'happy' | 'down' | 'sad';
 
@@ -143,5 +150,17 @@ export function dogStatusLine(pose: DogPose, name: string): string {
       return `${name} is happy to see you!`;
     case 'stretching':
       return `${name} is having a good stretch.`;
+    case 'bored':
+      return `${name} is a little bored.`;
+    case 'curious':
+      return `${name} is curious about something.`;
+    case 'love':
+      return `${name} loves you!`;
+    case 'playful':
+      return `${name} wants to play!`;
+    case 'smile':
+      return `${name} is all smiles.`;
+    case 'surprised':
+      return `${name} looks surprised!`;
   }
 }

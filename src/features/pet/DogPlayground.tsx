@@ -23,6 +23,17 @@ const THROW_CAP = 34;
 
 const RESTFUL = new Set<DogPose>(['full', 'stuffed', 'sleeping', 'sad', 'eating']);
 
+/** Transient expression/action poses the dog flashes between behaviours. */
+const BEAT_POSES: DogPose[] = [
+  'stretching',
+  'bored',
+  'curious',
+  'love',
+  'playful',
+  'smile',
+  'surprised',
+];
+
 const clamp = (v: number, lo: number, hi: number) =>
   Math.max(lo, Math.min(hi, v));
 
@@ -140,22 +151,23 @@ export function DogPlayground({ pose, className }: DogPlaygroundProps) {
     };
     roam();
 
-    // Occasional stretch beat — a brief play-bow, then back to the base pose.
+    // Occasional idle beat — a brief expression or action (stretch, curious,
+    // playful…) drawn at random, then back to the base pose.
     let beatTimer: ReturnType<typeof setTimeout>;
     let beatClear: ReturnType<typeof setTimeout>;
-    const stretchBeat = () => {
+    const idleBeat = () => {
       beatTimer = setTimeout(
         () => {
           if (onFloor.current && !dragging.current && !restfulRef.current) {
-            setBeat('stretching');
+            setBeat(BEAT_POSES[Math.floor(Math.random() * BEAT_POSES.length)]);
             beatClear = setTimeout(() => setBeat(null), 2400);
           }
-          stretchBeat();
+          idleBeat();
         },
-        7000 + Math.random() * 7000,
+        5000 + Math.random() * 6000,
       );
     };
-    stretchBeat();
+    idleBeat();
 
     return () => {
       cancelAnimationFrame(raf);

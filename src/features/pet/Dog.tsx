@@ -11,6 +11,12 @@ import sadUrl from '@/assets/pet/dog-sad.webp';
 import sleepingUrl from '@/assets/pet/dog-sleeping.webp';
 import stretchingUrl from '@/assets/pet/dog-stretching.webp';
 import stuffedUrl from '@/assets/pet/dog-stuffed.webp';
+import boredUrl from '@/assets/pet/dog-bored.webp';
+import curiousUrl from '@/assets/pet/dog-curious.webp';
+import loveUrl from '@/assets/pet/dog-love.webp';
+import playfulUrl from '@/assets/pet/dog-playful.webp';
+import smileUrl from '@/assets/pet/dog-smile.webp';
+import surprisedUrl from '@/assets/pet/dog-surprised.webp';
 
 const POSE_SRC: Record<DogPose, string> = {
   hungry: hungryUrl,
@@ -24,10 +30,16 @@ const POSE_SRC: Record<DogPose, string> = {
   sleeping: sleepingUrl,
   greeting: greetingUrl,
   stretching: stretchingUrl,
+  bored: boredUrl,
+  curious: curiousUrl,
+  love: loveUrl,
+  playful: playfulUrl,
+  smile: smileUrl,
+  surprised: surprisedUrl,
 };
 
 /** Poses with extra pep get the livelier bob instead of calm breathing. */
-const BOB_POSES = new Set<DogPose>(['happy', 'greeting', 'eating']);
+const BOB_POSES = new Set<DogPose>(['happy', 'greeting', 'eating', 'playful']);
 
 interface DogProps {
   pose: DogPose;
