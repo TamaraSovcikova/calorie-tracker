@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Sheet } from '@/components/ui/Sheet';
 import { QuantityStep } from './QuantityStep';
 import { QuickAddForm, type QuickAddValues } from './QuickAddForm';
-import { computeMacros, type QuantityMode, type QuantityState } from './foodMath';
+import type { QuantityMode, QuantityState, ResolvedMacros } from './foodMath';
 import { restoreDiaryEntry, softDeleteDiaryEntry, updateDiaryEntry } from '@/db/repos/diary';
 import { toast } from '@/components/ui/toast';
 import { getFood } from '@/db/repos/foods';
@@ -111,9 +111,8 @@ function EditFoodEntryInner({
     };
   }, [entry.food_id]);
 
-  const handleSave = async (state: QuantityState) => {
+  const handleSave = async (state: QuantityState, macros: ResolvedMacros) => {
     if (!food) return;
-    const macros = computeMacros(food, state);
     if (macros.grams <= 0) return;
     await updateDiaryEntry(entry.id, {
       qty: state.qty,

@@ -5,7 +5,7 @@ import { Tabs } from '@/components/ui/Tabs';
 import { FoodSearchPanel } from '@/features/food-search/FoodSearchPanel';
 import { QuantityStep } from '@/features/food-search/QuantityStep';
 import { ManualEntryForm } from '@/features/food-search/ManualEntryForm';
-import { computeMacros, type QuantityState } from '@/features/food-search/foodMath';
+import type { QuantityState, ResolvedMacros } from '@/features/food-search/foodMath';
 import { lookupBarcode, OffRateLimitError } from '@/lib/off-api';
 import { db } from '@/db/dexie';
 import type { Food } from '@/db/types';
@@ -58,9 +58,8 @@ export function IngredientPickerSheet({
   const handleManualCreated = (food: Food) =>
     setStep({ kind: 'quantity', food });
 
-  const handleSave = (state: QuantityState) => {
+  const handleSave = (state: QuantityState, macros: ResolvedMacros) => {
     if (step.kind !== 'quantity') return;
-    const macros = computeMacros(step.food, state);
     if (macros.grams <= 0) return;
     onPicked(
       { food_id: step.food.id, qty: state.qty, unit: macros.unit },

@@ -360,10 +360,7 @@ function EditIngredientSheet({
           })}
           saveLabel="Update ingredient"
           onBack={onClose}
-          onSave={(state) => {
-            const macros = computeMacros(food, state);
-            onSave(draft.uiKey, state.qty, macros.unit);
-          }}
+          onSave={(state, macros) => onSave(draft.uiKey, state.qty, macros.unit)}
         />
       ) : (
         <div className="p-8 text-center text-sm text-muted-foreground">

@@ -13,11 +13,11 @@ const BarcodeScanner = lazy(() =>
   import('./BarcodeScanner').then((m) => ({ default: m.BarcodeScanner })),
 );
 import {
-  computeMacros,
   customUnitFromMode,
   defaultQuantity,
   unitToQuantityState,
   type QuantityState,
+  type ResolvedMacros,
 } from './foodMath';
 import { createDiaryEntry, lastQuantityForFood } from '@/db/repos/diary';
 import { toast } from '@/components/ui/toast';
@@ -116,9 +116,8 @@ export function AddFoodSheet({ open, onClose, date, section }: AddFoodSheetProps
     handleClose();
   };
 
-  const handleSaveQuantity = async (state: QuantityState) => {
+  const handleSaveQuantity = async (state: QuantityState, macros: ResolvedMacros) => {
     if (step.kind !== 'quantity') return;
-    const macros = computeMacros(step.food, state);
     if (macros.grams <= 0) return;
     const foodName = step.food.name;
     await createDiaryEntry({

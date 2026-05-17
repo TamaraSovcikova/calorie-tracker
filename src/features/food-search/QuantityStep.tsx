@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input, LabeledInput } from '@/components/ui/Input';
@@ -9,6 +9,7 @@ import {
   defaultQuantity,
   type QuantityMode,
   type QuantityState,
+  type ResolvedMacros,
 } from './foodMath';
 import { updateFood } from '@/db/repos/foods';
 import type { CustomUnit, Food } from '@/db/types';
@@ -18,7 +19,7 @@ interface QuantityStepProps {
   initial?: QuantityState;
   saveLabel?: string;
   onBack: () => void;
-  onSave: (state: QuantityState) => void;
+  onSave: (state: QuantityState, macros: ResolvedMacros) => void;
   onDelete?: () => void;
 }
 
@@ -31,24 +32,52 @@ export function QuantityStep({
   onDelete,
 }: QuantityStepProps) {
   const [state, setState] = useState<QuantityState>(initial ?? defaultQuantity(food));
+  const [customUnits, setCustomUnits] = useState<CustomUnit[]>(food.custom_units);
   const [showAddUnit, setShowAddUnit] = useState(false);
   const [newUnitLabel, setNewUnitLabel] = useState('');
   const [newUnitGrams, setNewUnitGrams] = useState('');
 
-  const modes = useMemo(() => availableModes(food), [food]);
-  const macros = useMemo(() => computeMacros(food, state), [food, state]);
+  // Resync only when the step is reused for a different food — keying on
+  // food.id (not the units array) avoids clobbering a just-added unit.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => setCustomUnits(food.custom_units), [food.id]);
+
+  // `food` is a prop snapshot the parent owns; custom units added here are
+  // tracked locally (and persisted) so they appear immediately without
+  // waiting for a prop refresh that never comes.
+  const liveFood = useMemo<Food>(
+    () => ({ ...food, custom_units: customUnits }),
+    [food, customUnits],
+  );
+  const modes = useMemo(() => availableModes(liveFood), [liveFood]);
+  const macros = useMemo(() => computeMacros(liveFood, state), [liveFood, state]);
   const valid = state.qty > 0 && Number.isFinite(state.qty) && macros.grams > 0;
+
+  const persistUnits = async (next: CustomUnit[]) => {
+    setCustomUnits(next);
+    await updateFood(food.id, { custom_units: next });
+  };
 
   const handleAddCustomUnit = async () => {
     const grams = parseFloat(newUnitGrams);
     const label = newUnitLabel.trim();
     if (!label || !Number.isFinite(grams) || grams <= 0) return;
-    const next: CustomUnit[] = [...food.custom_units, { label, grams }];
-    await updateFood(food.id, { custom_units: next });
+    if (customUnits.some((u) => u.label.toLowerCase() === label.toLowerCase())) {
+      return;
+    }
+    await persistUnits([...customUnits, { label, grams }]);
     setState({ mode: `unit:${label}` as QuantityMode, qty: 1 });
     setShowAddUnit(false);
     setNewUnitLabel('');
     setNewUnitGrams('');
+  };
+
+  const handleRemoveUnit = async (label: string) => {
+    const next = customUnits.filter((u) => u.label !== label);
+    await persistUnits(next);
+    if (state.mode === `unit:${label}`) {
+      setState(defaultQuantity({ ...food, custom_units: next }));
+    }
   };
 
   return (
@@ -105,6 +134,34 @@ export function QuantityStep({
             </label>
           </div>
         </div>
+
+        {customUnits.length > 0 && (
+          <div className="space-y-1">
+            <span className="block text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Custom units
+            </span>
+            <ul className="space-y-1">
+              {customUnits.map((u) => (
+                <li
+                  key={u.label}
+                  className="flex items-center justify-between rounded-md border border-border bg-muted/40 px-3 py-2 text-sm"
+                >
+                  <span>
+                    1 {u.label} = {formatGrams(u.grams)} g
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => void handleRemoveUnit(u.label)}
+                    aria-label={`Remove ${u.label}`}
+                    className="tap-target rounded-md p-1 text-muted-foreground hover:text-destructive"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         {!showAddUnit ? (
           <button
@@ -181,7 +238,7 @@ export function QuantityStep({
           variant="primary"
           block
           disabled={!valid}
-          onClick={() => valid && onSave(state)}
+          onClick={() => valid && onSave(state, macros)}
         >
           {saveLabel}
         </Button>
