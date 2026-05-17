@@ -18,7 +18,7 @@ export function Toaster() {
         <div
           key={t.id}
           role="status"
-          className="pointer-events-auto flex w-full max-w-md items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 shadow-lg"
+          className="pointer-events-auto flex w-full max-w-md animate-slide-up items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3 shadow-lg"
         >
           {t.variant === 'success' && (
             <CheckCircle2 className="h-4 w-4 shrink-0 text-primary" />

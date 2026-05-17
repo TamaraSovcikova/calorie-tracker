@@ -93,17 +93,17 @@ export function Sheet({
       <button
         type="button"
         aria-label="Close"
-        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+        className="absolute inset-0 animate-fade-in bg-foreground/40 backdrop-blur-sm"
         onClick={onClose}
       />
       <div
         ref={ref}
         tabIndex={-1}
         className={cn(
-          'relative flex w-full flex-col bg-card text-card-foreground shadow-2xl outline-none',
+          'relative flex w-full animate-slide-up flex-col bg-card text-card-foreground shadow-2xl outline-none',
           fullScreenMobile
-            ? 'h-[92vh] rounded-t-2xl sm:h-auto sm:max-h-[88vh] sm:max-w-md sm:rounded-2xl'
-            : 'max-h-[88vh] rounded-t-2xl sm:max-w-md sm:rounded-2xl',
+            ? 'h-[92vh] rounded-t-3xl sm:h-auto sm:max-h-[88vh] sm:max-w-md sm:rounded-3xl'
+            : 'max-h-[88vh] rounded-t-3xl sm:max-w-md sm:rounded-3xl',
           className,
         )}
       >
