@@ -89,6 +89,20 @@ const config: Config = {
           '30%': { transform: 'translateY(-11%) scale(1.05)' },
           '60%': { transform: 'translateY(0) scale(0.97)' },
         },
+        // One-shot hop arc — the dog leaps to a new spot on its stage.
+        hop: {
+          '0%, 100%': { transform: 'translateY(0) scaleY(1)' },
+          '12%': { transform: 'translateY(4%) scaleY(0.9)' },
+          '50%': { transform: 'translateY(-44%) scaleY(1.06)' },
+          '88%': { transform: 'translateY(2%) scaleY(0.93)' },
+        },
+        // One-shot excited double-bounce in place.
+        perk: {
+          '0%, 100%': { transform: 'translateY(0)' },
+          '30%': { transform: 'translateY(-24%)' },
+          '55%': { transform: 'translateY(0)' },
+          '78%': { transform: 'translateY(-12%)' },
+        },
       },
       animation: {
         'fade-in': 'fade-in 0.2s ease-out',
@@ -96,6 +110,8 @@ const config: Config = {
         'pop-in': 'pop-in 0.2s cubic-bezier(0.22, 1, 0.36, 1)',
         breathe: 'breathe 2.6s ease-in-out infinite',
         bob: 'bob 0.85s ease-in-out infinite',
+        hop: 'hop 0.68s ease-in-out',
+        perk: 'perk 0.72s ease-in-out',
       },
     },
   },
