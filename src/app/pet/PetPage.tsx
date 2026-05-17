@@ -2,7 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { Loader2, Utensils } from 'lucide-react';
 import { PageHeader } from '@/components/PageHeader';
 import { Button } from '@/components/ui/Button';
-import { DogStage } from '@/features/pet/DogStage';
+import { DogPlayground } from '@/features/pet/DogPlayground';
 import { useDogState } from '@/features/pet/useDogState';
 import { wellbeingBand } from '@/features/pet/petLogic';
 import { formatKcal } from '@/lib/macros';
@@ -31,11 +31,14 @@ export function PetPage() {
     <>
       <PageHeader title={dog.petName} subtitle="Your companion" />
       <div className="mx-auto max-w-md animate-fade-in space-y-4 px-4 py-4">
-        {/* The dog's stage — it roams around here. */}
-        <section className="flex flex-col items-center rounded-3xl border border-border bg-card px-4 pb-5 pt-4 shadow-sm">
-          <DogStage pose={dog.pose} className="h-60 w-full" />
+        {/* The dog's playground — grab and fling him, he roams on his own. */}
+        <section className="flex flex-col items-center rounded-3xl border border-border bg-card px-4 pb-5 pt-2 shadow-sm">
+          <DogPlayground pose={dog.pose} className="h-72 w-full" />
           <p className="max-w-xs text-center text-sm text-muted-foreground">
             {dog.statusLine}
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground/70">
+            Tip: grab {dog.petName} and fling him around.
           </p>
         </section>
 
