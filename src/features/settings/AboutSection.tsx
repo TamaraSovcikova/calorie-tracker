@@ -1,13 +1,11 @@
 import { SettingCard } from './SettingCard';
 
-const VERSION = '0.0.1';
-
 export function AboutSection() {
   return (
     <SettingCard title="About">
       <div className="grid grid-cols-2 gap-y-2 text-sm">
         <div className="text-muted-foreground">Version</div>
-        <div className="text-right tabular-nums">{VERSION}</div>
+        <div className="text-right tabular-nums">{__APP_VERSION__}</div>
         <div className="text-muted-foreground">Cloud sync</div>
         <div className="text-right">Cloudflare Workers + D1</div>
         <div className="text-muted-foreground">Activity</div>

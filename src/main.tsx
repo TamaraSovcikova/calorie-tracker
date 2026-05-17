@@ -6,6 +6,7 @@ import App from './App';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { ensureSeed } from './db/seed';
 import { installSync } from './db/sync/install';
+import { registerPwa, requestPersistentStorage } from './pwa';
 import './index.css';
 
 // Fire-and-forget; useLiveQuery refetches once writes land.
@@ -15,6 +16,9 @@ ensureSeed()
     console.error('Seed/profile init failed', err);
     installSync();
   });
+
+registerPwa();
+void requestPersistentStorage();
 
 const queryClient = new QueryClient({
   defaultOptions: {
