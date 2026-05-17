@@ -6,6 +6,7 @@ import {
   CloudOff,
   Library,
   LineChart,
+  PawPrint,
   Settings,
 } from 'lucide-react';
 import { cn } from '@/lib/cn';
@@ -30,6 +31,7 @@ function useOnline(): boolean {
 }
 
 const NAV_ITEMS = [
+  { to: '/pet', label: 'Pet', icon: PawPrint },
   { to: '/diary', label: 'Diary', icon: BookOpen },
   { to: '/library', label: 'Library', icon: Library },
   { to: '/progress', label: 'Progress', icon: LineChart },

@@ -115,3 +115,29 @@ export function wellbeingBand(score: number): WellbeingBand {
   if (score >= 25) return 'down';
   return 'sad';
 }
+
+/** A friendly one-line status for the current pose. */
+export function dogStatusLine(pose: DogPose, name: string): string {
+  switch (pose) {
+    case 'hungry':
+      return `${name} is hungry — time to log a meal.`;
+    case 'peckish':
+      return `${name} is getting peckish.`;
+    case 'eating':
+      return `${name} is tucking in!`;
+    case 'happy':
+      return `${name} is delighted — right on track.`;
+    case 'content':
+      return `${name} is content.`;
+    case 'full':
+      return `${name} is full and happy.`;
+    case 'stuffed':
+      return `${name} is comfortably stuffed.`;
+    case 'sad':
+      return `${name} could use some care — log something today.`;
+    case 'sleeping':
+      return `${name} is fast asleep.`;
+    case 'greeting':
+      return `${name} is happy to see you!`;
+  }
+}

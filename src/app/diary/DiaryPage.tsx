@@ -1,18 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { format } from 'date-fns';
-import {
-  ChevronLeft,
-  ChevronRight,
-  CopyPlus,
-  Flame,
-  ListChecks,
-  Loader2,
-} from 'lucide-react';
+import { ChevronLeft, ChevronRight, CopyPlus, ListChecks, Loader2 } from 'lucide-react';
 import { PageHeader } from '@/components/PageHeader';
 import { Button } from '@/components/ui/Button';
 import { CoachTip } from '@/components/ui/CoachTip';
-import { useStreak } from '@/features/progress/useStreak';
+import { DogPeek } from '@/features/pet/DogPeek';
 import { MacroSummary } from '@/features/diary/MacroSummary';
 import { DiarySectionView } from '@/features/diary/DiarySection';
 import { CopyDaySheet } from '@/features/diary/CopyDaySheet';
@@ -46,7 +39,6 @@ export function DiaryPage() {
   const profile = useProfile();
   const entries = useDiaryDay(currentDate);
   const exercise = useExerciseDay(currentDate);
-  const streak = useStreak();
 
   // If Fitbit is connected, pulls daily calories burned and upserts an
   // exercise_entry row in the background. No-op when not connected.
@@ -187,20 +179,13 @@ export function DiaryPage() {
             Meal and quick-add entries can't be used as ingredients.
           </div>
         )}
+        {!selectMode && <DogPeek />}
         {!selectMode && (
           <CoachTip id="diary-basics">
             Tap the date above to jump to any day. Use a section's{' '}
             <span className="font-medium text-foreground">Add</span> button to
             search, scan a barcode, or quick-add calories.
           </CoachTip>
-        )}
-        {!selectMode && streak.current > 0 && (
-          <div className="flex justify-end">
-            <span className="inline-flex items-center gap-1 rounded-full bg-orange-500/10 px-2.5 py-1 text-xs font-medium text-orange-600 dark:text-orange-400">
-              <Flame className="h-3.5 w-3.5" />
-              {streak.current}-day streak
-            </span>
-          </div>
         )}
         {profile && (
           <MacroSummary profile={profile} totals={totals} burnedKcal={burned} />

@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
 import { Layout } from '@/components/Layout';
+import { PetPage } from '@/app/pet/PetPage';
 import { DiaryPage } from '@/app/diary/DiaryPage';
 import { LibraryPage } from '@/app/library/LibraryPage';
 import { ProgressPage } from '@/app/progress/ProgressPage';
@@ -22,14 +23,15 @@ export default function App() {
         <Route path="/meals/:id/edit" element={<MealEditor mode="edit" />} />
 
         <Route element={<Layout />}>
-          <Route path="/" element={<Navigate to="/diary" replace />} />
+          <Route path="/" element={<Navigate to="/pet" replace />} />
+          <Route path="/pet" element={<PetPage />} />
           <Route path="/diary" element={<DiaryPage />} />
           <Route path="/diary/:date" element={<DiaryPage />} />
           <Route path="/library" element={<LibraryPage />} />
           <Route path="/meals" element={<Navigate to="/library" replace />} />
           <Route path="/progress" element={<ProgressPage />} />
           <Route path="/settings" element={<SettingsPage />} />
-          <Route path="*" element={<Navigate to="/diary" replace />} />
+          <Route path="*" element={<Navigate to="/pet" replace />} />
         </Route>
       </Routes>
       <OnboardingGate />
