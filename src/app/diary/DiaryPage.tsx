@@ -178,7 +178,7 @@ export function DiaryPage() {
       />
 
       <div
-        className={`mx-auto max-w-md space-y-3 px-4 py-4 ${selectMode ? 'pb-24' : ''}`}
+        className={`mx-auto max-w-md animate-fade-in space-y-3 px-4 py-4 ${selectMode ? 'pb-24' : ''}`}
       >
         {selectMode && (
           <div className="rounded-xl border border-primary/30 bg-primary/5 px-3 py-2 text-xs text-muted-foreground">

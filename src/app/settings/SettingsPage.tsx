@@ -15,7 +15,7 @@ export function SettingsPage() {
   return (
     <>
       <PageHeader title="Settings" />
-      <div className="mx-auto max-w-md space-y-3 px-4 py-4">
+      <div className="mx-auto max-w-md animate-fade-in space-y-3 px-4 py-4">
         {profile ? (
           <>
             <GoalsSection profile={profile} />

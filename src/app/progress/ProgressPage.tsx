@@ -9,7 +9,7 @@ export function ProgressPage() {
   return (
     <>
       <PageHeader title="Progress" />
-      <div className="mx-auto max-w-md space-y-3 px-4 py-4">
+      <div className="mx-auto max-w-md animate-fade-in space-y-3 px-4 py-4">
         <StreakCard />
         {profile && <WeeklySummarySection profile={profile} />}
         {profile && <WeightLogSection profile={profile} />}

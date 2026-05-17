@@ -75,15 +75,26 @@ export function Layout() {
                 to={to}
                 className={({ isActive }) =>
                   cn(
-                    'flex flex-col items-center justify-center gap-1 py-2.5 text-[11px] tap-target',
+                    'flex flex-col items-center justify-center gap-1 py-2 text-[11px] tap-target',
                     isActive
-                      ? 'text-primary font-medium'
+                      ? 'text-primary'
                       : 'text-muted-foreground hover:text-foreground',
                   )
                 }
               >
-                <Icon className="h-5 w-5" strokeWidth={2.25} />
-                <span>{label}</span>
+                {({ isActive }) => (
+                  <>
+                    <span
+                      className={cn(
+                        'flex h-7 w-14 items-center justify-center rounded-full transition-colors',
+                        isActive && 'bg-accent',
+                      )}
+                    >
+                      <Icon className="h-5 w-5" strokeWidth={2.25} />
+                    </span>
+                    <span className={cn(isActive && 'font-medium')}>{label}</span>
+                  </>
+                )}
               </NavLink>
             </li>
           ))}

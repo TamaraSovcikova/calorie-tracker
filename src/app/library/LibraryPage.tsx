@@ -31,7 +31,7 @@ export function LibraryPage() {
           ) : undefined
         }
       />
-      <div className="mx-auto max-w-md space-y-3 px-4 py-4">
+      <div className="mx-auto max-w-md animate-fade-in space-y-3 px-4 py-4">
         <Tabs<LibTab>
           value={tab}
           onChange={setTab}
