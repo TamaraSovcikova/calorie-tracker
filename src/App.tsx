@@ -21,17 +21,17 @@ export default function App() {
         <Route path="/auth/fitbit/callback" element={<FitbitCallback />} />
         <Route path="/meals/new" element={<MealEditor mode="create" />} />
         <Route path="/meals/:id/edit" element={<MealEditor mode="edit" />} />
+        <Route path="/pet" element={<PetPage />} />
 
         <Route element={<Layout />}>
-          <Route path="/" element={<Navigate to="/pet" replace />} />
-          <Route path="/pet" element={<PetPage />} />
+          <Route path="/" element={<Navigate to="/diary" replace />} />
           <Route path="/diary" element={<DiaryPage />} />
           <Route path="/diary/:date" element={<DiaryPage />} />
           <Route path="/library" element={<LibraryPage />} />
           <Route path="/meals" element={<Navigate to="/library" replace />} />
           <Route path="/progress" element={<ProgressPage />} />
           <Route path="/settings" element={<SettingsPage />} />
-          <Route path="*" element={<Navigate to="/pet" replace />} />
+          <Route path="*" element={<Navigate to="/diary" replace />} />
         </Route>
       </Routes>
       <OnboardingGate />

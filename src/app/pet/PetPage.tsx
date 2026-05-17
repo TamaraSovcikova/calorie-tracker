@@ -14,7 +14,7 @@ export function PetPage() {
   if (!dog.ready) {
     return (
       <>
-        <PageHeader title="Home" />
+        <PageHeader title="Pet" onBack={() => navigate('/diary')} />
         <div className="flex items-center justify-center py-20 text-muted-foreground">
           <Loader2 className="h-5 w-5 animate-spin" />
         </div>
@@ -29,7 +29,11 @@ export function PetPage() {
 
   return (
     <>
-      <PageHeader title={dog.petName} subtitle="Your companion" />
+      <PageHeader
+        title={dog.petName}
+        subtitle="Your companion"
+        onBack={() => navigate('/diary')}
+      />
       <div className="mx-auto max-w-md animate-fade-in space-y-4 px-4 py-4">
         {/* The dog's playground — grab and fling him, he roams on his own. */}
         <section className="flex flex-col items-center rounded-3xl border border-border bg-card px-4 pb-5 pt-2 shadow-sm">

@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, ChevronLeft } from 'lucide-react';
 
 interface PageHeaderProps {
   title: string;
@@ -7,13 +7,31 @@ interface PageHeaderProps {
   trailing?: ReactNode;
   /** When set, the title becomes a button (with a chevron) that calls this. */
   onTitleClick?: () => void;
+  /** When set, a back arrow is shown before the title. */
+  onBack?: () => void;
 }
 
-export function PageHeader({ title, subtitle, trailing, onTitleClick }: PageHeaderProps) {
+export function PageHeader({
+  title,
+  subtitle,
+  trailing,
+  onTitleClick,
+  onBack,
+}: PageHeaderProps) {
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-background/90 backdrop-blur">
-      <div className="mx-auto flex max-w-md items-center justify-between gap-4 px-4 py-3">
-        <div className="min-w-0">
+      <div className="mx-auto flex max-w-md items-center gap-2 px-4 py-3">
+        {onBack && (
+          <button
+            type="button"
+            onClick={onBack}
+            aria-label="Back"
+            className="tap-target -ml-2 shrink-0 rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground"
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </button>
+        )}
+        <div className="min-w-0 flex-1">
           {onTitleClick ? (
             <button
               type="button"

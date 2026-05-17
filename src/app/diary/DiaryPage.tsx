@@ -1,11 +1,18 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { format } from 'date-fns';
-import { ChevronLeft, ChevronRight, CopyPlus, ListChecks, Loader2 } from 'lucide-react';
+import {
+  ChevronLeft,
+  ChevronRight,
+  CopyPlus,
+  ListChecks,
+  Loader2,
+  MoreVertical,
+} from 'lucide-react';
 import { PageHeader } from '@/components/PageHeader';
 import { Button } from '@/components/ui/Button';
 import { CoachTip } from '@/components/ui/CoachTip';
-import { DogPeek } from '@/features/pet/DogPeek';
+import { DogHero } from '@/features/pet/DogHero';
 import { MacroSummary } from '@/features/diary/MacroSummary';
 import { DiarySectionView } from '@/features/diary/DiarySection';
 import { CopyDaySheet } from '@/features/diary/CopyDaySheet';
@@ -49,6 +56,7 @@ export function DiaryPage() {
   const [copyOpen, setCopyOpen] = useState(false);
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [menuOpen, setMenuOpen] = useState(false);
   const dateInputRef = useRef<HTMLInputElement>(null);
 
   // Leaving the day cancels an in-progress selection.
@@ -132,14 +140,6 @@ export function DiaryPage() {
             )}
             <button
               type="button"
-              onClick={() => setCopyOpen(true)}
-              className="tap-target rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground"
-              aria-label="Copy this day to another date"
-            >
-              <CopyPlus className="h-5 w-5" />
-            </button>
-            <button
-              type="button"
               onClick={() => goToDate(shiftDate(currentDate, -1))}
               className="tap-target rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground"
               aria-label="Previous day"
@@ -154,6 +154,54 @@ export function DiaryPage() {
             >
               <ChevronRight className="h-5 w-5" />
             </button>
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setMenuOpen((v) => !v)}
+                aria-label="More actions"
+                aria-expanded={menuOpen}
+                className="tap-target rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground"
+              >
+                <MoreVertical className="h-5 w-5" />
+              </button>
+              {menuOpen && (
+                <>
+                  <button
+                    type="button"
+                    aria-hidden="true"
+                    tabIndex={-1}
+                    className="fixed inset-0 z-[55] cursor-default"
+                    onClick={() => setMenuOpen(false)}
+                  />
+                  <div className="absolute right-0 top-full z-[56] mt-1 w-56 overflow-hidden rounded-xl border border-border bg-card p-1 shadow-lg">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCopyOpen(true);
+                        setMenuOpen(false);
+                      }}
+                      className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-sm hover:bg-muted"
+                    >
+                      <CopyPlus className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      Copy this day to…
+                    </button>
+                    {foodEntryCount > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectMode(true);
+                          setMenuOpen(false);
+                        }}
+                        className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-sm hover:bg-muted"
+                      >
+                        <ListChecks className="h-4 w-4 shrink-0 text-muted-foreground" />
+                        Build a meal from foods
+                      </button>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         }
       />
@@ -179,7 +227,7 @@ export function DiaryPage() {
             Meal and quick-add entries can't be used as ingredients.
           </div>
         )}
-        {!selectMode && <DogPeek />}
+        {!selectMode && <DogHero />}
         {!selectMode && (
           <CoachTip id="diary-basics">
             Tap the date above to jump to any day. Use a section's{' '}
@@ -213,18 +261,6 @@ export function DiaryPage() {
             ))}
 
             {!selectMode && <ExerciseSection date={currentDate} />}
-
-            {!selectMode && foodEntryCount > 0 && (
-              <Button
-                type="button"
-                variant="outline"
-                block
-                onClick={() => setSelectMode(true)}
-              >
-                <ListChecks className="h-4 w-4" />
-                Select foods to build a meal
-              </Button>
-            )}
           </>
         )}
       </div>
