@@ -6,7 +6,15 @@ import type { DogPose } from './petLogic';
 /** Poses where the dog rests in place — no roaming. */
 const RESTFUL = new Set<DogPose>(['full', 'stuffed', 'sleeping', 'sad', 'eating']);
 
-type Action = 'idle' | 'hop' | 'perk';
+type Action = 'idle' | 'hop' | 'perk' | 'wiggle' | 'stretch';
+
+const ACTION_CLASS: Record<Action, string> = {
+  idle: '',
+  hop: 'animate-hop',
+  perk: 'animate-perk',
+  wiggle: 'animate-wiggle',
+  stretch: 'animate-stretch',
+};
 
 interface DogStageProps {
   pose: DogPose;
@@ -15,57 +23,91 @@ interface DogStageProps {
 
 /**
  * The dog's "stage" — whole-sprite choreography. For active poses the dog
- * roams: it hops to new spots, turns to look around, and does excited
- * little double-bounces, always in the logging-driven pose. Restful poses
- * (full, stuffed, asleep, sad) stay put and just breathe.
+ * keeps busy on a randomised loop: hopping to new spots, turning to look
+ * around, wiggling, stretching, and the odd happy beat — so the same
+ * logging state never looks the same for long. Restful poses (full,
+ * stuffed, asleep, sad) settle in place and just breathe.
  */
 export function DogStage({ pose, className }: DogStageProps) {
   const [x, setX] = useState(50); // horizontal centre, % of stage
   const [facing, setFacing] = useState<1 | -1>(1);
   const [action, setAction] = useState<Action>('idle');
+  const [beatPose, setBeatPose] = useState<DogPose | null>(null);
   const xRef = useRef(50);
   const restful = RESTFUL.has(pose);
 
   useEffect(() => {
-    if (restful) {
-      setAction('idle');
-      return;
-    }
-    let next: ReturnType<typeof setTimeout>;
-    let reset: ReturnType<typeof setTimeout>;
+    // A pose change cancels anything in flight.
+    setAction('idle');
+    setBeatPose(null);
+    if (restful) return;
 
-    const schedule = () => {
-      next = setTimeout(
-        () => {
-          const roll = Math.random();
-          if (roll < 0.55) {
-            // hop to a fresh spot, turning to face the way it travels
-            const target = 28 + Math.random() * 44;
-            setFacing(target >= xRef.current ? 1 : -1);
-            xRef.current = target;
-            setX(target);
-            setAction('hop');
-            reset = setTimeout(() => setAction('idle'), 680);
-          } else if (roll < 0.82) {
-            // excited bounce in place
-            setAction('perk');
-            reset = setTimeout(() => setAction('idle'), 720);
-          } else {
-            // just turn to look around
-            setFacing((f) => (f === 1 ? -1 : 1));
-          }
-          schedule();
-        },
-        2400 + Math.random() * 3200,
-      );
+    const canBeat = pose === 'content' || pose === 'peckish';
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    const after = (ms: number, fn: () => void) => {
+      timers.push(setTimeout(fn, ms));
     };
-    schedule();
 
-    return () => {
-      clearTimeout(next);
-      clearTimeout(reset);
+    const run = () => {
+      const choices: Array<[string, number]> = [
+        ['hop', 28],
+        ['perk', 15],
+        ['turn', 14],
+        ['wiggle', 15],
+        ['stretch', 13],
+        ['beat', canBeat ? 17 : 0],
+      ];
+      let r = Math.random() * choices.reduce((s, [, w]) => s + w, 0);
+      let pick = 'perk';
+      for (const [name, w] of choices) {
+        r -= w;
+        if (r < 0) {
+          pick = name;
+          break;
+        }
+      }
+
+      switch (pick) {
+        case 'hop': {
+          const target = 28 + Math.random() * 44;
+          setFacing(target >= xRef.current ? 1 : -1);
+          xRef.current = target;
+          setX(target);
+          setAction('hop');
+          after(700, () => setAction('idle'));
+          break;
+        }
+        case 'perk':
+          setAction('perk');
+          after(740, () => setAction('idle'));
+          break;
+        case 'turn':
+          setFacing((f) => (f === 1 ? -1 : 1));
+          setAction('perk'); // a little bounce as he turns around
+          after(740, () => setAction('idle'));
+          break;
+        case 'wiggle':
+          setAction('wiggle');
+          after(640, () => setAction('idle'));
+          break;
+        case 'stretch':
+          setAction('stretch');
+          after(970, () => setAction('idle'));
+          break;
+        case 'beat': // a brief delighted moment, then back to the base pose
+          setBeatPose('happy');
+          setAction('perk');
+          after(760, () => setAction('idle'));
+          after(2300, () => setBeatPose(null));
+          break;
+      }
+
+      after(2100 + Math.random() * 3000, run);
     };
-  }, [restful]);
+
+    after(800 + Math.random() * 1400, run);
+    return () => timers.forEach(clearTimeout);
+  }, [restful, pose]);
 
   return (
     <div className={cn('relative overflow-hidden', className)}>
@@ -75,22 +117,14 @@ export function DogStage({ pose, className }: DogStageProps) {
       >
         {/* centre the dog on its x point */}
         <div className="-translate-x-1/2">
-          {/* one-shot hop / perk */}
-          <div
-            className={
-              action === 'hop'
-                ? 'animate-hop'
-                : action === 'perk'
-                  ? 'animate-perk'
-                  : ''
-            }
-          >
+          {/* one-shot action animation */}
+          <div className={cn('origin-bottom', ACTION_CLASS[action])}>
             {/* facing flip */}
             <div
               className="transition-transform duration-200"
               style={{ transform: `scaleX(${facing})` }}
             >
-              <Dog pose={pose} className="h-36 w-36" />
+              <Dog pose={beatPose ?? pose} className="h-36 w-36" />
             </div>
           </div>
         </div>

@@ -103,6 +103,19 @@ const config: Config = {
           '55%': { transform: 'translateY(0)' },
           '78%': { transform: 'translateY(-12%)' },
         },
+        // One-shot playful side-to-side wiggle.
+        wiggle: {
+          '0%, 100%': { transform: 'rotate(0deg)' },
+          '22%': { transform: 'rotate(-7deg)' },
+          '52%': { transform: 'rotate(6deg)' },
+          '80%': { transform: 'rotate(-3deg)' },
+        },
+        // One-shot stretch / yawn (squash-and-stretch).
+        stretch: {
+          '0%, 100%': { transform: 'scale(1, 1)' },
+          '42%': { transform: 'scale(1.11, 0.9)' },
+          '70%': { transform: 'scale(0.95, 1.08)' },
+        },
       },
       animation: {
         'fade-in': 'fade-in 0.2s ease-out',
@@ -112,6 +125,8 @@ const config: Config = {
         bob: 'bob 0.85s ease-in-out infinite',
         hop: 'hop 0.68s ease-in-out',
         perk: 'perk 0.72s ease-in-out',
+        wiggle: 'wiggle 0.62s ease-in-out',
+        stretch: 'stretch 0.95s ease-in-out',
       },
     },
   },
