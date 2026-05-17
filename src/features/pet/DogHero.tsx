@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { Maximize2 } from 'lucide-react';
 import { DogPlayground } from './DogPlayground';
 import { useDogState } from './useDogState';
+import { useDailyGreeting } from './useDailyGreeting';
 
 /**
  * The dog hero band at the top of the Today screen — a compact playground
@@ -10,7 +11,8 @@ import { useDogState } from './useDogState';
  */
 export function DogHero() {
   const navigate = useNavigate();
-  const dog = useDogState();
+  const greeting = useDailyGreeting();
+  const dog = useDogState({ greeting });
   if (!dog.ready) return null;
 
   return (

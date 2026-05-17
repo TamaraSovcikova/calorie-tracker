@@ -11,7 +11,9 @@ import {
 import { Button } from '@/components/ui/Button';
 import { LabeledInput } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
+import { Dog } from '@/features/pet/Dog';
 import { useProfile, updateProfile } from '@/db/repos/profile';
+import { renamePet } from '@/db/repos/pet';
 import {
   ACTIVITY_LABELS,
   type ActivityLevel,
@@ -36,10 +38,10 @@ export function OnboardingGate() {
   return <OnboardingWizard profile={profile} />;
 }
 
-type StepId = 'welcome' | 'goals' | 'profile' | 'macros' | 'done';
+type StepId = 'welcome' | 'pet' | 'goals' | 'profile' | 'macros' | 'done';
 // Profile (with its TDEE + goal picker) comes before the calorie target so
 // the goal pick can pre-fill it, rather than asking for a blind number first.
-const STEPS: StepId[] = ['welcome', 'profile', 'goals', 'macros', 'done'];
+const STEPS: StepId[] = ['welcome', 'pet', 'profile', 'goals', 'macros', 'done'];
 
 function OnboardingWizard({ profile }: { profile: Profile }) {
   const [step, setStep] = useState<StepId>('welcome');
@@ -59,6 +61,7 @@ function OnboardingWizard({ profile }: { profile: Profile }) {
     protein: String(profile.protein_g),
     carbs: String(profile.carbs_g),
     fat: String(profile.fat_g),
+    petName: 'Biscuit',
   }));
 
   const update = <K extends keyof typeof draft>(k: K, v: (typeof draft)[K]) =>
@@ -102,6 +105,7 @@ function OnboardingWizard({ profile }: { profile: Profile }) {
       }
     }
     await updateProfile(patch);
+    await renamePet(draft.petName.trim() || 'Biscuit');
   };
 
   const tdeePreview = useMemo(() => {
@@ -157,6 +161,14 @@ function OnboardingWizard({ profile }: { profile: Profile }) {
       <div className="mx-auto flex w-full max-w-md flex-1 flex-col overflow-y-auto px-5 py-8">
         {step === 'welcome' && (
           <Welcome onNext={goNext} onSkip={skipAll} />
+        )}
+        {step === 'pet' && (
+          <PetStep
+            name={draft.petName}
+            onChangeName={(v) => update('petName', v)}
+            onNext={goNext}
+            onBack={goBack}
+          />
         )}
         {step === 'goals' && (
           <GoalsStep
@@ -233,6 +245,40 @@ function Welcome({ onNext, onSkip }: { onNext: () => void; onSkip: () => void })
           Skip for now
         </Button>
       </div>
+    </div>
+  );
+}
+
+function PetStep({
+  name,
+  onChangeName,
+  onNext,
+  onBack,
+}: {
+  name: string;
+  onChangeName: (v: string) => void;
+  onNext: () => void;
+  onBack: () => void;
+}) {
+  return (
+    <div className="flex flex-1 flex-col">
+      <header>
+        <h1 className="text-2xl font-semibold">Meet your dog</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Logging your meals feeds and cheers up your companion. What should
+          they be called?
+        </p>
+      </header>
+      <div className="my-6 flex justify-center">
+        <Dog pose="happy" className="h-40 w-40" />
+      </div>
+      <LabeledInput
+        label="Dog's name"
+        value={name}
+        onChange={(e) => onChangeName(e.target.value)}
+        autoFocus
+      />
+      <NavButtons onBack={onBack} onNext={onNext} nextDisabled={!name.trim()} />
     </div>
   );
 }
@@ -653,4 +699,5 @@ interface Draft {
   protein: string;
   carbs: string;
   fat: string;
+  petName: string;
 }

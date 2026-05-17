@@ -4,12 +4,14 @@ import { PageHeader } from '@/components/PageHeader';
 import { Button } from '@/components/ui/Button';
 import { DogPlayground } from '@/features/pet/DogPlayground';
 import { useDogState } from '@/features/pet/useDogState';
+import { useDailyGreeting } from '@/features/pet/useDailyGreeting';
 import { wellbeingBand } from '@/features/pet/petLogic';
 import { formatKcal } from '@/lib/macros';
 
 export function PetPage() {
   const navigate = useNavigate();
-  const dog = useDogState();
+  const greeting = useDailyGreeting();
+  const dog = useDogState({ greeting });
 
   if (!dog.ready) {
     return (

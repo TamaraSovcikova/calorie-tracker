@@ -6,12 +6,16 @@ import App from './App';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { ensureSeed } from './db/seed';
 import { installSync } from './db/sync/install';
+import { runWellbeingRollForward } from './features/pet/wellbeingRollForward';
 import { registerPwa, requestPersistentStorage } from './pwa';
 import './index.css';
 
 // Fire-and-forget; useLiveQuery refetches once writes land.
 ensureSeed()
-  .then(() => installSync())
+  .then(() => {
+    installSync();
+    void runWellbeingRollForward().catch(() => undefined);
+  })
   .catch((err) => {
     console.error('Seed/profile init failed', err);
     installSync();
