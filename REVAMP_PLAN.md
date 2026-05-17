@@ -136,19 +136,19 @@ transitions. (Lottie was considered; free Lottie packs can't give us one
 4. Repeat per breed variant.
 
 ### 3.5 Tooling — how we generate the art
-- **`shinpr/mcp-image`** MCP server, added to Claude Code so the art can be
-  generated and iterated on directly in build sessions.
-- Backed by the **Google Gemini image models** (Nano Banana / Nano Banana 2 for
-  most work, Nano Banana Pro optionally for hero poses). Uses the server's
-  `maintainCharacterConsistency` mode and image-to-image (`inputImagePath`) so
-  every pose is generated *from* the locked reference sheet.
-- **Cost:** free tier covers our ~30-image volume on the standard model; the Pro
-  model is optional and paid (~$0.13/image).
-- **Transparency:** the server has no alpha-channel flag — poses are generated
-  on a plain background and run through a free background-removal step before
-  rigging.
-- Generated images are reviewed in a scratch folder; only the final keepers are
-  committed to `src/assets/pet/`.
+The Gemini **image API has no free tier** (Google removed it in Dec 2025 — every
+image model returns `limit: 0`). Rather than enable billing, the art is
+generated **manually in the free Gemini app** (gemini.google.com / AI Studio),
+which still has free image generation separate from the API.
+
+- The user generates the dog poses in the Gemini app following **`ART_BRIEF.md`**
+  — a reference dog first, then each pose generated *with the reference image
+  attached* for consistency.
+- Finished PNGs are dropped into `src/assets/pet/`; Claude handles background
+  removal, slicing into layers, rigging and the CSS animation.
+- **v1 ships one dog** (one breed/colour). Breed/colour options are deferred —
+  manual generation makes variants expensive, so the customisation feature
+  starts as name-only and gains appearance later.
 
 ### 3.4 Customisation scope — a deliberate scope lever
 "Name + appearance" multiplies the art: poses × breeds × colours. To keep it
