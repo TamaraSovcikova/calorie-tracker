@@ -65,6 +65,7 @@ export function GoalsSection({ profile }: GoalsSectionProps) {
     <SettingCard
       title="Goals"
       description="Daily targets for calories and macros."
+      defaultOpen
     >
       <LabeledInput
         label="Calorie target"

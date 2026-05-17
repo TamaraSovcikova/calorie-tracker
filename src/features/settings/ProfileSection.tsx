@@ -133,6 +133,7 @@ export function ProfileSection({ profile }: ProfileSectionProps) {
     <SettingCard
       title="Profile"
       description="Used to suggest a daily calorie target (TDEE)."
+      defaultOpen
     >
       <LabeledInput
         label="Name"

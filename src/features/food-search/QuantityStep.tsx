@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ArrowLeft, Plus, Trash2 } from 'lucide-react';
+import { ArrowLeft, Pencil, Plus, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input, LabeledInput } from '@/components/ui/Input';
 import { formatKcal, formatGrams } from '@/lib/macros';
@@ -33,6 +33,7 @@ export function QuantityStep({
 }: QuantityStepProps) {
   const [state, setState] = useState<QuantityState>(initial ?? defaultQuantity(food));
   const [customUnits, setCustomUnits] = useState<CustomUnit[]>(food.custom_units);
+  const [editingUnits, setEditingUnits] = useState(false);
   const [showAddUnit, setShowAddUnit] = useState(false);
   const [newUnitLabel, setNewUnitLabel] = useState('');
   const [newUnitGrams, setNewUnitGrams] = useState('');
@@ -114,31 +115,47 @@ export function QuantityStep({
             />
           </div>
           <div className="flex-[1.5]">
-            <label className="block space-y-1">
+            <div className="flex h-5 items-center justify-between">
               <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 Unit
               </span>
-              <select
-                value={state.mode}
-                onChange={(e) =>
-                  setState((s) => ({ ...s, mode: e.target.value as QuantityMode }))
-                }
-                className="h-11 w-full rounded-lg border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                {modes.map((m) => (
-                  <option key={m.value} value={m.value}>
-                    {m.label}
-                  </option>
-                ))}
-              </select>
-            </label>
+              {customUnits.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setEditingUnits((v) => !v)}
+                  aria-label="Edit custom units"
+                  aria-pressed={editingUnits}
+                  className={
+                    editingUnits
+                      ? 'rounded p-0.5 text-primary'
+                      : 'rounded p-0.5 text-muted-foreground hover:text-foreground'
+                  }
+                >
+                  <Pencil className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+            <select
+              value={state.mode}
+              onChange={(e) =>
+                setState((s) => ({ ...s, mode: e.target.value as QuantityMode }))
+              }
+              aria-label="Unit"
+              className="mt-1 h-11 w-full rounded-lg border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              {modes.map((m) => (
+                <option key={m.value} value={m.value}>
+                  {m.label}
+                </option>
+              ))}
+            </select>
           </div>
         </div>
 
-        {customUnits.length > 0 && (
-          <div className="space-y-1">
+        {editingUnits && customUnits.length > 0 && (
+          <div className="space-y-1 rounded-lg border border-dashed border-border p-3">
             <span className="block text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Custom units
+              Custom units — tap a trash icon to remove
             </span>
             <ul className="space-y-1">
               {customUnits.map((u) => (
