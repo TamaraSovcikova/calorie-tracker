@@ -1,7 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Trash2 } from 'lucide-react';
 import { Sheet } from '@/components/ui/Sheet';
-import { Button } from '@/components/ui/Button';
 import { QuantityStep } from './QuantityStep';
 import { QuickAddForm, type QuickAddValues } from './QuickAddForm';
 import { computeMacros, type QuantityMode, type QuantityState } from './foodMath';
@@ -193,28 +191,15 @@ function EditMealEntryInner({
   };
 
   return (
-    <Sheet
-      open={open}
-      onClose={onClose}
-      title="Edit meal entry"
-      trailing={
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={handleDelete}
-          aria-label="Delete entry"
-          className="text-destructive"
-        >
-          <Trash2 className="h-4 w-4" />
-        </Button>
-      }
-    >
+    <Sheet open={open} onClose={onClose} title="Edit meal entry">
       {entry.meal_id && resolved !== null ? (
         <LogMealStep
           mealId={entry.meal_id}
           initialMultiplier={entry.portion_multiplier ?? 1}
+          saveLabel="Save changes"
           onBack={onClose}
           onSave={handleSave}
+          onDelete={handleDelete}
         />
       ) : (
         <div className="p-8 text-center text-sm text-muted-foreground">

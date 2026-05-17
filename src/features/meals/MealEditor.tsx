@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft,
   Copy,
@@ -53,6 +53,7 @@ interface MealEditorProps {
 export function MealEditor({ mode }: MealEditorProps) {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const resolved = useMealResolved(mode === 'edit' ? id : undefined);
 
   const [name, setName] = useState('');
@@ -61,6 +62,28 @@ export function MealEditor({ mode }: MealEditorProps) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+
+  // Create mode: hydrate from diary entries passed in via router state
+  // (the "build a meal from selected foods" shortcut on the diary).
+  useEffect(() => {
+    if (mode !== 'create') return;
+    const state = location.state as { prefillItems?: MealItemInput[] } | null;
+    const prefill = state?.prefillItems;
+    if (!prefill || prefill.length === 0) return;
+    let cancelled = false;
+    void (async () => {
+      const foods = await db.foods.bulkGet(prefill.map((p) => p.food_id));
+      if (cancelled) return;
+      const byId = new Map<string, Food>();
+      for (const f of foods) if (f) byId.set(f.id, f);
+      setItems(prefill.map((p) => inputToDraft(p, byId.get(p.food_id), nextKey())));
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // location.state is fixed for this navigation entry.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode]);
 
   // Hydrate from existing meal once it loads.
   useEffect(() => {

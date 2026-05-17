@@ -1,8 +1,16 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { format } from 'date-fns';
-import { ChevronLeft, ChevronRight, CopyPlus, Flame, Loader2 } from 'lucide-react';
+import {
+  ChevronLeft,
+  ChevronRight,
+  CopyPlus,
+  Flame,
+  ListChecks,
+  Loader2,
+} from 'lucide-react';
 import { PageHeader } from '@/components/PageHeader';
+import { Button } from '@/components/ui/Button';
 import { CoachTip } from '@/components/ui/CoachTip';
 import { useStreak } from '@/features/progress/useStreak';
 import { MacroSummary } from '@/features/diary/MacroSummary';
@@ -47,7 +55,38 @@ export function DiaryPage() {
   const [addingTo, setAddingTo] = useState<MealSection | null>(null);
   const [editing, setEditing] = useState<DiaryEntry | null>(null);
   const [copyOpen, setCopyOpen] = useState(false);
+  const [selectMode, setSelectMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const dateInputRef = useRef<HTMLInputElement>(null);
+
+  // Leaving the day cancels an in-progress selection.
+  useEffect(() => {
+    setSelectMode(false);
+    setSelectedIds(new Set());
+  }, [currentDate]);
+
+  const toggleSelect = (entry: DiaryEntry) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(entry.id)) next.delete(entry.id);
+      else next.add(entry.id);
+      return next;
+    });
+  };
+
+  const exitSelection = () => {
+    setSelectMode(false);
+    setSelectedIds(new Set());
+  };
+
+  const createMealFromSelection = () => {
+    if (!entries) return;
+    const items = entries
+      .filter((e) => selectedIds.has(e.id) && e.kind === 'food' && e.food_id)
+      .map((e) => ({ food_id: e.food_id as string, qty: e.qty, unit: e.unit }));
+    if (items.length === 0) return;
+    navigate('/meals/new', { state: { prefillItems: items } });
+  };
 
   const goToDate = (next: LocalDate) => {
     navigate(isToday(next) ? '/diary' : `/diary/${next}`);
@@ -78,6 +117,9 @@ export function DiaryPage() {
     ? groupBySection(entries)
     : { breakfast: [], lunch: [], dinner: [], snacks: [] };
   const burned = exercise ? totalBurned(exercise) : 0;
+  const foodEntryCount = entries
+    ? entries.filter((e) => e.kind === 'food' && e.food_id).length
+    : 0;
 
   return (
     <>
@@ -135,13 +177,24 @@ export function DiaryPage() {
         className="pointer-events-none absolute left-4 top-12 h-0 w-0 opacity-0"
       />
 
-      <div className="mx-auto max-w-md space-y-3 px-4 py-4">
-        <CoachTip id="diary-basics">
-          Tap the date above to jump to any day. Use a section's{' '}
-          <span className="font-medium text-foreground">Add</span> button to
-          search, scan a barcode, or quick-add calories.
-        </CoachTip>
-        {streak.current > 0 && (
+      <div
+        className={`mx-auto max-w-md space-y-3 px-4 py-4 ${selectMode ? 'pb-24' : ''}`}
+      >
+        {selectMode && (
+          <div className="rounded-xl border border-primary/30 bg-primary/5 px-3 py-2 text-xs text-muted-foreground">
+            Tap the foods you want, then{' '}
+            <span className="font-medium text-foreground">Create meal</span>.
+            Meal and quick-add entries can't be used as ingredients.
+          </div>
+        )}
+        {!selectMode && (
+          <CoachTip id="diary-basics">
+            Tap the date above to jump to any day. Use a section's{' '}
+            <span className="font-medium text-foreground">Add</span> button to
+            search, scan a barcode, or quick-add calories.
+          </CoachTip>
+        )}
+        {!selectMode && streak.current > 0 && (
           <div className="flex justify-end">
             <span className="inline-flex items-center gap-1 rounded-full bg-orange-500/10 px-2.5 py-1 text-xs font-medium text-orange-600 dark:text-orange-400">
               <Flame className="h-3.5 w-3.5" />
@@ -168,13 +221,47 @@ export function DiaryPage() {
                 primaryMacro={profile?.primary_macro ?? 'protein'}
                 onAdd={(s) => setAddingTo(s)}
                 onEntryClick={(e) => setEditing(e)}
+                selectMode={selectMode}
+                selectedIds={selectedIds}
+                onToggleSelect={toggleSelect}
               />
             ))}
 
-            <ExerciseSection date={currentDate} />
+            {!selectMode && <ExerciseSection date={currentDate} />}
+
+            {!selectMode && foodEntryCount > 0 && (
+              <Button
+                type="button"
+                variant="outline"
+                block
+                onClick={() => setSelectMode(true)}
+              >
+                <ListChecks className="h-4 w-4" />
+                Select foods to build a meal
+              </Button>
+            )}
           </>
         )}
       </div>
+
+      {selectMode && (
+        <div className="fixed inset-x-0 bottom-0 z-[60] border-t border-border bg-card p-3 pb-[max(env(safe-area-inset-bottom),12px)]">
+          <div className="mx-auto flex max-w-md items-center gap-2">
+            <Button type="button" variant="ghost" onClick={exitSelection}>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="primary"
+              block
+              disabled={selectedIds.size === 0}
+              onClick={createMealFromSelection}
+            >
+              Create meal ({selectedIds.size})
+            </Button>
+          </div>
+        </div>
+      )}
 
       <AddFoodSheet
         open={addingTo !== null}

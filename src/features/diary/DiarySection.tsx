@@ -17,6 +17,9 @@ interface DiarySectionProps {
   primaryMacro: MacroKey;
   onAdd: (section: MealSection) => void;
   onEntryClick?: (entry: DiaryEntry) => void;
+  selectMode?: boolean;
+  selectedIds?: Set<string>;
+  onToggleSelect?: (entry: DiaryEntry) => void;
 }
 
 export function DiarySectionView({
@@ -25,6 +28,9 @@ export function DiarySectionView({
   primaryMacro,
   onAdd,
   onEntryClick,
+  selectMode = false,
+  selectedIds,
+  onToggleSelect,
 }: DiarySectionProps) {
   const totals = sumTotals(entries);
   const primaryVal =
@@ -52,21 +58,30 @@ export function DiarySectionView({
             </p>
           )}
         </div>
-        <button
-          type="button"
-          onClick={() => onAdd(section)}
-          aria-label={`Add to ${SECTION_TITLES[section]}`}
-          className="tap-target flex items-center gap-1 rounded-full bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:opacity-90 active:scale-95 transition-transform"
-        >
-          <Plus className="h-4 w-4" strokeWidth={2.5} />
-          Add
-        </button>
+        {!selectMode && (
+          <button
+            type="button"
+            onClick={() => onAdd(section)}
+            aria-label={`Add to ${SECTION_TITLES[section]}`}
+            className="tap-target flex items-center gap-1 rounded-full bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:opacity-90 active:scale-95 transition-transform"
+          >
+            <Plus className="h-4 w-4" strokeWidth={2.5} />
+            Add
+          </button>
+        )}
       </header>
       {hasEntries && (
         <ul className="divide-y divide-border px-2 pb-2">
           {entries.map((e) => (
             <li key={e.id}>
-              <DiaryRow entry={e} primaryMacro={primaryMacro} onClick={onEntryClick} />
+              <DiaryRow
+                entry={e}
+                primaryMacro={primaryMacro}
+                onClick={onEntryClick}
+                selectMode={selectMode}
+                selected={selectedIds?.has(e.id) ?? false}
+                onToggleSelect={onToggleSelect}
+              />
             </li>
           ))}
         </ul>

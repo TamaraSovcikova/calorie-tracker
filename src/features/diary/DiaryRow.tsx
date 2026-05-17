@@ -1,12 +1,18 @@
 import { useLiveQuery } from 'dexie-react-hooks';
+import { Check } from 'lucide-react';
 import { db } from '@/db/dexie';
 import type { DiaryEntry, Food, Meal } from '@/db/types';
 import { formatGrams, formatKcal, MACRO_LABELS, type MacroKey } from '@/lib/macros';
+import { cn } from '@/lib/cn';
 
 interface DiaryRowProps {
   entry: DiaryEntry;
   primaryMacro: MacroKey;
   onClick?: (entry: DiaryEntry) => void;
+  /** Selection mode for the "build a meal from diary entries" flow. */
+  selectMode?: boolean;
+  selected?: boolean;
+  onToggleSelect?: (entry: DiaryEntry) => void;
 }
 
 function entryDisplayQty(entry: DiaryEntry): string {
@@ -26,7 +32,14 @@ function entryDisplayQty(entry: DiaryEntry): string {
   return `${formatGrams(entry.qty)} ${entry.unit}${entry.qty === 1 ? '' : 's'}`;
 }
 
-export function DiaryRow({ entry, primaryMacro, onClick }: DiaryRowProps) {
+export function DiaryRow({
+  entry,
+  primaryMacro,
+  onClick,
+  selectMode = false,
+  selected = false,
+  onToggleSelect,
+}: DiaryRowProps) {
   const target = useLiveQuery<Food | Meal | undefined>(async () => {
     if (entry.kind === 'food' && entry.food_id) return db.foods.get(entry.food_id);
     if (entry.kind === 'meal' && entry.meal_id) return db.meals.get(entry.meal_id);
@@ -47,12 +60,40 @@ export function DiaryRow({ entry, primaryMacro, onClick }: DiaryRowProps) {
         ? entry.carbs
         : entry.fat;
 
+  // Only plain food entries can become meal ingredients.
+  const selectable = entry.kind === 'food' && !!entry.food_id;
+  const handleClick = selectMode
+    ? selectable
+      ? () => onToggleSelect?.(entry)
+      : undefined
+    : onClick
+      ? () => onClick(entry)
+      : undefined;
+
   return (
     <button
       type="button"
-      onClick={onClick ? () => onClick(entry) : undefined}
-      className="flex w-full items-start justify-between gap-3 rounded-lg px-2 py-2.5 text-left transition-colors hover:bg-muted/50 active:bg-muted"
+      onClick={handleClick}
+      disabled={selectMode && !selectable}
+      className={cn(
+        'flex w-full items-start gap-3 rounded-lg px-2 py-2.5 text-left transition-colors',
+        selectMode && !selectable
+          ? 'opacity-40'
+          : 'hover:bg-muted/50 active:bg-muted',
+      )}
     >
+      {selectMode && (
+        <span
+          className={cn(
+            'mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border',
+            selected
+              ? 'border-primary bg-primary text-primary-foreground'
+              : 'border-border',
+          )}
+        >
+          {selected && <Check className="h-3.5 w-3.5" strokeWidth={3} />}
+        </span>
+      )}
       <div className="min-w-0 flex-1">
         <div className="truncate text-sm font-medium">{name}</div>
         <div className="mt-0.5 truncate text-xs text-muted-foreground">

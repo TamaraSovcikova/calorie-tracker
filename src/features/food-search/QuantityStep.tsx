@@ -170,10 +170,10 @@ export function QuantityStep({
             type="button"
             variant="ghost"
             onClick={onDelete}
-            aria-label="Delete entry"
-            className="!w-11 px-0 text-destructive"
+            className="shrink-0 text-destructive"
           >
             <Trash2 className="h-4 w-4" />
+            Delete
           </Button>
         )}
         <Button

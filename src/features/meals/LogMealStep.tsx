@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { LabeledInput } from '@/components/ui/Input';
 import { useMealResolved } from './useMealResolved';
@@ -11,6 +11,9 @@ interface LogMealStepProps {
   onBack: () => void;
   onSave: (multiplier: number) => void;
   initialMultiplier?: number;
+  saveLabel?: string;
+  /** When set, shows a Delete button (used when editing a logged entry). */
+  onDelete?: () => void;
 }
 
 const QUICK_MULTS = [0.5, 1, 1.5, 2];
@@ -20,6 +23,8 @@ export function LogMealStep({
   onBack,
   onSave,
   initialMultiplier = 1,
+  saveLabel = 'Add to diary',
+  onDelete,
 }: LogMealStepProps) {
   const resolved = useMealResolved(mealId);
   const [mult, setMult] = useState<number>(initialMultiplier);
@@ -117,7 +122,18 @@ export function LogMealStep({
         </details>
       </div>
 
-      <div className="mt-auto border-t border-border bg-card p-4">
+      <div className="mt-auto flex gap-2 border-t border-border bg-card p-4">
+        {onDelete && (
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={onDelete}
+            className="shrink-0 text-destructive"
+          >
+            <Trash2 className="h-4 w-4" />
+            Delete
+          </Button>
+        )}
         <Button
           type="button"
           variant="primary"
@@ -125,7 +141,7 @@ export function LogMealStep({
           disabled={!valid}
           onClick={() => valid && onSave(mult)}
         >
-          Add to diary
+          {saveLabel}
         </Button>
       </div>
     </div>
