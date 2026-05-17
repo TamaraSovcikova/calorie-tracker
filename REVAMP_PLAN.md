@@ -135,6 +135,21 @@ transitions. (Lottie was considered; free Lottie packs can't give us one
 3. Slice into layers; assemble the rig in-app.
 4. Repeat per breed variant.
 
+### 3.5 Tooling — how we generate the art
+- **`shinpr/mcp-image`** MCP server, added to Claude Code so the art can be
+  generated and iterated on directly in build sessions.
+- Backed by the **Google Gemini image models** (Nano Banana / Nano Banana 2 for
+  most work, Nano Banana Pro optionally for hero poses). Uses the server's
+  `maintainCharacterConsistency` mode and image-to-image (`inputImagePath`) so
+  every pose is generated *from* the locked reference sheet.
+- **Cost:** free tier covers our ~30-image volume on the standard model; the Pro
+  model is optional and paid (~$0.13/image).
+- **Transparency:** the server has no alpha-channel flag — poses are generated
+  on a plain background and run through a free background-removal step before
+  rigging.
+- Generated images are reviewed in a scratch folder; only the final keepers are
+  committed to `src/assets/pet/`.
+
 ### 3.4 Customisation scope — a deliberate scope lever
 "Name + appearance" multiplies the art: poses × breeds × colours. To keep it
 sane:
