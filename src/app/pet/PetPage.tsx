@@ -1,8 +1,10 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Loader2, Utensils } from 'lucide-react';
 import { PageHeader } from '@/components/PageHeader';
 import { Button } from '@/components/ui/Button';
 import { DogPlayground } from '@/features/pet/DogPlayground';
+import { RenamePetSheet } from '@/features/pet/RenamePetSheet';
 import { useDogState } from '@/features/pet/useDogState';
 import { useDailyGreeting } from '@/features/pet/useDailyGreeting';
 import { wellbeingBand } from '@/features/pet/petLogic';
@@ -12,6 +14,7 @@ export function PetPage() {
   const navigate = useNavigate();
   const greeting = useDailyGreeting();
   const dog = useDogState({ greeting });
+  const [renameOpen, setRenameOpen] = useState(false);
 
   if (!dog.ready) {
     return (
@@ -33,8 +36,9 @@ export function PetPage() {
     <>
       <PageHeader
         title={dog.petName}
-        subtitle="Your companion"
+        subtitle="Tap the name to rename"
         onBack={() => navigate('/diary')}
+        onTitleClick={() => setRenameOpen(true)}
       />
       <div className="mx-auto max-w-md animate-fade-in space-y-4 px-4 py-4">
         {/* The dog's playground — grab and fling him, he roams on his own. */}
@@ -95,6 +99,12 @@ export function PetPage() {
           </div>
         </section>
       </div>
+
+      <RenamePetSheet
+        open={renameOpen}
+        currentName={dog.petName}
+        onClose={() => setRenameOpen(false)}
+      />
     </>
   );
 }

@@ -20,6 +20,7 @@ const WALL_BOUNCE = 0.5;
 const GROUND_FRICTION = 0.84;
 const AIR_FRICTION = 0.992;
 const THROW_CAP = 34;
+const WALK_SPEED = 1.45; // px/frame at 60fps — a calm stroll
 
 const RESTFUL = new Set<DogPose>(['full', 'stuffed', 'sleeping', 'sad', 'eating']);
 
@@ -54,6 +55,9 @@ export function DogPlayground({ pose, className }: DogPlaygroundProps) {
   const rot = useRef(0);
   const onFloor = useRef(false);
   const dragging = useRef(false);
+  // Autonomous behaviour: 'walking' glides toward walkTarget, else 'idle'.
+  const behavior = useRef<'idle' | 'walking'>('idle');
+  const walkTarget = useRef(0);
   const stageRect = useRef<DOMRect | null>(null);
   const grab = useRef({ x: 0, y: 0 });
   const ptr = useRef({ x: 0, y: 0, px: 0, py: 0 });
@@ -93,15 +97,32 @@ export function DogPlayground({ pose, className }: DogPlaygroundProps) {
 
       if (!dragging.current) {
         v.vy += GRAVITY * dt;
+
+        // Walking: glide horizontally toward the target at a steady pace.
+        const walking = behavior.current === 'walking' && onFloor.current;
+        if (walking) {
+          const dir = walkTarget.current >= p.x ? 1 : -1;
+          facing.current = dir;
+          if (Math.abs(walkTarget.current - p.x) <= WALK_SPEED * dt + 1.5) {
+            p.x = walkTarget.current;
+            v.vx = 0;
+            behavior.current = 'idle';
+          } else {
+            v.vx = dir * WALK_SPEED;
+          }
+        }
+
         p.x += v.vx * dt;
         p.y += v.vy * dt;
 
         if (p.x <= 0) {
           p.x = 0;
           v.vx = Math.abs(v.vx) * WALL_BOUNCE;
+          behavior.current = 'idle';
         } else if (p.x >= s.w - DOG) {
           p.x = s.w - DOG;
           v.vx = -Math.abs(v.vx) * WALL_BOUNCE;
+          behavior.current = 'idle';
         }
         if (p.y < 0) {
           p.y = 0;
@@ -110,7 +131,8 @@ export function DogPlayground({ pose, className }: DogPlaygroundProps) {
         if (p.y >= floorY) {
           p.y = floorY;
           v.vy = v.vy > 1.6 ? -v.vy * FLOOR_BOUNCE : 0;
-          v.vx *= GROUND_FRICTION ** dt;
+          // Friction only when not walking — a walk holds a steady pace.
+          if (behavior.current !== 'walking') v.vx *= GROUND_FRICTION ** dt;
           onFloor.current = Math.abs(v.vy) < 0.6;
         } else {
           onFloor.current = false;
@@ -123,7 +145,10 @@ export function DogPlayground({ pose, className }: DogPlaygroundProps) {
         } else {
           rot.current += v.vx * 0.7 * dt;
         }
-        if (Math.abs(v.vx) > 0.45) facing.current = v.vx > 0 ? 1 : -1;
+        // Facing follows motion (a fling, a hop) — walking sets it above.
+        if (!walking && Math.abs(v.vx) > 0.45) {
+          facing.current = v.vx > 0 ? 1 : -1;
+        }
       }
 
       dogEl.style.transform = `translate3d(${p.x.toFixed(1)}px, ${p.y.toFixed(1)}px, 0) rotate(${rot.current.toFixed(1)}deg) scaleX(${facing.current})`;
@@ -131,22 +156,42 @@ export function DogPlayground({ pose, className }: DogPlaygroundProps) {
     };
     raf = requestAnimationFrame(frame);
 
-    // Self-roaming: when settled on the floor and not restful, hop about.
+    // Self-roaming: a calm behaviour mix — mostly pausing and strolling,
+    // with the odd turn and a rare hop.
     let roamTimer: ReturnType<typeof setTimeout>;
     const roam = () => {
       roamTimer = setTimeout(
         () => {
-          if (
+          const free =
             onFloor.current &&
             !dragging.current &&
-            !restfulRef.current
-          ) {
-            vel.current.vy = -(10 + Math.random() * 4);
-            vel.current.vx = (Math.random() < 0.5 ? -1 : 1) * (1.4 + Math.random() * 2);
+            !restfulRef.current &&
+            behavior.current !== 'walking';
+          if (free) {
+            const roll = Math.random();
+            if (roll < 0.4) {
+              // pause — just stand and breathe
+            } else if (roll < 0.78) {
+              // stroll to a new spot a decent distance away
+              const dir = Math.random() < 0.5 ? -1 : 1;
+              walkTarget.current = clamp(
+                pos.current.x + dir * (60 + Math.random() * 150),
+                0,
+                stage.current.w - DOG,
+              );
+              behavior.current = 'walking';
+            } else if (roll < 0.9) {
+              // turn to look the other way
+              facing.current = facing.current === 1 ? -1 : 1;
+            } else {
+              // a rare little hop
+              vel.current.vy = -(7 + Math.random() * 3);
+              vel.current.vx = (Math.random() < 0.5 ? -1 : 1) * (0.8 + Math.random());
+            }
           }
           roam();
         },
-        2200 + Math.random() * 3000,
+        1800 + Math.random() * 3200,
       );
     };
     roam();
@@ -185,6 +230,7 @@ export function DogPlayground({ pose, className }: DogPlaygroundProps) {
     const rect = stageEl.getBoundingClientRect();
     stageRect.current = rect;
     dragging.current = true;
+    behavior.current = 'idle'; // grabbing cancels a stroll
     grab.current = {
       x: e.clientX - rect.left - pos.current.x,
       y: e.clientY - rect.top - pos.current.y,
