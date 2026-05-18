@@ -13,7 +13,7 @@ import { db } from '@/db/dexie';
 import { getSyncConfig, syncBaseUrl } from '@/db/sync/config';
 import { createFood, searchLocalFoods } from '@/db/repos/foods';
 import { createMeal, type MealItemInput } from '@/db/repos/meals';
-import type { DayTotals } from '@/db/repos/diary';
+import { recentFoods, type DayTotals } from '@/db/repos/diary';
 import { computeMacros } from '@/features/food-search/foodMath';
 import { getUsdaApiKey, searchUsda } from '@/lib/usda-api';
 import type { Food } from '@/db/types';
@@ -137,6 +137,43 @@ function scoreFood(food: Food, query: string): number {
 
 // Dedupe lookups across all meal cards for the lifetime of the page.
 const lookupCache = new Map<string, Promise<Food | null>>();
+let recentsCache: Promise<Food[]> | null = null;
+
+/** The foods the user has logged recently — what they actually buy. */
+function loadRecentFoods(): Promise<Food[]> {
+  if (!recentsCache) {
+    recentsCache = (async () => {
+      const ids = await recentFoods(40).catch(() => [] as string[]);
+      if (ids.length === 0) return [];
+      const rows = await db.foods.bulkGet(ids);
+      return rows.filter((r): r is Food => !!r && !r.deleted_at);
+    })();
+  }
+  return recentsCache;
+}
+
+/** Clear per-session caches — call when the planner page opens so recents
+ *  and lookups are fresh. */
+export function resetPlannerCaches(): void {
+  lookupCache.clear();
+  recentsCache = null;
+}
+
+/** Significant (3+ char) words of a name. */
+function sigWords(s: string): string[] {
+  return (s.toLowerCase().match(/[a-z0-9]+/g) ?? []).filter((w) => w.length >= 3);
+}
+
+/** True when every significant word of the ingredient appears in the food
+ *  name — strict enough to match "chicken breast" to a recent branded
+ *  "Tesco Chicken Breast Fillets" without matching it to "chicken soup". */
+function nameContainsIngredient(food: Food, query: string): boolean {
+  const name = food.name.toLowerCase();
+  if (name === query) return true;
+  const words = sigWords(query);
+  if (words.length === 0) return name.includes(query);
+  return words.every((w) => name.includes(w));
+}
 
 async function lookupIngredientFood(name: string): Promise<Food | null> {
   const key = name.trim().toLowerCase();
@@ -145,6 +182,14 @@ async function lookupIngredientFood(name: string): Promise<Food | null> {
   if (cached) return cached;
 
   const promise = (async (): Promise<Food | null> => {
+    // 0. Recents — match against what the user actually logs, so a brand
+    //    they buy is used for the estimate rather than a generic entry.
+    const recents = await loadRecentFoods();
+    const recentHits = recents.filter((f) => nameContainsIngredient(f, key));
+    if (recentHits.length > 0) {
+      return [...recentHits].sort((a, b) => scoreFood(b, key) - scoreFood(a, key))[0];
+    }
+
     // 1. Local DB — curated common foods, the user's products, cached hits.
     const local = await searchLocalFoods(key, 25).catch(() => [] as Food[]);
     if (local.length > 0) {

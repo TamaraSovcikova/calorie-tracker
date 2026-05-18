@@ -7,6 +7,7 @@ import {
   ChevronDown,
   Loader2,
   Plus,
+  RefreshCw,
   Sparkles,
   X,
 } from 'lucide-react';
@@ -16,6 +17,7 @@ import { toast } from '@/components/ui/toast';
 import { formatKcal } from '@/lib/macros';
 import {
   requestMealPlan,
+  resetPlannerCaches,
   resolveAndFitMeal,
   savePlanAsMeal,
   type MealPlanRequest,
@@ -39,6 +41,11 @@ export function MealPlannerPage() {
   const [meals, setMeals] = useState<PlannedMeal[]>([]);
   const [req, setReq] = useState<MealPlanRequest | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Fresh recents + lookups each time the planner is opened.
+  useEffect(() => {
+    resetPlannerCaches();
+  }, []);
 
   const addIngredient = (raw: string) => {
     const parts = raw.split(',').map((s) => s.trim()).filter(Boolean);
@@ -78,6 +85,23 @@ export function MealPlannerPage() {
     setPhase('results');
   };
 
+  const handleRegenerate = async () => {
+    if (!req) return;
+    setPhase('loading');
+    const res = await requestMealPlan(req);
+    if (res.meals.length === 0) {
+      // Keep the meals already on screen; just report the hiccup.
+      toast({
+        message: res.error ?? 'Could not get new meals — try again.',
+        variant: 'error',
+      });
+      setPhase('results');
+      return;
+    }
+    setMeals(res.meals);
+    setPhase('results');
+  };
+
   return (
     <div className="mx-auto flex max-w-md flex-col">
       <header className="sticky top-0 z-30 flex items-center gap-2 border-b border-border bg-background/95 p-3 backdrop-blur">
@@ -114,7 +138,7 @@ export function MealPlannerPage() {
               variant="ghost"
               onClick={() => setPhase('form')}
             >
-              New plan
+              Edit requirements
             </Button>
           </div>
           <p className="text-xs text-muted-foreground">
@@ -127,6 +151,15 @@ export function MealPlannerPage() {
           <Button
             type="button"
             variant="secondary"
+            block
+            onClick={() => void handleRegenerate()}
+          >
+            <RefreshCw className="h-4 w-4" />
+            Show me different meals
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
             block
             onClick={() => navigate('/library')}
           >
