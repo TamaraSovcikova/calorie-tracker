@@ -1,6 +1,12 @@
+import { useState } from 'react';
 import { Select } from '@/components/ui/Select';
+import { Switch } from '@/components/ui/Switch';
 import { SettingCard } from './SettingCard';
 import { updateProfile } from '@/db/repos/profile';
+import {
+  isFoodFactsEnabled,
+  setFoodFactsEnabled,
+} from '@/features/food-facts/factSettings';
 import type { Profile } from '@/db/types';
 
 interface PreferencesSectionProps {
@@ -8,6 +14,8 @@ interface PreferencesSectionProps {
 }
 
 export function PreferencesSection({ profile }: PreferencesSectionProps) {
+  const [foodFacts, setFoodFacts] = useState(() => isFoodFactsEnabled());
+
   return (
     <SettingCard title="Preferences">
       <label className="block space-y-1">
@@ -40,6 +48,18 @@ export function PreferencesSection({ profile }: PreferencesSectionProps) {
           <option value="dark">Dark</option>
         </Select>
       </label>
+
+      <div className="border-t border-border pt-1">
+        <Switch
+          label="Food facts when logging"
+          description="Now and then, show a quick nutrition fact about a food you just logged."
+          checked={foodFacts}
+          onChange={(next) => {
+            setFoodFacts(next);
+            setFoodFactsEnabled(next);
+          }}
+        />
+      </div>
     </SettingCard>
   );
 }

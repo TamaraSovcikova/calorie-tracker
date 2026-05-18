@@ -20,6 +20,7 @@ import {
   type ResolvedMacros,
 } from './foodMath';
 import { createDiaryEntry, lastQuantityForFood } from '@/db/repos/diary';
+import { maybeShowFoodFact } from '@/features/food-facts/foodFacts';
 import { toast } from '@/components/ui/toast';
 import { db } from '@/db/dexie';
 import { lookupBarcode, OffRateLimitError } from '@/lib/off-api';
@@ -119,7 +120,8 @@ export function AddFoodSheet({ open, onClose, date, section }: AddFoodSheetProps
   const handleSaveQuantity = async (state: QuantityState, macros: ResolvedMacros) => {
     if (step.kind !== 'quantity') return;
     if (macros.grams <= 0) return;
-    const foodName = step.food.name;
+    const loggedFood = step.food;
+    const foodName = loggedFood.name;
     await createDiaryEntry({
       date,
       section,
@@ -136,6 +138,8 @@ export function AddFoodSheet({ open, onClose, date, section }: AddFoodSheetProps
       message: `${foodName} added to ${SECTION_LABEL[section]}`,
       variant: 'success',
     });
+    // Occasionally surface a nutrition fact about what was just logged.
+    void maybeShowFoodFact(loggedFood);
     // Stay open on the search panel so several items can be logged in a row.
     setStep({ kind: 'pick' });
     setTab('search');

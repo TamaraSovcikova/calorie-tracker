@@ -10,6 +10,7 @@ import { FitbitCallback } from '@/app/auth/FitbitCallback';
 import { useThemeEffect } from '@/features/settings/useThemeEffect';
 import { OnboardingGate } from '@/features/onboarding/OnboardingWizard';
 import { InstallPrompt } from '@/features/install-prompt/InstallPrompt';
+import { FoodFactCard } from '@/features/food-facts/FoodFactCard';
 import { Toaster } from '@/components/ui/Toaster';
 
 export default function App() {
@@ -36,6 +37,7 @@ export default function App() {
       </Routes>
       <OnboardingGate />
       <InstallPrompt />
+      <FoodFactCard />
       <Toaster />
     </>
   );

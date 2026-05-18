@@ -14,10 +14,13 @@
  */
 
 import { handleSync } from './sync';
+import { handleFoodFact } from './foodFacts';
 
 export interface Env {
   DB: D1Database;
   ASSETS: Fetcher;
+  /** Cloudflare Workers AI binding — food facts + meal planner. */
+  AI: Ai;
 }
 
 /** Shortest accepted sync code — generated codes are far longer; this
@@ -128,6 +131,15 @@ export default {
         } catch (err) {
           const msg = err instanceof Error ? err.message : 'sync error';
           return jsonResponse({ error: msg }, { status: 500 });
+        }
+      }
+
+      // /api/food-fact — AI nutrition fact for a logged food (cached).
+      if (url.pathname === '/api/food-fact' && req.method === 'POST') {
+        try {
+          return await handleFoodFact(req, env);
+        } catch {
+          return jsonResponse({ fact: null });
         }
       }
 

@@ -13,13 +13,13 @@
  * Manual one-time setup (Tamara, see README "Cloud sync setup"):
  *   1. wrangler login
  *   2. wrangler d1 create calorie-tracker
- *      → paste the returned database_id below where it says
- *        REPLACE_WITH_D1_DATABASE_ID.
+ *      → paste the returned database_id below.
  *   3. wrangler d1 execute calorie-tracker --remote --file ./worker/schema.sql
- *   4. wrangler secret put SYNC_TOKEN
- *      → paste a random 32+ char string (same one you'll paste in
- *        Settings → Cloud sync on each device).
- *   5. wrangler deploy
+ *   4. wrangler deploy
+ *
+ * Auth is per-user sync codes (no shared secret) — see worker/index.ts.
+ * The "ai" binding is Cloudflare Workers AI: the free allocation (10k
+ * neurons/day) powers food facts + the meal planner at no cost.
  */
 {
   "$schema": "node_modules/wrangler/config-schema.json",
@@ -41,6 +41,10 @@
       "database_id": "e07a1cc2-a985-4917-9481-84cc16c9c190"
     }
   ],
+
+  "ai": {
+    "binding": "AI"
+  },
 
   "observability": {
     "enabled": true
