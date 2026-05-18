@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
+  AlertTriangle,
   ArrowLeft,
   Check,
   ChevronDown,
@@ -14,11 +15,12 @@ import { Input, LabeledInput } from '@/components/ui/Input';
 import { toast } from '@/components/ui/toast';
 import { formatKcal } from '@/lib/macros';
 import {
-  planPerServing,
   requestMealPlan,
+  resolveAndFitMeal,
   savePlanAsMeal,
-  type MealPlanResult,
+  type MealPlanRequest,
   type PlannedMeal,
+  type ResolvedMeal,
 } from './mealPlanner';
 
 type Phase = 'form' | 'loading' | 'results';
@@ -29,20 +31,17 @@ export function MealPlannerPage() {
   const [phase, setPhase] = useState<Phase>('form');
   const [ingredients, setIngredients] = useState<string[]>([]);
   const [draft, setDraft] = useState('');
-  const [days, setDays] = useState(5);
-  const [mealsPerDay, setMealsPerDay] = useState(1);
+  const [portions, setPortions] = useState(5);
   const [kcalMax, setKcalMax] = useState('');
   const [proteinMin, setProteinMin] = useState('');
   const [notes, setNotes] = useState('');
 
-  const [result, setResult] = useState<MealPlanResult | null>(null);
+  const [meals, setMeals] = useState<PlannedMeal[]>([]);
+  const [req, setReq] = useState<MealPlanRequest | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const addIngredient = (raw: string) => {
-    const parts = raw
-      .split(',')
-      .map((s) => s.trim())
-      .filter(Boolean);
+    const parts = raw.split(',').map((s) => s.trim()).filter(Boolean);
     if (parts.length === 0) return;
     setIngredients((curr) => {
       const seen = new Set(curr.map((c) => c.toLowerCase()));
@@ -58,26 +57,24 @@ export function MealPlannerPage() {
     setDraft('');
   };
 
-  const removeIngredient = (name: string) =>
-    setIngredients((curr) => curr.filter((c) => c !== name));
-
   const handleGenerate = async () => {
     setPhase('loading');
     setError(null);
-    const res = await requestMealPlan({
-      ingredients,
-      days,
-      mealsPerDay,
+    const request: MealPlanRequest = {
+      portions: portions > 0 ? portions : 1,
       kcalMax: kcalMax ? parseFloat(kcalMax) : undefined,
       proteinMin: proteinMin ? parseFloat(proteinMin) : undefined,
+      ingredients: ingredients.length > 0 ? ingredients : undefined,
       notes: notes.trim() || undefined,
-    });
-    if (res.error && res.meals.length === 0) {
-      setError(res.error);
+    };
+    const res = await requestMealPlan(request);
+    if (res.meals.length === 0) {
+      setError(res.error ?? 'Could not generate a plan — try again.');
       setPhase('form');
       return;
     }
-    setResult(res);
+    setMeals(res.meals);
+    setReq(request);
     setPhase('results');
   };
 
@@ -102,25 +99,76 @@ export function MealPlannerPage() {
         <div className="flex flex-col items-center gap-3 p-16 text-center">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
           <p className="text-sm text-muted-foreground">
-            Building your meal plan… this usually takes 10–20 seconds.
+            Finding meal ideas… this usually takes 10–20 seconds.
           </p>
         </div>
-      ) : phase === 'results' && result ? (
-        <ResultsView
-          result={result}
-          onRestart={() => {
-            setResult(null);
-            setPhase('form');
-          }}
-          onGoToLibrary={() => navigate('/library')}
-        />
+      ) : phase === 'results' && req ? (
+        <div className="space-y-4 p-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
+              {meals.length} meal ideas
+            </h2>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={() => setPhase('form')}
+            >
+              New plan
+            </Button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Each makes {req.portions} portion{req.portions === 1 ? '' : 's'}. Tap a
+            meal to see the recipe, scaled to hit your targets — then save it.
+          </p>
+          {meals.map((meal, i) => (
+            <MealCard key={`${meal.name}-${i}`} meal={meal} req={req} />
+          ))}
+          <Button
+            type="button"
+            variant="secondary"
+            block
+            onClick={() => navigate('/library')}
+          >
+            Done — go to library
+          </Button>
+        </div>
       ) : (
         <div className="space-y-4 p-4">
           <p className="text-sm text-muted-foreground">
-            Set your targets and get meal-prep recipes you can save straight
-            to your library. Add ingredients to build around — or leave them
-            blank for free inspiration.
+            Set your targets and get meal-prep recipes that actually fit them.
+            Add ingredients to build around — or leave them blank for free
+            inspiration.
           </p>
+
+          <div className="grid grid-cols-2 gap-3">
+            <LabeledInput
+              label="Portions to prep"
+              type="number"
+              inputMode="numeric"
+              min="1"
+              value={Number.isFinite(portions) ? portions : ''}
+              onChange={(e) => setPortions(parseInt(e.target.value, 10))}
+            />
+            <div />
+            <LabeledInput
+              label="Max kcal / portion"
+              type="number"
+              inputMode="numeric"
+              placeholder="optional"
+              value={kcalMax}
+              onChange={(e) => setKcalMax(e.target.value)}
+            />
+            <LabeledInput
+              label="Min protein / portion"
+              type="number"
+              inputMode="numeric"
+              placeholder="optional"
+              value={proteinMin}
+              onChange={(e) => setProteinMin(e.target.value)}
+              trailing="g"
+            />
+          </div>
 
           <div className="space-y-2">
             <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
@@ -157,7 +205,9 @@ export function MealPlannerPage() {
                     {ing}
                     <button
                       type="button"
-                      onClick={() => removeIngredient(ing)}
+                      onClick={() =>
+                        setIngredients((c) => c.filter((x) => x !== ing))
+                      }
                       aria-label={`Remove ${ing}`}
                       className="text-muted-foreground hover:text-destructive"
                     >
@@ -167,43 +217,6 @@ export function MealPlannerPage() {
                 ))}
               </div>
             )}
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <LabeledInput
-              label="Prep for"
-              type="number"
-              inputMode="numeric"
-              min="1"
-              value={Number.isFinite(days) ? days : ''}
-              onChange={(e) => setDays(parseInt(e.target.value, 10))}
-              trailing="days"
-            />
-            <LabeledInput
-              label="Meals per day"
-              type="number"
-              inputMode="numeric"
-              min="1"
-              value={Number.isFinite(mealsPerDay) ? mealsPerDay : ''}
-              onChange={(e) => setMealsPerDay(parseInt(e.target.value, 10))}
-            />
-            <LabeledInput
-              label="Max kcal / portion"
-              type="number"
-              inputMode="numeric"
-              placeholder="optional"
-              value={kcalMax}
-              onChange={(e) => setKcalMax(e.target.value)}
-            />
-            <LabeledInput
-              label="Min protein / portion"
-              type="number"
-              inputMode="numeric"
-              placeholder="optional"
-              value={proteinMin}
-              onChange={(e) => setProteinMin(e.target.value)}
-              trailing="g"
-            />
           </div>
 
           <LabeledInput
@@ -219,18 +232,12 @@ export function MealPlannerPage() {
             </p>
           )}
 
-          <Button
-            type="button"
-            variant="primary"
-            block
-            onClick={handleGenerate}
-          >
+          <Button type="button" variant="primary" block onClick={handleGenerate}>
             <Sparkles className="h-4 w-4" />
-            Generate plan
+            Find meals
           </Button>
           <p className="text-center text-[11px] text-muted-foreground">
-            Powered by free on-device AI — macros are estimates you can edit
-            after saving.
+            Macros are looked up from real food data — free, on Cloudflare AI.
           </p>
         </div>
       )}
@@ -238,63 +245,37 @@ export function MealPlannerPage() {
   );
 }
 
-function ResultsView({
-  result,
-  onRestart,
-  onGoToLibrary,
+function MealCard({
+  meal,
+  req,
 }: {
-  result: MealPlanResult;
-  onRestart: () => void;
-  onGoToLibrary: () => void;
+  meal: PlannedMeal;
+  req: MealPlanRequest;
 }) {
-  return (
-    <div className="space-y-4 p-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
-          {result.meals.length} meal{result.meals.length === 1 ? '' : 's'} suggested
-        </h2>
-        <Button type="button" size="sm" variant="ghost" onClick={onRestart}>
-          New plan
-        </Button>
-      </div>
-
-      {result.meals.map((meal, i) => (
-        <MealSuggestionCard key={`${meal.name}-${i}`} meal={meal} />
-      ))}
-
-      {result.shoppingList.length > 0 && (
-        <details className="rounded-2xl border border-border bg-card">
-          <summary className="cursor-pointer list-none px-4 py-3 text-sm font-medium">
-            Shopping list ({result.shoppingList.length})
-          </summary>
-          <ul className="divide-y divide-border px-4 pb-3 text-sm">
-            {result.shoppingList.map((s, i) => (
-              <li key={`${s.name}-${i}`} className="flex justify-between gap-3 py-2">
-                <span className="truncate">{s.name}</span>
-                <span className="shrink-0 text-muted-foreground">{s.amount}</span>
-              </li>
-            ))}
-          </ul>
-        </details>
-      )}
-
-      <Button type="button" variant="secondary" block onClick={onGoToLibrary}>
-        Done — go to library
-      </Button>
-    </div>
-  );
-}
-
-function MealSuggestionCard({ meal }: { meal: PlannedMeal }) {
   const [open, setOpen] = useState(false);
+  const [resolved, setResolved] = useState<ResolvedMeal | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
-  const per = planPerServing(meal);
+
+  useEffect(() => {
+    let cancelled = false;
+    void resolveAndFitMeal(meal, {
+      portions: req.portions,
+      kcalMax: req.kcalMax,
+      proteinMin: req.proteinMin,
+    }).then((r) => {
+      if (!cancelled) setResolved(r);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [meal, req]);
 
   const handleSave = async () => {
+    if (!resolved) return;
     setSaving(true);
     try {
-      await savePlanAsMeal(meal);
+      await savePlanAsMeal(resolved);
       setSaved(true);
       toast({ message: `"${meal.name}" saved to your library`, variant: 'success' });
     } catch {
@@ -303,6 +284,8 @@ function MealSuggestionCard({ meal }: { meal: PlannedMeal }) {
       setSaving(false);
     }
   };
+
+  const fits = resolved && resolved.fitsKcal && resolved.fitsProtein;
 
   return (
     <div className="overflow-hidden rounded-2xl border border-border bg-card">
@@ -318,13 +301,23 @@ function MealSuggestionCard({ meal }: { meal: PlannedMeal }) {
               {meal.description}
             </div>
           )}
-          <div className="mt-1 text-xs text-muted-foreground tabular-nums">
-            <span className="font-medium text-foreground">
-              {formatKcal(per.kcal)}
-            </span>{' '}
-            kcal/portion · {Math.round(per.protein)} P / {Math.round(per.carbs)} C /{' '}
-            {Math.round(per.fat)} F · makes {Math.round(meal.servings)}
-          </div>
+          {!resolved ? (
+            <div className="mt-1.5 flex items-center gap-1.5 text-xs text-muted-foreground">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              Checking nutrition…
+            </div>
+          ) : (
+            <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
+              <span className="text-xs text-muted-foreground tabular-nums">
+                <span className="font-medium text-foreground">
+                  {formatKcal(resolved.perPortion.kcal)}
+                </span>{' '}
+                kcal · {Math.round(resolved.perPortion.protein)} g protein /
+                portion
+              </span>
+              <FitBadge fits={!!fits} />
+            </div>
+          )}
         </div>
         <ChevronDown
           className={`mt-0.5 h-4 w-4 shrink-0 text-muted-foreground transition-transform ${
@@ -335,61 +328,115 @@ function MealSuggestionCard({ meal }: { meal: PlannedMeal }) {
 
       {open && (
         <div className="space-y-3 border-t border-border px-4 py-3">
-          <div>
-            <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Ingredients (whole batch)
+          {!resolved ? (
+            <div className="flex items-center gap-2 py-4 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Looking up ingredients…
             </div>
-            <ul className="mt-1 divide-y divide-border text-sm">
-              {meal.ingredients.map((ing, i) => (
-                <li key={`${ing.name}-${i}`} className="flex justify-between gap-3 py-1.5">
-                  <span className="truncate">{ing.name}</span>
-                  <span className="shrink-0 text-muted-foreground tabular-nums">
-                    {Math.round(ing.grams)} g · {formatKcal(ing.kcal)} kcal
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {meal.steps.length > 0 && (
-            <div>
-              <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Method
+          ) : (
+            <>
+              <div className="rounded-xl border border-border bg-muted/30 p-3">
+                <div className="text-xs uppercase tracking-wide text-muted-foreground">
+                  Per portion
+                </div>
+                <div className="mt-0.5 text-sm font-medium tabular-nums">
+                  {formatKcal(resolved.perPortion.kcal)} kcal ·{' '}
+                  {Math.round(resolved.perPortion.protein)} P /{' '}
+                  {Math.round(resolved.perPortion.carbs)} C /{' '}
+                  {Math.round(resolved.perPortion.fat)} F
+                </div>
+                {!fits && (
+                  <div className="mt-1 text-[11px] text-amber-600 dark:text-amber-400">
+                    {!resolved.fitsKcal && 'Slightly over your kcal target. '}
+                    {!resolved.fitsProtein && 'A little under your protein target.'}
+                  </div>
+                )}
               </div>
-              <ol className="mt-1 list-decimal space-y-1 pl-5 text-sm">
-                {meal.steps.map((step, i) => (
-                  <li key={i}>{step}</li>
-                ))}
-              </ol>
-            </div>
-          )}
 
-          <Button
-            type="button"
-            variant={saved ? 'secondary' : 'primary'}
-            block
-            disabled={saving || saved}
-            onClick={handleSave}
-          >
-            {saving ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" />
-                Saving…
-              </>
-            ) : saved ? (
-              <>
-                <Check className="h-4 w-4" />
-                Saved to library
-              </>
-            ) : (
-              <>
-                <Plus className="h-4 w-4" />
-                Save to library
-              </>
-            )}
-          </Button>
+              <div>
+                <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Shopping list · whole batch ({resolved.portions} portions)
+                </div>
+                <ul className="mt-1 divide-y divide-border text-sm">
+                  {resolved.ingredients.map((ing, i) => (
+                    <li
+                      key={`${ing.name}-${i}`}
+                      className="flex justify-between gap-3 py-1.5"
+                    >
+                      <span className="truncate">
+                        {ing.name}
+                        {!ing.food && (
+                          <span className="ml-1 text-[10px] text-amber-600 dark:text-amber-400">
+                            (no nutrition data)
+                          </span>
+                        )}
+                      </span>
+                      <span className="shrink-0 text-muted-foreground tabular-nums">
+                        {ing.grams} g
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              {meal.steps.length > 0 && (
+                <div>
+                  <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    Method
+                  </div>
+                  <ol className="mt-1 list-decimal space-y-1 pl-5 text-sm">
+                    {meal.steps.map((step, i) => (
+                      <li key={i}>{step}</li>
+                    ))}
+                  </ol>
+                </div>
+              )}
+
+              <Button
+                type="button"
+                variant={saved ? 'secondary' : 'primary'}
+                block
+                disabled={saving || saved}
+                onClick={handleSave}
+              >
+                {saving ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Saving…
+                  </>
+                ) : saved ? (
+                  <>
+                    <Check className="h-4 w-4" />
+                    Saved to library
+                  </>
+                ) : (
+                  <>
+                    <Plus className="h-4 w-4" />
+                    Save to library
+                  </>
+                )}
+              </Button>
+            </>
+          )}
         </div>
       )}
     </div>
+  );
+}
+
+function FitBadge({ fits }: { fits: boolean }) {
+  if (fits) {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
+        <Check className="h-3 w-3" />
+        Fits targets
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-400">
+      <AlertTriangle className="h-3 w-3" />
+      Close
+    </span>
   );
 }

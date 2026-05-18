@@ -3,26 +3,25 @@
  *
  *   POST /api/meal-plan
  *   {
- *     "ingredients": ["chicken breast", "rice", ...],
- *     "days": 5,
- *     "mealsPerDay": 1,
- *     "kcalMax": 500,        // optional, per portion
- *     "proteinMin": 40,      // optional, per portion (g)
- *     "notes": "vegetarian, no oven"   // optional
+ *     "portions": 5,             // how many meal-prep portions to make
+ *     "kcalMax": 500,            // optional, per portion
+ *     "proteinMin": 40,          // optional, per portion (g)
+ *     "ingredients": ["chicken breast", ...],   // optional, to build around
+ *     "notes": "vegetarian, no oven"            // optional
  *   }
  *
- *   → { "meals": [ ...PlannedMeal ], "shoppingList": [ {name, amount} ] }
+ *   → { "meals": [ { name, description, ingredients:[{name,grams}], steps } ] }
  *
- * Runs Llama 3.3 70B on Cloudflare Workers AI in JSON mode. Each meal is a
- * batch recipe — ingredient amounts are for the WHOLE batch and the meal
- * "makes" `servings` portions, matching the app's multi-portion meals.
- * Fails soft with `{ meals: [], error }` if the AI is unavailable.
+ * The model ONLY proposes recipes — names, ingredient amounts and method.
+ * It is deliberately NOT asked for calories or macros: small models are
+ * unreliable at nutrition numbers. The client computes real macros from
+ * the food database (curated foods + USDA) and scales each recipe to fit
+ * the targets. Ingredient amounts are for the WHOLE batch of `portions`.
  */
 
 import type { Env } from './index';
 
-// 8B "fast" — the 70B model takes ~100s for a full plan, which reads as a
-// frozen UI. 8B returns in ~10-20s and is plenty for structured meal ideas.
+// 8B "fast" — quick (~10-20s) and good enough now it only writes recipes.
 const MODEL = '@cf/meta/llama-3.1-8b-instruct-fast';
 
 const RESPONSE_SCHEMA = {
@@ -35,7 +34,6 @@ const RESPONSE_SCHEMA = {
         properties: {
           name: { type: 'string' },
           description: { type: 'string' },
-          servings: { type: 'number' },
           ingredients: {
             type: 'array',
             items: {
@@ -43,34 +41,22 @@ const RESPONSE_SCHEMA = {
               properties: {
                 name: { type: 'string' },
                 grams: { type: 'number' },
-                kcal: { type: 'number' },
-                protein: { type: 'number' },
-                carbs: { type: 'number' },
-                fat: { type: 'number' },
               },
-              required: ['name', 'grams', 'kcal', 'protein', 'carbs', 'fat'],
+              required: ['name', 'grams'],
             },
           },
           steps: { type: 'array', items: { type: 'string' } },
         },
-        required: ['name', 'description', 'servings', 'ingredients', 'steps'],
-      },
-    },
-    shoppingList: {
-      type: 'array',
-      items: {
-        type: 'object',
-        properties: { name: { type: 'string' }, amount: { type: 'string' } },
-        required: ['name', 'amount'],
+        required: ['name', 'description', 'ingredients', 'steps'],
       },
     },
   },
-  required: ['meals', 'shoppingList'],
+  required: ['meals'],
 };
 
-function jsonResponse(body: unknown, status = 200): Response {
+function jsonResponse(body: unknown, init: ResponseInit = {}): Response {
   return new Response(JSON.stringify(body), {
-    status,
+    ...init,
     headers: {
       'content-type': 'application/json',
       'Access-Control-Allow-Origin': '*',
@@ -86,8 +72,7 @@ function clamp(n: number, lo: number, hi: number): number {
   return Math.min(hi, Math.max(lo, n));
 }
 
-/** Pull the JSON object out of a model response that may be wrapped in
- *  prose or ```json fences. */
+/** Pull the JSON object out of a response that may be wrapped in prose. */
 function extractJson(raw: unknown): unknown {
   if (raw && typeof raw === 'object') return raw;
   if (typeof raw !== 'string') return null;
@@ -104,15 +89,10 @@ function extractJson(raw: unknown): unknown {
 interface CleanIngredient {
   name: string;
   grams: number;
-  kcal: number;
-  protein: number;
-  carbs: number;
-  fat: number;
 }
 interface CleanMeal {
   name: string;
   description: string;
-  servings: number;
   ingredients: CleanIngredient[];
   steps: string[];
 }
@@ -125,19 +105,13 @@ function cleanMeals(value: unknown): CleanMeal[] {
     const r = m as Record<string, unknown>;
     const ingredients: CleanIngredient[] = [];
     if (Array.isArray(r.ingredients)) {
-      for (const ing of (r.ingredients as unknown[]).slice(0, 25)) {
+      for (const ing of (r.ingredients as unknown[]).slice(0, 14)) {
         if (!ing || typeof ing !== 'object') continue;
         const i = ing as Record<string, unknown>;
         const name = typeof i.name === 'string' ? i.name.trim() : '';
-        if (!name) continue;
-        ingredients.push({
-          name: name.slice(0, 80),
-          grams: Math.max(0, Number(i.grams) || 0),
-          kcal: Math.max(0, Number(i.kcal) || 0),
-          protein: Math.max(0, Number(i.protein) || 0),
-          carbs: Math.max(0, Number(i.carbs) || 0),
-          fat: Math.max(0, Number(i.fat) || 0),
-        });
+        const grams = Math.round(Number(i.grams) || 0);
+        if (!name || grams <= 0) continue;
+        ingredients.push({ name: name.slice(0, 80), grams: clamp(grams, 1, 50000) });
       }
     }
     const name = typeof r.name === 'string' ? r.name.trim() : '';
@@ -147,13 +121,12 @@ function cleanMeals(value: unknown): CleanMeal[] {
           .filter((s): s is string => typeof s === 'string')
           .map((s) => s.trim())
           .filter(Boolean)
-          .slice(0, 15)
+          .slice(0, 10)
       : [];
     meals.push({
       name: name.slice(0, 80),
       description:
         typeof r.description === 'string' ? r.description.trim().slice(0, 200) : '',
-      servings: clamp(Math.round(Number(r.servings) || 1), 1, 30),
       ingredients,
       steps,
     });
@@ -161,30 +134,19 @@ function cleanMeals(value: unknown): CleanMeal[] {
   return meals;
 }
 
-function cleanShoppingList(value: unknown): { name: string; amount: string }[] {
-  if (!Array.isArray(value)) return [];
-  const out: { name: string; amount: string }[] = [];
-  for (const s of value.slice(0, 50)) {
-    if (!s || typeof s !== 'object') continue;
-    const r = s as Record<string, unknown>;
-    const name = typeof r.name === 'string' ? r.name.trim() : '';
-    if (!name) continue;
-    out.push({
-      name: name.slice(0, 80),
-      amount: typeof r.amount === 'string' ? r.amount.trim().slice(0, 40) : '',
-    });
-  }
-  return out;
-}
-
 export async function handleMealPlan(req: Request, env: Env): Promise<Response> {
   let body: Record<string, unknown> = {};
   try {
     body = (await req.json()) as Record<string, unknown>;
   } catch {
-    return jsonResponse({ meals: [], shoppingList: [], error: 'Bad request.' }, 400);
+    return jsonResponse({ meals: [], error: 'Bad request.' }, { status: 400 });
   }
 
+  const portions = clamp(Math.round(posNum(body.portions) ?? 5), 1, 30);
+  const kcalMax = posNum(body.kcalMax);
+  const proteinMin = posNum(body.proteinMin);
+  const notes =
+    typeof body.notes === 'string' ? body.notes.trim().slice(0, 300) : '';
   const ingredients = Array.isArray(body.ingredients)
     ? (body.ingredients as unknown[])
         .filter((x): x is string => typeof x === 'string')
@@ -192,83 +154,63 @@ export async function handleMealPlan(req: Request, env: Env): Promise<Response> 
         .filter(Boolean)
         .slice(0, 30)
     : [];
-  const days = clamp(Math.round(posNum(body.days) ?? 3), 1, 14);
-  const mealsPerDay = clamp(Math.round(posNum(body.mealsPerDay) ?? 1), 1, 5);
-  const kcalMax = posNum(body.kcalMax);
-  const proteinMin = posNum(body.proteinMin);
-  const notes =
-    typeof body.notes === 'string' ? body.notes.trim().slice(0, 300) : '';
 
-  const constraints: string[] = [
-    `Plan batch-cook meals for ${days} day(s), ${mealsPerDay} meal(s) per day.`,
+  const targetLines: string[] = [
+    `Each recipe must make exactly ${portions} portion(s) — ingredient ` +
+      `amounts are the totals for the whole batch.`,
   ];
-  if (kcalMax) constraints.push(`Each portion must be at most ${kcalMax} kcal.`);
+  if (kcalMax) targetLines.push(`Aim for at most ${kcalMax} kcal per portion.`);
   if (proteinMin)
-    constraints.push(`Each portion should have at least ${proteinMin} g protein.`);
-  if (notes) constraints.push(`Extra preferences: ${notes}`);
+    targetLines.push(`Aim for at least ${proteinMin} g protein per portion.`);
+  if (notes) targetLines.push(`Preferences: ${notes}`);
 
   const ingredientLine =
     ingredients.length > 0
-      ? `I'd like meals built around these ingredients: ${ingredients.join(', ')}. ` +
-        `Use them where they fit — I don't have to use all of them, and you ` +
-        `can freely add any other ingredients the recipes need.`
-      : `I haven't picked specific ingredients — suggest meals freely for ` +
-        `inspiration, choosing whatever ingredients fit the targets below.`;
+      ? `Build the meals around these ingredients where they fit: ` +
+        `${ingredients.join(', ')}. You don't have to use all of them and ` +
+        `may add others.`
+      : `I haven't picked ingredients — suggest varied meals for inspiration.`;
 
   const userPrompt =
-    `${ingredientLine}\n` +
-    `${constraints.join('\n')}\n\n` +
-    `Suggest exactly 3 distinct meal-prep recipes. Keep it compact — at ` +
-    `most 7 ingredients and 6 short steps per meal. For each meal:\n` +
-    `- "servings" is how many portions the batch makes.\n` +
-    `- "ingredients" amounts are for the WHOLE batch, in grams, each with ` +
-    `realistic kcal/protein/carbs/fat for that amount.\n` +
-    `- include every ingredient the recipe needs, staples included.\n` +
-    `- "steps" are short cooking instructions.\n` +
-    `Also return a combined "shoppingList" of everything needed across all meals.`;
+    `${ingredientLine}\n${targetLines.join('\n')}\n\n` +
+    `Suggest exactly 5 distinct, realistic meal-prep recipes. For each: a ` +
+    `short name, a one-line description, an ingredient list (each with a ` +
+    `name and a gram amount for the whole batch — include staples like oil ` +
+    `and salt), and up to 8 short method steps. Do NOT include calories or ` +
+    `macros — only ingredient names and gram amounts.`;
 
   let parsed: unknown = null;
   try {
     const out = (await env.AI.run(MODEL, {
-      max_tokens: 4096,
-      temperature: 0.6,
+      max_tokens: 3000,
+      temperature: 0.7,
       response_format: { type: 'json_schema', json_schema: RESPONSE_SCHEMA },
       messages: [
         {
           role: 'system',
           content:
-            'You are a practical meal-prep planner. You reply ONLY with ' +
-            'JSON matching the requested schema — no prose, no markdown. ' +
-            'Macros must be realistic and internally consistent.',
+            'You are a practical meal-prep planner. Reply ONLY with JSON ' +
+            'matching the requested schema — no prose, no markdown. Use ' +
+            'realistic gram amounts for a batch of the requested size.',
         },
         { role: 'user', content: userPrompt },
       ],
     })) as { response?: unknown };
     parsed = extractJson(out.response);
   } catch {
-    return jsonResponse(
-      {
-        meals: [],
-        shoppingList: [],
-        error: "The planner is busy right now (today's free AI limit may be reached). Try again later.",
-      },
-      200,
-    );
+    return jsonResponse({
+      meals: [],
+      error:
+        "The planner is busy right now (today's free AI limit may be reached). Try again later.",
+    });
   }
 
-  if (!parsed || typeof parsed !== 'object') {
-    return jsonResponse(
-      { meals: [], shoppingList: [], error: 'Could not generate a plan — try again.' },
-      200,
-    );
-  }
-  const root = parsed as Record<string, unknown>;
-  const meals = cleanMeals(root.meals);
+  const meals = cleanMeals((parsed as Record<string, unknown> | null)?.meals);
   if (meals.length === 0) {
-    return jsonResponse(
-      { meals: [], shoppingList: [], error: 'Could not generate a plan — try again.' },
-      200,
-    );
+    return jsonResponse({
+      meals: [],
+      error: 'Could not generate a plan — please try again.',
+    });
   }
-  return jsonResponse({ meals, shoppingList: cleanShoppingList(root.shoppingList) });
+  return jsonResponse({ meals });
 }

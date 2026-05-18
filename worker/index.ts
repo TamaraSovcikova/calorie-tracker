@@ -150,11 +150,7 @@ export default {
         try {
           return await handleMealPlan(req, env);
         } catch {
-          return jsonResponse({
-            meals: [],
-            shoppingList: [],
-            error: 'Planner failed — try again.',
-          });
+          return jsonResponse({ meals: [], error: 'Planner failed — try again.' });
         }
       }
 
