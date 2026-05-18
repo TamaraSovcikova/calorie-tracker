@@ -218,7 +218,8 @@ export async function handleMealPlan(req: Request, env: Env): Promise<Response> 
   const userPrompt =
     `${ingredientLine}\n` +
     `${constraints.join('\n')}\n\n` +
-    `Suggest exactly 3 distinct meal-prep recipes. For each meal:\n` +
+    `Suggest exactly 3 distinct meal-prep recipes. Keep it compact — at ` +
+    `most 7 ingredients and 6 short steps per meal. For each meal:\n` +
     `- "servings" is how many portions the batch makes.\n` +
     `- "ingredients" amounts are for the WHOLE batch, in grams, each with ` +
     `realistic kcal/protein/carbs/fat for that amount.\n` +
@@ -229,7 +230,7 @@ export async function handleMealPlan(req: Request, env: Env): Promise<Response> 
   let parsed: unknown = null;
   try {
     const out = (await env.AI.run(MODEL, {
-      max_tokens: 2400,
+      max_tokens: 4096,
       temperature: 0.6,
       response_format: { type: 'json_schema', json_schema: RESPONSE_SCHEMA },
       messages: [
