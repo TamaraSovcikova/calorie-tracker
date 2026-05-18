@@ -53,6 +53,7 @@ export function LogMealStep({
         <p className="text-xs text-muted-foreground">
           {resolved.items.length} ingredients · {formatKcal(resolved.totals.kcal)} kcal
           per portion
+          {resolved.servings > 1 && ` · batch makes ${Math.round(resolved.servings)}`}
         </p>
       </div>
 
@@ -113,7 +114,10 @@ export function LogMealStep({
                 <li key={it.id} className="flex justify-between py-2">
                   <span className="truncate">{food?.name ?? '(deleted)'}</span>
                   <span className="text-muted-foreground tabular-nums">
-                    {(it.qty * mult).toFixed(1).replace(/\.0$/, '')} {it.unit}
+                    {((it.qty / resolved.servings) * mult)
+                      .toFixed(1)
+                      .replace(/\.0$/, '')}{' '}
+                    {it.unit}
                   </span>
                 </li>
               );

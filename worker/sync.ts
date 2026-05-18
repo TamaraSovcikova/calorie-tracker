@@ -90,7 +90,16 @@ const COLUMNS: Record<TableName, string[]> = {
     'updated_at',
     'deleted_at',
   ],
-  meals: ['id', 'user_id', 'name', 'notes', 'created_at', 'updated_at', 'deleted_at'],
+  meals: [
+    'id',
+    'user_id',
+    'name',
+    'notes',
+    'servings',
+    'created_at',
+    'updated_at',
+    'deleted_at',
+  ],
   meal_items: ['id', 'meal_id', 'food_id', 'qty', 'unit', 'meal_updated_at'],
   diary_entries: [
     'id',

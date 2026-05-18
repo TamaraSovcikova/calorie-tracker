@@ -13,7 +13,15 @@ export interface MealItemInput {
 export interface CreateMealInput {
   name: string;
   notes?: string;
+  /** How many portions the batch makes (defaults to 1). */
+  servings?: number;
   items: MealItemInput[];
+}
+
+function normaliseServings(servings: number | undefined): number {
+  return typeof servings === 'number' && Number.isFinite(servings) && servings > 0
+    ? servings
+    : 1;
 }
 
 export async function createMeal(input: CreateMealInput): Promise<Meal> {
@@ -24,6 +32,7 @@ export async function createMeal(input: CreateMealInput): Promise<Meal> {
     user_id: userId,
     name: input.name,
     notes: input.notes,
+    servings: normaliseServings(input.servings),
     created_at: now,
     updated_at: now,
   };
@@ -78,6 +87,7 @@ export async function duplicateMeal(id: string): Promise<Meal | undefined> {
   return createMeal({
     name: `Copy of ${original.name}`,
     notes: original.notes,
+    servings: original.servings,
     items: items.map((it) => ({ food_id: it.food_id, qty: it.qty, unit: it.unit })),
   });
 }

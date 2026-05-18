@@ -1,4 +1,4 @@
-import type { Food, MealItem } from '@/db/types';
+import type { Food, Meal, MealItem } from '@/db/types';
 import {
   computeMacros,
   type QuantityMode,
@@ -45,4 +45,27 @@ export function multiplyTotals(t: DayTotals, factor: number): DayTotals {
     carbs: t.carbs * factor,
     fat: t.fat * factor,
   };
+}
+
+/**
+ * How many portions a meal's batch makes. Always ≥ 1; missing/invalid
+ * values (old rows, bad input) read as 1 so per-portion math is safe.
+ */
+export function getServings(meal: Pick<Meal, 'servings'>): number {
+  const s = meal.servings;
+  return typeof s === 'number' && Number.isFinite(s) && s > 0 ? s : 1;
+}
+
+/** Divide a whole-batch total into one portion's worth. */
+export function perServingTotals(
+  whole: DayTotals,
+  servings: number,
+): DayTotals {
+  return multiplyTotals(whole, 1 / (servings > 0 ? servings : 1));
+}
+
+/** Display a servings count: "5 portions", "1 portion", "1.5 portions". */
+export function formatServings(servings: number): string {
+  const n = Math.round(servings * 10) / 10;
+  return `${n} ${n === 1 ? 'portion' : 'portions'}`;
 }

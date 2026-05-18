@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import type { Food, MealItem } from '@/db/types';
-import { computeMealTotals, itemToQuantity, multiplyTotals } from './mealMath';
+import {
+  computeMealTotals,
+  formatServings,
+  getServings,
+  itemToQuantity,
+  multiplyTotals,
+  perServingTotals,
+} from './mealMath';
 
 const food = (id: string, over: Partial<Food> = {}): Food =>
   ({
@@ -90,5 +97,46 @@ describe('multiplyTotals', () => {
     expect(
       multiplyTotals({ kcal: 100, protein: 10, carbs: 20, fat: 5 }, 2.5),
     ).toEqual({ kcal: 250, protein: 25, carbs: 50, fat: 12.5 });
+  });
+});
+
+describe('getServings', () => {
+  it('returns the meal servings when valid', () => {
+    expect(getServings({ servings: 5 })).toBe(5);
+    expect(getServings({ servings: 1.5 })).toBe(1.5);
+  });
+
+  it('falls back to 1 for missing or invalid values', () => {
+    expect(getServings({ servings: undefined })).toBe(1);
+    expect(getServings({ servings: 0 })).toBe(1);
+    expect(getServings({ servings: -3 })).toBe(1);
+    expect(getServings({ servings: NaN })).toBe(1);
+  });
+});
+
+describe('perServingTotals', () => {
+  it('divides a whole-batch total by the servings count', () => {
+    expect(
+      perServingTotals({ kcal: 1000, protein: 50, carbs: 200, fat: 30 }, 5),
+    ).toEqual({ kcal: 200, protein: 10, carbs: 40, fat: 6 });
+  });
+
+  it('is a no-op for a single-serving batch', () => {
+    const t = { kcal: 420, protein: 30, carbs: 40, fat: 12 };
+    expect(perServingTotals(t, 1)).toEqual(t);
+  });
+
+  it('treats a non-positive servings count as 1', () => {
+    const t = { kcal: 420, protein: 30, carbs: 40, fat: 12 };
+    expect(perServingTotals(t, 0)).toEqual(t);
+  });
+});
+
+describe('formatServings', () => {
+  it('pluralises and rounds', () => {
+    expect(formatServings(1)).toBe('1 portion');
+    expect(formatServings(5)).toBe('5 portions');
+    expect(formatServings(1.5)).toBe('1.5 portions');
+    expect(formatServings(2.04)).toBe('2 portions');
   });
 });

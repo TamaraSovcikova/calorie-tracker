@@ -56,11 +56,18 @@ CREATE TABLE IF NOT EXISTS meals (
   user_id     TEXT NOT NULL,
   name        TEXT NOT NULL,
   notes       TEXT,
+  servings    INTEGER,  -- portions the batch makes; NULL = 1 (pre-feature rows)
   created_at  TEXT NOT NULL,
   updated_at  TEXT NOT NULL,
   deleted_at  TEXT
 );
 CREATE INDEX IF NOT EXISTS meals_updated_at ON meals (updated_at);
+
+-- Migration for databases created before the `servings` column existed.
+-- Safe to run once on an existing D1; errors with "duplicate column" if
+-- re-run (the column already exists) — that error is expected and benign.
+--   wrangler d1 execute <db> --remote \
+--     --command "ALTER TABLE meals ADD COLUMN servings INTEGER"
 
 CREATE TABLE IF NOT EXISTS meal_items (
   id        TEXT PRIMARY KEY,

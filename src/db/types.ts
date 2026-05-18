@@ -95,6 +95,13 @@ export interface Meal {
   user_id: ID;
   name: string;
   notes?: string;
+  /**
+   * How many portions the batch makes. Ingredients are entered as the
+   * whole batch (e.g. all the groceries cooked at once); per-portion
+   * macros = batch total ÷ servings. Defaults to 1; rows synced before
+   * this field existed read as 1 via `getServings()`.
+   */
+  servings?: number;
   created_at: ISOTimestamp;
   updated_at: ISOTimestamp;
   deleted_at?: ISOTimestamp;

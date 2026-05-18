@@ -3,11 +3,14 @@ import { db } from '@/db/dexie';
 import { currentUserId } from '@/db/userId';
 import type { DayTotals } from '@/db/repos/diary';
 import type { Food, Meal, MealItem } from '@/db/types';
-import { computeMealTotals } from './mealMath';
+import { computeMealTotals, getServings, perServingTotals } from './mealMath';
 
 export interface MealWithTotals {
   meal: Meal;
+  /** Per-portion macros (whole batch ÷ servings). */
   totals: DayTotals;
+  /** How many portions the batch makes (always ≥ 1). */
+  servings: number;
   itemCount: number;
 }
 
@@ -46,9 +49,11 @@ export function useMealsWithTotals(): MealWithTotals[] | undefined {
 
     return meals.map((meal) => {
       const mealItems = itemsByMeal.get(meal.id) ?? [];
+      const servings = getServings(meal);
       return {
         meal,
-        totals: computeMealTotals(mealItems, foodsById),
+        servings,
+        totals: perServingTotals(computeMealTotals(mealItems, foodsById), servings),
         itemCount: mealItems.length,
       };
     });

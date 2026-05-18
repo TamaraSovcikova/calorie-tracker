@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { LogMealSheet } from './LogMealSheet';
 import { useMealsWithTotals } from './useMealsWithTotals';
+import { formatServings } from './mealMath';
 import { formatKcal } from '@/lib/macros';
 import type { Meal } from '@/db/types';
 
@@ -61,7 +62,7 @@ export function MealsLibrary() {
         </div>
       ) : (
         <ul className="space-y-2">
-          {filtered.map(({ meal, totals, itemCount }) => (
+          {filtered.map(({ meal, totals, itemCount, servings }) => (
             <li
               key={meal.id}
               className="flex items-center gap-1 rounded-2xl border border-border bg-card"
@@ -78,7 +79,13 @@ export function MealsLibrary() {
                   <span className="font-medium text-foreground">
                     {formatKcal(totals.kcal)}
                   </span>{' '}
-                  kcal
+                  kcal{servings > 1 ? '/portion' : ''}
+                  {servings > 1 && (
+                    <>
+                      <span className="mx-1.5">·</span>
+                      makes {formatServings(servings)}
+                    </>
+                  )}
                 </div>
                 {meal.notes && (
                   <div className="mt-0.5 truncate text-xs text-muted-foreground">

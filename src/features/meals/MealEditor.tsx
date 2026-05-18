@@ -14,9 +14,13 @@ import { Sheet } from '@/components/ui/Sheet';
 import { IngredientPickerSheet } from './IngredientPickerSheet';
 import { QuantityStep } from '@/features/food-search/QuantityStep';
 import { useMealResolved } from './useMealResolved';
-import { computeMealTotals } from './mealMath';
+import {
+  computeMealTotals,
+  getServings,
+  itemToQuantity,
+  perServingTotals,
+} from './mealMath';
 import { computeMacros } from '@/features/food-search/foodMath';
-import { itemToQuantity } from './mealMath';
 import {
   createMeal,
   duplicateMeal,
@@ -58,6 +62,7 @@ export function MealEditor({ mode }: MealEditorProps) {
 
   const [name, setName] = useState('');
   const [notes, setNotes] = useState('');
+  const [servings, setServings] = useState(1);
   const [items, setItems] = useState<DraftItem[]>([]);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [editingKey, setEditingKey] = useState<string | null>(null);
@@ -90,6 +95,7 @@ export function MealEditor({ mode }: MealEditorProps) {
     if (mode !== 'edit' || !resolved) return;
     setName(resolved.meal.name);
     setNotes(resolved.meal.notes ?? '');
+    setServings(getServings(resolved.meal));
     setItems(
       resolved.items.map((it) =>
         inputToDraft(
@@ -117,6 +123,11 @@ export function MealEditor({ mode }: MealEditorProps) {
     );
   }, [items]);
 
+  const perPortion = useMemo(
+    () => perServingTotals(totals, servings > 0 ? servings : 1),
+    [totals, servings],
+  );
+
   const addIngredient = (input: MealItemInput, food: Food) =>
     setItems((curr) => [...curr, inputToDraft(input, food, nextKey())]);
 
@@ -140,10 +151,20 @@ export function MealEditor({ mode }: MealEditorProps) {
         qty: it.qty,
         unit: it.unit,
       }));
+      const safeServings = servings > 0 ? servings : 1;
       if (mode === 'create') {
-        await createMeal({ name: trimmed, notes: notes.trim() || undefined, items: itemInputs });
+        await createMeal({
+          name: trimmed,
+          notes: notes.trim() || undefined,
+          servings: safeServings,
+          items: itemInputs,
+        });
       } else if (id) {
-        await updateMeal(id, { name: trimmed, notes: notes.trim() || undefined });
+        await updateMeal(id, {
+          name: trimmed,
+          notes: notes.trim() || undefined,
+          servings: safeServings,
+        });
         await replaceMealItems(id, itemInputs);
       }
       navigate('/library');
@@ -234,21 +255,45 @@ export function MealEditor({ mode }: MealEditorProps) {
           onChange={(e) => setNotes(e.target.value)}
         />
 
+        <div className="space-y-1">
+          <LabeledInput
+            label="This batch makes"
+            type="number"
+            inputMode="numeric"
+            step="1"
+            min="1"
+            value={Number.isFinite(servings) ? servings : ''}
+            onChange={(e) => setServings(parseFloat(e.target.value))}
+            trailing="portions"
+          />
+          <p className="px-1 text-xs text-muted-foreground">
+            Add every ingredient for the whole batch — logging one portion
+            uses {servings > 1 ? `1⁄${Math.round(servings)}` : 'all'} of it.
+          </p>
+        </div>
+
         <div className="rounded-2xl border border-border bg-card p-4">
           <div className="text-xs uppercase tracking-wide text-muted-foreground">
             Per portion
           </div>
           <div className="mt-1 flex items-baseline gap-2">
             <span className="text-2xl font-semibold tabular-nums">
-              {formatKcal(totals.kcal)}
+              {formatKcal(perPortion.kcal)}
             </span>
             <span className="text-sm text-muted-foreground">kcal</span>
           </div>
           <div className="mt-2 grid grid-cols-3 gap-2 text-xs text-muted-foreground tabular-nums">
-            <div>Protein {Math.round(totals.protein)} g</div>
-            <div>Carbs {Math.round(totals.carbs)} g</div>
-            <div>Fat {Math.round(totals.fat)} g</div>
+            <div>Protein {Math.round(perPortion.protein)} g</div>
+            <div>Carbs {Math.round(perPortion.carbs)} g</div>
+            <div>Fat {Math.round(perPortion.fat)} g</div>
           </div>
+          {servings > 1 && (
+            <div className="mt-3 border-t border-border pt-2 text-xs text-muted-foreground tabular-nums">
+              Whole batch · {formatKcal(totals.kcal)} kcal ·{' '}
+              {Math.round(totals.protein)} P / {Math.round(totals.carbs)} C /{' '}
+              {Math.round(totals.fat)} F
+            </div>
+          )}
         </div>
 
         <section className="space-y-2">
