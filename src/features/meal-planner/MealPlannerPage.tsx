@@ -102,7 +102,7 @@ export function MealPlannerPage() {
         <div className="flex flex-col items-center gap-3 p-16 text-center">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
           <p className="text-sm text-muted-foreground">
-            Building your meal plan… this can take a few seconds.
+            Building your meal plan… this usually takes 10–20 seconds.
           </p>
         </div>
       ) : phase === 'results' && result ? (

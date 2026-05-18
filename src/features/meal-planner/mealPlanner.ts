@@ -94,6 +94,9 @@ export async function requestMealPlan(
       error: 'Connect a sync code in Settings to use the AI planner.',
     };
   }
+  // Safety net — never let the UI hang forever if the AI stalls.
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 90_000);
   try {
     const res = await fetch(`${syncBaseUrl()}/api/meal-plan`, {
       method: 'POST',
@@ -102,6 +105,7 @@ export async function requestMealPlan(
         authorization: `Bearer ${token}`,
       },
       body: JSON.stringify(input),
+      signal: controller.signal,
     });
     const data = (await res.json().catch(() => null)) as MealPlanResult | null;
     if (!data) {
@@ -112,12 +116,17 @@ export async function requestMealPlan(
       shoppingList: Array.isArray(data.shoppingList) ? data.shoppingList : [],
       error: data.error,
     };
-  } catch {
+  } catch (err) {
+    const aborted = err instanceof DOMException && err.name === 'AbortError';
     return {
       meals: [],
       shoppingList: [],
-      error: 'Could not reach the planner. Check your connection.',
+      error: aborted
+        ? 'The planner took too long this time — please try again.'
+        : 'Could not reach the planner. Check your connection.',
     };
+  } finally {
+    clearTimeout(timeout);
   }
 }
 

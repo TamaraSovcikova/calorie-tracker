@@ -21,7 +21,9 @@
 
 import type { Env } from './index';
 
-const MODEL = '@cf/meta/llama-3.3-70b-instruct-fp8-fast';
+// 8B "fast" — the 70B model takes ~100s for a full plan, which reads as a
+// frozen UI. 8B returns in ~10-20s and is plenty for structured meal ideas.
+const MODEL = '@cf/meta/llama-3.1-8b-instruct-fast';
 
 const RESPONSE_SCHEMA = {
   type: 'object',
@@ -216,7 +218,7 @@ export async function handleMealPlan(req: Request, env: Env): Promise<Response> 
   const userPrompt =
     `${ingredientLine}\n` +
     `${constraints.join('\n')}\n\n` +
-    `Suggest 3 to 5 distinct meal-prep recipes. For each meal:\n` +
+    `Suggest exactly 3 distinct meal-prep recipes. For each meal:\n` +
     `- "servings" is how many portions the batch makes.\n` +
     `- "ingredients" amounts are for the WHOLE batch, in grams, each with ` +
     `realistic kcal/protein/carbs/fat for that amount.\n` +
@@ -227,7 +229,7 @@ export async function handleMealPlan(req: Request, env: Env): Promise<Response> 
   let parsed: unknown = null;
   try {
     const out = (await env.AI.run(MODEL, {
-      max_tokens: 4096,
+      max_tokens: 2400,
       temperature: 0.6,
       response_format: { type: 'json_schema', json_schema: RESPONSE_SCHEMA },
       messages: [
