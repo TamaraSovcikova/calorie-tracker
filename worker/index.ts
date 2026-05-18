@@ -15,6 +15,7 @@
 
 import { handleSync } from './sync';
 import { handleFoodFact } from './foodFacts';
+import { handleMealPlan } from './mealPlan';
 
 export interface Env {
   DB: D1Database;
@@ -140,6 +141,20 @@ export default {
           return await handleFoodFact(req, env);
         } catch {
           return jsonResponse({ fact: null });
+        }
+      }
+
+      // /api/meal-plan — AI meal-prep suggestions from the user's
+      // ingredients + macro targets.
+      if (url.pathname === '/api/meal-plan' && req.method === 'POST') {
+        try {
+          return await handleMealPlan(req, env);
+        } catch {
+          return jsonResponse({
+            meals: [],
+            shoppingList: [],
+            error: 'Planner failed — try again.',
+          });
         }
       }
 

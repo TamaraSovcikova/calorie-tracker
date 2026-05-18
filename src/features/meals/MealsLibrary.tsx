@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChefHat, Pencil, Plus, Search } from 'lucide-react';
+import { ChefHat, Pencil, Plus, Search, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { LogMealSheet } from './LogMealSheet';
@@ -25,6 +25,22 @@ export function MealsLibrary() {
 
   return (
     <>
+      <button
+        type="button"
+        onClick={() => navigate('/meals/plan')}
+        className="flex w-full items-center gap-3 rounded-2xl border border-primary/30 bg-primary/5 px-4 py-3 text-left transition-colors hover:bg-primary/10"
+      >
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/15">
+          <Sparkles className="h-4 w-4 text-primary" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="text-sm font-medium">Plan meals with AI</div>
+          <div className="truncate text-xs text-muted-foreground">
+            Turn your ingredients + targets into meal-prep recipes
+          </div>
+        </div>
+      </button>
+
       {meals && meals.length > 0 && (
         <div className="relative">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />

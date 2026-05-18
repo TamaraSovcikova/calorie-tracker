@@ -6,6 +6,7 @@ import { LibraryPage } from '@/app/library/LibraryPage';
 import { ProgressPage } from '@/app/progress/ProgressPage';
 import { SettingsPage } from '@/app/settings/SettingsPage';
 import { MealEditor } from '@/features/meals/MealEditor';
+import { MealPlannerPage } from '@/features/meal-planner/MealPlannerPage';
 import { FitbitCallback } from '@/app/auth/FitbitCallback';
 import { useThemeEffect } from '@/features/settings/useThemeEffect';
 import { OnboardingGate } from '@/features/onboarding/OnboardingWizard';
@@ -21,6 +22,7 @@ export default function App() {
         {/* Fullscreen routes (no bottom nav). */}
         <Route path="/auth/fitbit/callback" element={<FitbitCallback />} />
         <Route path="/meals/new" element={<MealEditor mode="create" />} />
+        <Route path="/meals/plan" element={<MealPlannerPage />} />
         <Route path="/meals/:id/edit" element={<MealEditor mode="edit" />} />
         <Route path="/pet" element={<PetPage />} />
 
