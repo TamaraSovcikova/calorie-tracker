@@ -20,9 +20,14 @@ import type { CustomUnit, Food, UsdaDataType } from '@/db/types';
 const BASE = 'https://api.nal.usda.gov/fdc/v1';
 const API_KEY_LS = 'calorie-tracker:usda-key';
 
-/** A build-time key bundled into the app — set so no user needs their own. */
-export const BUNDLED_USDA_KEY: string | null =
-  import.meta.env.VITE_USDA_API_KEY ?? null;
+/**
+ * Shared USDA FoodData Central key bundled into the app, so the food
+ * search works for everyone with zero setup. FDC is a free public
+ * database (1000 requests/hour per key) — a single shared key is fine
+ * for personal use. Overridable at build time via VITE_USDA_API_KEY.
+ */
+export const BUNDLED_USDA_KEY: string =
+  import.meta.env.VITE_USDA_API_KEY ?? 'cP45kucaUCY1TsM8twp7BndJVnVWBbTeoOGy0Xbp';
 
 /** The user's own saved key, ignoring the bundled fallback. */
 export function getUserUsdaApiKey(): string | null {

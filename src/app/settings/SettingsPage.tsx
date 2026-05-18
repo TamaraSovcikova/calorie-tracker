@@ -2,7 +2,6 @@ import { PageHeader } from '@/components/PageHeader';
 import { useProfile } from '@/db/repos/profile';
 import { GoalsSection } from '@/features/settings/GoalsSection';
 import { ProfileSection } from '@/features/settings/ProfileSection';
-import { FoodSourcesSection } from '@/features/settings/FoodSourcesSection';
 import { FitbitSection } from '@/features/settings/FitbitSection';
 import { PreferencesSection } from '@/features/settings/PreferencesSection';
 import { SyncSection } from '@/features/settings/SyncSection';
@@ -20,7 +19,6 @@ export function SettingsPage() {
           <>
             <GoalsSection profile={profile} />
             <ProfileSection profile={profile} />
-            <FoodSourcesSection />
             <FitbitSection />
             <PreferencesSection profile={profile} />
             <SyncSection />
