@@ -62,7 +62,6 @@ export function MealPlannerPage() {
     setIngredients((curr) => curr.filter((c) => c !== name));
 
   const handleGenerate = async () => {
-    if (ingredients.length === 0) return;
     setPhase('loading');
     setError(null);
     const res = await requestMealPlan({
@@ -118,13 +117,14 @@ export function MealPlannerPage() {
       ) : (
         <div className="space-y-4 p-4">
           <p className="text-sm text-muted-foreground">
-            List what you&apos;ve got, set your targets, and get meal-prep
-            recipes you can save straight to your library.
+            Set your targets and get meal-prep recipes you can save straight
+            to your library. Add ingredients to build around — or leave them
+            blank for free inspiration.
           </p>
 
           <div className="space-y-2">
             <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Ingredients you have
+              Ingredients to use (optional)
             </span>
             <div className="flex gap-2">
               <Input
@@ -223,7 +223,6 @@ export function MealPlannerPage() {
             type="button"
             variant="primary"
             block
-            disabled={ingredients.length === 0}
             onClick={handleGenerate}
           >
             <Sparkles className="h-4 w-4" />

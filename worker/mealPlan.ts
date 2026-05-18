@@ -190,13 +190,6 @@ export async function handleMealPlan(req: Request, env: Env): Promise<Response> 
         .filter(Boolean)
         .slice(0, 30)
     : [];
-  if (ingredients.length === 0) {
-    return jsonResponse(
-      { meals: [], shoppingList: [], error: 'List at least one ingredient.' },
-      400,
-    );
-  }
-
   const days = clamp(Math.round(posNum(body.days) ?? 3), 1, 14);
   const mealsPerDay = clamp(Math.round(posNum(body.mealsPerDay) ?? 1), 1, 5);
   const kcalMax = posNum(body.kcalMax);
@@ -212,14 +205,22 @@ export async function handleMealPlan(req: Request, env: Env): Promise<Response> 
     constraints.push(`Each portion should have at least ${proteinMin} g protein.`);
   if (notes) constraints.push(`Extra preferences: ${notes}`);
 
+  const ingredientLine =
+    ingredients.length > 0
+      ? `I'd like meals built around these ingredients: ${ingredients.join(', ')}. ` +
+        `Use them where they fit — I don't have to use all of them, and you ` +
+        `can freely add any other ingredients the recipes need.`
+      : `I haven't picked specific ingredients — suggest meals freely for ` +
+        `inspiration, choosing whatever ingredients fit the targets below.`;
+
   const userPrompt =
-    `Ingredients I have available: ${ingredients.join(', ')}.\n` +
+    `${ingredientLine}\n` +
     `${constraints.join('\n')}\n\n` +
     `Suggest 3 to 5 distinct meal-prep recipes. For each meal:\n` +
     `- "servings" is how many portions the batch makes.\n` +
     `- "ingredients" amounts are for the WHOLE batch, in grams, each with ` +
     `realistic kcal/protein/carbs/fat for that amount.\n` +
-    `- you may add common staples (oil, salt, spices) beyond my list.\n` +
+    `- include every ingredient the recipe needs, staples included.\n` +
     `- "steps" are short cooking instructions.\n` +
     `Also return a combined "shoppingList" of everything needed across all meals.`;
 
