@@ -66,8 +66,8 @@ async function syncFitbitForDate(
     date,
     source: 'fitbit',
     name: needsProfile
-      ? `Fitbit${stepsLabel}`
-      : `Fitbit activity${stepsLabel}`,
+      ? `Health${stepsLabel}`
+      : `Health activity${stepsLabel}`,
     duration_min: undefined,
     kcal_burned: activity ?? 0,
     needs_profile: needsProfile || undefined,

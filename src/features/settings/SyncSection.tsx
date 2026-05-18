@@ -4,8 +4,10 @@ import {
   CheckCircle2,
   Cloud,
   CloudOff,
+  Copy,
   Loader2,
   RefreshCw,
+  Sparkles,
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { Button } from '@/components/ui/Button';
@@ -15,55 +17,69 @@ import {
   clearSyncConfig,
   getSyncConfig,
   setSyncConfig,
+  syncBaseUrl,
 } from '@/db/sync/config';
+import { adoptSyncCode } from '@/db/sync/userMigration';
 import { syncEngine, useSyncStatus } from '@/db/sync/client';
+
+/** Generate a fresh, human-friendly sync code: 20 chars of ambiguity-free
+ *  base32 (~100 bits), grouped for readability. The code IS the account. */
+function generateCode(): string {
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no I/O/0/1
+  const bytes = new Uint8Array(20);
+  crypto.getRandomValues(bytes);
+  return [...bytes]
+    .map((b) => alphabet[b % 32])
+    .join('')
+    .replace(/(.{5})(?=.)/g, '$1-');
+}
 
 export function SyncSection() {
   const status = useSyncStatus();
-  const [{ url, token }, setStored] = useState(() => getSyncConfig());
-  const [draftUrl, setDraftUrl] = useState(url ?? '');
-  const [draftToken, setDraftToken] = useState(token ?? '');
+  const [{ token }, setStored] = useState(() => getSyncConfig());
+  const [draftCode, setDraftCode] = useState(token ?? '');
   const [testing, setTesting] = useState(false);
   const [testError, setTestError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    setDraftUrl(url ?? '');
-    setDraftToken(token ?? '');
-  }, [url, token]);
+    setDraftCode(token ?? '');
+  }, [token]);
 
-  const isConfigured = Boolean(url && token);
+  const isConfigured = Boolean(token);
 
   const handleConnect = async () => {
     setTesting(true);
     setTestError(null);
     try {
-      const trimmedUrl = draftUrl.trim().replace(/\/$/, '');
-      const trimmedToken = draftToken.trim();
-      if (!trimmedUrl || !trimmedToken) {
-        setTestError('Enter both the URL and the token.');
+      const code = draftCode.trim();
+      if (code.length < 12) {
+        setTestError('Enter a sync code (at least 12 characters).');
         return;
       }
+      const base = syncBaseUrl();
       // Reachability probe (unauthenticated).
-      const health = await fetch(`${trimmedUrl}/api/health`);
+      const health = await fetch(`${base}/api/health`);
       if (!health.ok) {
-        setTestError(`Could not reach worker (HTTP ${health.status}).`);
+        setTestError(`Could not reach the sync server (HTTP ${health.status}).`);
         return;
       }
-      // Token probe (authenticated).
-      const auth = await fetch(`${trimmedUrl}/api/auth`, {
-        headers: { authorization: `Bearer ${trimmedToken}` },
+      // Code probe (authenticated).
+      const auth = await fetch(`${base}/api/auth`, {
+        headers: { authorization: `Bearer ${code}` },
       });
-      if (auth.status === 401) {
-        setTestError('Token rejected by the worker.');
-        return;
-      }
       if (!auth.ok) {
-        setTestError(`Auth probe failed (HTTP ${auth.status}).`);
+        setTestError(`Sync server rejected the code (HTTP ${auth.status}).`);
         return;
       }
-      setSyncConfig({ url: trimmedUrl, token: trimmedToken });
-      setStored({ url: trimmedUrl, token: trimmedToken });
-      void syncEngine.syncNow().catch(() => undefined);
+      setSyncConfig({ token: code });
+      // Migrate this device's data to the account derived from the code,
+      // then reload so every screen picks up the new account id.
+      await adoptSyncCode(code);
+      setStored({ token: code });
+      window.location.reload();
+    } catch {
+      setTestError('Could not reach the sync server. Check your connection.');
     } finally {
       setTesting(false);
     }
@@ -72,41 +88,55 @@ export function SyncSection() {
   const handleDisconnect = () => {
     if (
       !confirm(
-        'Disconnect cloud sync? Your local data stays on this device. To reconnect later, paste the same URL and token.',
+        'Disconnect cloud sync? Your data stays on this device. Reconnect any time with the same code.',
       )
     ) {
       return;
     }
     clearSyncConfig();
-    setStored({ url: null, token: null });
-    setDraftUrl('');
-    setDraftToken('');
+    setStored({ token: null });
+    setDraftCode('');
+  };
+
+  const handleCopy = async () => {
+    if (!token) return;
+    try {
+      await navigator.clipboard.writeText(token);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      /* clipboard unavailable — ignore */
+    }
   };
 
   return (
     <SettingCard
       title="Cloud sync"
-      description="Single-user Cloudflare Worker + D1 backend. Same token on every device."
+      description="Your sync code is your private account. Enter the same code on every device to keep them in sync — and never share it."
     >
       {!isConfigured ? (
         <>
           <LabeledInput
-            label="Worker URL"
-            placeholder="https://calorie-tracker.your-subdomain.workers.dev"
-            value={draftUrl}
-            onChange={(e) => setDraftUrl(e.target.value)}
+            label="Sync code"
+            placeholder="Enter an existing code, or generate one"
+            value={draftCode}
+            onChange={(e) => setDraftCode(e.target.value)}
             autoComplete="off"
             spellCheck={false}
           />
-          <LabeledInput
-            label="Sync token"
-            type="password"
-            placeholder="Paste the SYNC_TOKEN you set with wrangler"
-            value={draftToken}
-            onChange={(e) => setDraftToken(e.target.value)}
-            autoComplete="off"
-            spellCheck={false}
-          />
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => setDraftCode(generateCode())}
+          >
+            <Sparkles className="h-3.5 w-3.5" />
+            Generate a new code
+          </Button>
+          <p className="text-xs text-muted-foreground">
+            New here? Generate a code — that&apos;s your account. Already set up
+            on another device? Enter that device&apos;s code instead.
+          </p>
           {testError && (
             <p className="flex items-start gap-1.5 text-xs text-destructive">
               <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
@@ -118,12 +148,12 @@ export function SyncSection() {
             variant="primary"
             block
             onClick={handleConnect}
-            disabled={testing || !draftUrl.trim() || !draftToken.trim()}
+            disabled={testing || draftCode.trim().length < 12}
           >
             {testing ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
-                Testing…
+                Connecting…
               </>
             ) : (
               <>
@@ -162,9 +192,24 @@ export function SyncSection() {
               {status.error}
             </p>
           )}
-          <p className="text-xs text-muted-foreground">
-            <span className="text-foreground/80">URL:</span> <span className="font-mono">{url}</span>
-          </p>
+          <div className="rounded-lg border border-border bg-muted/30 px-3 py-2">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-xs text-muted-foreground">Your sync code</span>
+              <Button size="sm" variant="ghost" onClick={() => void handleCopy()}>
+                {copied ? (
+                  <CheckCircle2 className="h-3.5 w-3.5 text-primary" />
+                ) : (
+                  <Copy className="h-3.5 w-3.5" />
+                )}
+                {copied ? 'Copied' : 'Copy'}
+              </Button>
+            </div>
+            <p className="break-all font-mono text-xs text-foreground/90">{token}</p>
+            <p className="mt-1 text-[11px] text-muted-foreground">
+              Enter this on your other devices. Anyone with it can see your
+              data — keep it private.
+            </p>
+          </div>
           <Button
             type="button"
             variant="ghost"

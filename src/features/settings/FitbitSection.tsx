@@ -63,7 +63,7 @@ export function FitbitSection() {
   };
 
   const handleDisconnect = async () => {
-    if (!confirm('Disconnect Fitbit? Re-authorise any time.')) return;
+    if (!confirm('Disconnect health sync? Re-authorise any time.')) return;
     await disconnectFitbit();
   };
 
@@ -91,8 +91,8 @@ export function FitbitSection() {
 
   return (
     <SettingCard
-      title="Fitbit (via Google Health)"
-      description="Auto-import daily activity calories into the diary's exercise section. Reads your Fitbit data through the new Google Health API."
+      title="Health sync"
+      description="Auto-imports your daily activity calories into the diary's exercise section, via the Google Health API."
     >
       {/* Client ID + Secret — both required (Google web clients are
           confidential clients; the token exchange needs the secret). */}
@@ -218,7 +218,7 @@ export function FitbitSection() {
               onClick={handleDisconnect}
               className="text-destructive"
             >
-              Disconnect Fitbit
+              Disconnect
             </Button>
           </div>
         ) : (
@@ -237,7 +237,7 @@ export function FitbitSection() {
             ) : (
               <>
                 <Watch className="h-4 w-4" />
-                Connect Fitbit
+                Connect
               </>
             )}
           </Button>
@@ -271,7 +271,7 @@ export function FitbitSection() {
           </span>{' '}
           Google issues 7-day refresh tokens to apps in "Testing" mode (which
           is normal for personal use, avoids needing app verification).
-          About once a week you'll see a "Reconnect Fitbit" button — one tap to
+          About once a week you'll see a "Reconnect" button — one tap to
           re-authorise. Connecting on one device propagates to every device
           via cloud sync.
         </p>

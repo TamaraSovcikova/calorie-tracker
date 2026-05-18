@@ -233,19 +233,30 @@ const PULL_PAGE = 2000;
 const PULL_HARD_CAP = 100_000;
 
 /** Pull every row with updated_at > since, paging within this call so a
- *  truncated result page can never advance the cursor past unpulled rows. */
+ *  truncated result page can never advance the cursor past unpulled rows.
+ *  Scoped to `userId`: meal_items have no user_id of their own, so they're
+ *  scoped through their parent meal. */
 async function pullSince(
   db: D1Database,
   table: TableName,
   since: string,
+  userId: string,
 ): Promise<{ rows: Row[]; until: string }> {
   const updatedAt = UPDATED_AT_COLUMN[table];
   const cols = COLUMNS[table];
-  const sql = `SELECT ${cols.join(', ')} FROM ${table} WHERE ${updatedAt} > ? ORDER BY ${updatedAt} ASC LIMIT ${PULL_PAGE}`;
+  const sql =
+    table === 'meal_items'
+      ? `SELECT ${cols.join(', ')} FROM meal_items WHERE ${updatedAt} > ? AND meal_id IN (SELECT id FROM meals WHERE user_id = ?) ORDER BY ${updatedAt} ASC LIMIT ${PULL_PAGE}`
+      : `SELECT ${cols.join(', ')} FROM ${table} WHERE user_id = ? AND ${updatedAt} > ? ORDER BY ${updatedAt} ASC LIMIT ${PULL_PAGE}`;
   const all: Row[] = [];
   let cursor = since;
   for (;;) {
-    const result = await db.prepare(sql).bind(cursor).all<Row>();
+    const stmt = db.prepare(sql);
+    const bound =
+      table === 'meal_items'
+        ? stmt.bind(cursor, userId)
+        : stmt.bind(userId, cursor);
+    const result = await bound.all<Row>();
     const page = result.results ?? [];
     all.push(...page);
     if (page.length < PULL_PAGE || all.length >= PULL_HARD_CAP) break;
@@ -257,32 +268,42 @@ async function pullSince(
   return { rows: all, until };
 }
 
-export async function handleSync(req: Request, env: Env): Promise<Response> {
+export async function handleSync(
+  req: Request,
+  env: Env,
+  userId: string,
+): Promise<Response> {
   const body = (await req.json()) as SyncRequest;
   const since = body.since ?? {};
   const push = body.push ?? {};
 
   // Apply every pushed row across all tables in ONE atomic D1 batch, so a
   // mid-sync failure can't leave a partial apply. Pushes go in before the
-  // pulls so the client's own writes round-trip back consistently.
+  // pulls so the client's own writes round-trip back consistently. Every
+  // pushed row's user_id is forced to the caller's account id — a client
+  // can only ever write into its own dataset.
   const pushStatements: D1PreparedStatement[] = [];
   for (const table of TABLES) {
     if (table === 'meal_items') continue; // handled below with cleanup
     const rows = push[table];
     if (rows && Array.isArray(rows)) {
-      pushStatements.push(...buildPushStatements(env.DB, table, rows));
+      const scoped = rows.map((r) => ({ ...r, user_id: userId }));
+      pushStatements.push(...buildPushStatements(env.DB, table, scoped));
     }
   }
   // meal_items are a child collection: for every pushed meal, delete its
   // existing server items first, then insert the pushed set. A plain
   // upsert would leave removed ingredients orphaned and let an edited
-  // meal accumulate every item it ever had.
+  // meal accumulate every item it ever had. The delete is scoped to the
+  // caller's meals so it can't touch another account's items.
   const pushedMeals = push.meals;
   if (Array.isArray(pushedMeals) && pushedMeals.length > 0) {
-    const del = env.DB.prepare('DELETE FROM meal_items WHERE meal_id = ?');
+    const del = env.DB.prepare(
+      'DELETE FROM meal_items WHERE meal_id = ? AND meal_id IN (SELECT id FROM meals WHERE user_id = ?)',
+    );
     for (const m of pushedMeals) {
       const id = (m as Row).id;
-      if (typeof id === 'string') pushStatements.push(del.bind(id));
+      if (typeof id === 'string') pushStatements.push(del.bind(id, userId));
     }
   }
   const pushedItems = push.meal_items;
@@ -298,7 +319,12 @@ export async function handleSync(req: Request, env: Env): Promise<Response> {
   const until: Partial<Record<TableName, string>> = {};
   for (const table of TABLES) {
     const cursor = since[table] ?? EPOCH;
-    const { rows, until: nextCursor } = await pullSince(env.DB, table, cursor);
+    const { rows, until: nextCursor } = await pullSince(
+      env.DB,
+      table,
+      cursor,
+      userId,
+    );
     pull[table] = rows;
     until[table] = nextCursor;
   }

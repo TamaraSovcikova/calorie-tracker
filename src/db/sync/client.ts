@@ -29,6 +29,7 @@ import {
   isConfigured,
   setCursors,
   setLastSyncAt,
+  syncBaseUrl,
   type Cursors,
 } from './config';
 
@@ -142,13 +143,13 @@ class SyncEngine {
   }
 
   private async runOnce(): Promise<void> {
-    const { url, token } = getSyncConfig();
-    if (!url || !token) throw new Error('Sync not configured');
+    const { token } = getSyncConfig();
+    if (!token) throw new Error('Sync not configured');
 
     const cursors = getCursors();
     const push = await this.collectPush(cursors);
 
-    const res = await fetch(`${url.replace(/\/$/, '')}/api/sync`, {
+    const res = await fetch(`${syncBaseUrl()}/api/sync`, {
       method: 'POST',
       headers: {
         'content-type': 'application/json',

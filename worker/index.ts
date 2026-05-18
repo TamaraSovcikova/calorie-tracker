@@ -6,17 +6,44 @@
  *   2. Everything else — fall through to the static-assets binding (the
  *      Vite SPA build in ./dist).
  *
- * Auth: a single shared bearer token in the SYNC_TOKEN secret. Personal
- * use, no multi-tenant. Set with:
- *   wrangler secret put SYNC_TOKEN
+ * Auth: every device sends a private **sync code** as its bearer token.
+ * The account id is `SHA-256(code)` — there is no server-side user list,
+ * a code simply *is* its own isolated, private dataset. Every sync query
+ * is scoped to that derived id, so no two codes ever see each other's
+ * data.
  */
 
 import { handleSync } from './sync';
 
 export interface Env {
   DB: D1Database;
-  SYNC_TOKEN: string;
   ASSETS: Fetcher;
+}
+
+/** Shortest accepted sync code — generated codes are far longer; this
+ *  just rejects empty / obviously-bogus tokens. */
+const MIN_TOKEN_LENGTH = 12;
+
+/**
+ * Derive the account id from a sync code: SHA-256, hex, truncated to 32
+ * chars. MUST stay byte-identical to the client's `deriveUserId`
+ * (`src/db/userId.ts`).
+ */
+async function deriveUserId(code: string): Promise<string> {
+  const bytes = new TextEncoder().encode(code.trim());
+  const digest = await crypto.subtle.digest('SHA-256', bytes);
+  return [...new Uint8Array(digest)]
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('')
+    .slice(0, 32);
+}
+
+/** Extract the bearer token, or null if missing / too short. */
+function bearerToken(req: Request): string | null {
+  const auth = req.headers.get('authorization') ?? '';
+  const m = /^Bearer (.+)$/.exec(auth);
+  const token = m?.[1]?.trim() ?? '';
+  return token.length >= MIN_TOKEN_LENGTH ? token : null;
 }
 
 const CORS_HEADERS: Record<string, string> = {
@@ -38,18 +65,6 @@ function jsonResponse(body: unknown, init: ResponseInit = {}): Response {
       ...(init.headers ?? {}),
     },
   });
-}
-
-function authorize(req: Request, env: Env): Response | null {
-  if (!env.SYNC_TOKEN) {
-    return jsonResponse({ error: 'SYNC_TOKEN not configured on server' }, { status: 500 });
-  }
-  const auth = req.headers.get('authorization') ?? '';
-  const expected = `Bearer ${env.SYNC_TOKEN}`;
-  if (auth !== expected) {
-    return jsonResponse({ error: 'unauthorized' }, { status: 401 });
-  }
-  return null;
 }
 
 export default {
@@ -99,20 +114,24 @@ export default {
         return jsonResponse({ ok: true, version: 1 });
       }
 
-      // Everything else under /api requires the bearer token.
-      const blocked = authorize(req, env);
-      if (blocked) return blocked;
+      // Everything else under /api requires a sync code. The code's
+      // SHA-256 is the account id every query is scoped to.
+      const token = bearerToken(req);
+      if (!token) {
+        return jsonResponse({ error: 'unauthorized' }, { status: 401 });
+      }
+      const userId = await deriveUserId(token);
 
       if (url.pathname === '/api/sync' && req.method === 'POST') {
         try {
-          return await handleSync(req, env);
+          return await handleSync(req, env, userId);
         } catch (err) {
           const msg = err instanceof Error ? err.message : 'sync error';
           return jsonResponse({ error: msg }, { status: 500 });
         }
       }
 
-      // /api/auth — minimal "is my token correct" probe used by the
+      // /api/auth — minimal "is my code accepted" probe used by the
       // Settings panel to validate before saving.
       if (url.pathname === '/api/auth' && req.method === 'GET') {
         return jsonResponse({ ok: true });

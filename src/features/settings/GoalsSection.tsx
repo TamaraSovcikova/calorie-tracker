@@ -141,7 +141,7 @@ export function GoalsSection({ profile }: GoalsSectionProps) {
 
       <Switch
         label="Add burned calories to my target"
-        description="Off: exercise + Fitbit activity calories are shown but don't change your target. On: your daily target rises by activity calories burned (Fitbit activity = total burn minus estimated resting burn)."
+        description="Off: exercise + health activity calories are shown but don't change your target. On: your daily target rises by activity calories burned (health activity = total burn minus estimated resting burn)."
         checked={profile.eat_back_burned}
         onChange={(v) => void updateProfile({ eat_back_burned: v })}
       />

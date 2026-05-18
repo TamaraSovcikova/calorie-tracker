@@ -56,7 +56,7 @@ export function ExerciseSection({ date }: ExerciseSectionProps) {
                     {e.name}
                     {e.source === 'fitbit' && (
                       <span className="ml-2 rounded-full bg-blue-500/10 px-1.5 text-[10px] font-medium uppercase tracking-wide text-blue-600 dark:text-blue-300">
-                        Fitbit
+                        Health
                       </span>
                     )}
                   </div>

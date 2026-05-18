@@ -9,7 +9,7 @@ export function AboutSection() {
         <div className="text-muted-foreground">Cloud sync</div>
         <div className="text-right">Cloudflare Workers + D1</div>
         <div className="text-muted-foreground">Activity</div>
-        <div className="text-right">Fitbit via Google Health</div>
+        <div className="text-right">Google Health API</div>
         <div className="text-muted-foreground">Food data</div>
         <div className="text-right">Curated · USDA · OFF</div>
       </div>

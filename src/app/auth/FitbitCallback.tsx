@@ -45,7 +45,7 @@ export function FitbitCallback() {
         {status === 'exchanging' && (
           <>
             <Loader2 className="mx-auto h-8 w-8 animate-spin text-muted-foreground" />
-            <h1 className="mt-4 text-base font-semibold">Connecting Fitbit…</h1>
+            <h1 className="mt-4 text-base font-semibold">Connecting health sync…</h1>
             <p className="mt-1 text-sm text-muted-foreground">
               Exchanging authorisation code.
             </p>
@@ -54,7 +54,7 @@ export function FitbitCallback() {
         {status === 'ok' && (
           <>
             <CheckCircle2 className="mx-auto h-8 w-8 text-primary" />
-            <h1 className="mt-4 text-base font-semibold">Fitbit connected</h1>
+            <h1 className="mt-4 text-base font-semibold">Health sync connected</h1>
             <p className="mt-1 text-sm text-muted-foreground">
               Heading back to Settings…
             </p>
