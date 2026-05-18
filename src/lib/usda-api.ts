@@ -20,9 +20,19 @@ import type { CustomUnit, Food, UsdaDataType } from '@/db/types';
 const BASE = 'https://api.nal.usda.gov/fdc/v1';
 const API_KEY_LS = 'calorie-tracker:usda-key';
 
-export function getUsdaApiKey(): string | null {
+/** A build-time key bundled into the app — set so no user needs their own. */
+export const BUNDLED_USDA_KEY: string | null =
+  import.meta.env.VITE_USDA_API_KEY ?? null;
+
+/** The user's own saved key, ignoring the bundled fallback. */
+export function getUserUsdaApiKey(): string | null {
   if (typeof localStorage === 'undefined') return null;
   return localStorage.getItem(API_KEY_LS);
+}
+
+/** The key searches use — the user's own key, else the bundled one. */
+export function getUsdaApiKey(): string | null {
+  return getUserUsdaApiKey() ?? BUNDLED_USDA_KEY;
 }
 
 export function setUsdaApiKey(key: string | null): void {

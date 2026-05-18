@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db/dexie';
 import { searchLocalFoods } from '@/db/repos/foods';
-import { recentFoodsInSection } from '@/db/repos/diary';
+import { recentFoods } from '@/db/repos/diary';
 import { OffRateLimitError, searchOff } from '@/lib/off-api';
 import {
   getUsdaApiKey,
@@ -14,17 +14,17 @@ import {
   getShowPackaged,
   subscribeToFoodSourceSettings,
 } from '@/features/settings/foodSourceSettings';
-import type { Food, MealSection } from '@/db/types';
+import type { Food } from '@/db/types';
 
 /**
  * Combines:
- *  - section-aware recents (foods previously logged in this section)
+ *  - recents (the last ~30 foods logged, across all sections)
  *  - local search across My Products + cached USDA/OFF rows
  *  - live USDA FoodData Central search (generic + branded)
  *  - live Open Food Facts search (rate-limited 10/min, packaged-product DB)
  *
  * Result groups returned to the UI:
- *   recents       — section-aware
+ *   recents       — last ~30 foods logged, any section
  *   myProducts    — user's manually-added products (source='custom')
  *   common        — USDA Foundation / SR Legacy / Survey (FNDDS)
  *   packaged      — USDA Branded + OFF (hidden when showPackaged=false)
@@ -79,10 +79,7 @@ function scoreFoodMatch(food: Food, q: string): number {
   return score;
 }
 
-export function useFoodSearch(
-  query: string,
-  section?: MealSection,
-): FoodSearchResult {
+export function useFoodSearch(query: string): FoodSearchResult {
   const [debouncedQuery, setDebouncedQuery] = useState(query.trim());
   const [showPackaged, setShowPackaged] = useState(getShowPackaged());
 
@@ -95,12 +92,11 @@ export function useFoodSearch(
   }, [query]);
 
   const recents = useLiveQuery(async () => {
-    if (!section) return [];
-    const ids = await recentFoodsInSection(section, 6);
+    const ids = await recentFoods(30);
     if (ids.length === 0) return [];
     const rows = await db.foods.bulkGet(ids);
     return rows.filter((r): r is Food => !!r && !r.deleted_at);
-  }, [section]);
+  }, []);
 
   const [local, setLocal] = useState<Food[]>([]);
   const [usda, setUsda] = useState<Food[]>([]);

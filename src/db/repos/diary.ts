@@ -168,22 +168,22 @@ export async function lastQuantityForFood(
   return { qty: latest.qty, unit: latest.unit };
 }
 
-/** Recent foods logged into a given section, most recent first, deduped. */
-export async function recentFoodsInSection(
-  section: MealSection,
-  limit = 10,
-): Promise<string[]> {
+/**
+ * Recent foods logged across ALL sections, most recent first, deduped —
+ * so meal-prepping the same items shows them whichever section you're in.
+ */
+export async function recentFoods(limit = 30): Promise<string[]> {
   const userId = currentUserId();
   // The '0000-00-00' / '9999-99-99' bounds aren't real dates — they're
-  // lexical sentinels that bracket every YYYY-MM-DD string for this
-  // [user_id, date, section] compound index. Safe because dates are stored
-  // as fixed-width ISO strings, so a lexical compare equals a date compare.
+  // lexical sentinels that bracket every YYYY-MM-DD string on the
+  // [user_id, date] compound index. Safe because dates are fixed-width ISO
+  // strings, so a lexical compare equals a date compare.
   const rows = await db.diary_entries
-    .where('[user_id+date+section]')
-    .between([userId, '0000-00-00', section], [userId, '9999-99-99', section])
+    .where('[user_id+date]')
+    .between([userId, '0000-00-00'], [userId, '9999-99-99'])
     .filter((e) => !e.deleted_at && e.kind === 'food' && !!e.food_id)
     .reverse()
-    .limit(limit * 4)
+    .limit(limit * 6)
     .toArray();
   const seen = new Set<string>();
   const ids: string[] = [];

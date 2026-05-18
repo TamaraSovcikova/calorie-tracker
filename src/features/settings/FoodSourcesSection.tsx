@@ -10,9 +10,10 @@ import { LabeledInput } from '@/components/ui/Input';
 import { Switch } from '@/components/ui/Switch';
 import { SettingCard } from './SettingCard';
 import {
-  getUsdaApiKey,
+  getUserUsdaApiKey,
   setUsdaApiKey,
   probeUsdaKey,
+  BUNDLED_USDA_KEY,
 } from '@/lib/usda-api';
 import {
   getShowPackaged,
@@ -23,8 +24,9 @@ import {
 type ProbeStatus = 'idle' | 'testing' | 'ok' | 'bad' | 'error';
 
 export function FoodSourcesSection() {
-  const [draftKey, setDraftKey] = useState(() => getUsdaApiKey() ?? '');
-  const [savedKey, setSavedKey] = useState(() => getUsdaApiKey() ?? '');
+  const [draftKey, setDraftKey] = useState(() => getUserUsdaApiKey() ?? '');
+  const [savedKey, setSavedKey] = useState(() => getUserUsdaApiKey() ?? '');
+  const bundled = BUNDLED_USDA_KEY !== null;
   const [showPackaged, setShowPackagedState] = useState(getShowPackaged);
   const [probe, setProbe] = useState<ProbeStatus>('idle');
   const [probeMessage, setProbeMessage] = useState<string | null>(null);
@@ -77,10 +79,21 @@ export function FoodSourcesSection() {
   return (
     <SettingCard
       title="Food sources"
-      description="Where the search box looks. USDA needs a free API key; Open Food Facts works without."
+      description="What the food search looks through. Your saved products and a built-in library of common foods always work — USDA and Open Food Facts add thousands more."
     >
+      {bundled && (
+        <p className="flex items-start gap-1.5 rounded-lg bg-accent px-3 py-2 text-xs text-accent-foreground">
+          <CheckCircle2 className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+          USDA search is set up for you — no API key needed. The field below
+          is only if you'd rather use your own key.
+        </p>
+      )}
       <LabeledInput
-        label="USDA FoodData Central API key"
+        label={
+          bundled
+            ? 'Your own USDA key (optional)'
+            : 'USDA FoodData Central API key'
+        }
         type="password"
         placeholder={savedKey ? '•••••••• (saved)' : 'Paste your key'}
         value={draftKey}

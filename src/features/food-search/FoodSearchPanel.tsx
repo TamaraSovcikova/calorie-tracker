@@ -59,7 +59,7 @@ export function FoodSearchPanel({
     errorBanner,
     needsUsdaKey,
     showPackaged,
-  } = useFoodSearch(query, section);
+  } = useFoodSearch(query);
 
   const hasQuery = query.trim().length > 0;
   const showRecents = !hasQuery && recents.length > 0;
@@ -127,7 +127,7 @@ export function FoodSearchPanel({
           </CoachTip>
         )}
         {showRecents && (
-          <Group title={`Recent in ${SECTION_TITLES[section]}`}>
+          <Group title="Recent" hint={`${recents.length}`}>
             {recents.map((f) => (
               <FoodResultRow key={f.id} food={f} onClick={onPick} />
             ))}
