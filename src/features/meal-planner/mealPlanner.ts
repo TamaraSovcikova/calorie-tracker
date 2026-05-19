@@ -11,7 +11,7 @@
 
 import { db } from '@/db/dexie';
 import { getSyncConfig, syncBaseUrl } from '@/db/sync/config';
-import { createFood, searchLocalFoods } from '@/db/repos/foods';
+import { searchLocalFoods } from '@/db/repos/foods';
 import { createMeal, type MealItemInput } from '@/db/repos/meals';
 import { recentFoods, type DayTotals } from '@/db/repos/diary';
 import { computeMacros } from '@/features/food-search/foodMath';
@@ -340,24 +340,29 @@ export async function resolveAndFitMeal(
 
 // ----------------------------------------------------------------- save
 
-/** Save a resolved meal into the library as a multi-portion meal. */
-export async function savePlanAsMeal(resolved: ResolvedMeal): Promise<string> {
+export interface SavedPlanResult {
+  mealId: string;
+  /** Ingredient names dropped because no nutrition data was found. */
+  skipped: string[];
+}
+
+/**
+ * Save a resolved meal into the library as a multi-portion meal.
+ * Ingredients with no nutrition match are skipped (rather than saved as
+ * zero-macro foods that would clutter "My Products") and reported back so
+ * the UI can tell the user to add them by hand.
+ */
+export async function savePlanAsMeal(
+  resolved: ResolvedMeal,
+): Promise<SavedPlanResult> {
   const items: MealItemInput[] = [];
+  const skipped: string[] = [];
   for (const ing of resolved.ingredients) {
-    let foodId = ing.food?.id;
-    if (!foodId) {
-      // No nutrition found — bank a zero-macro placeholder the user can edit.
-      const placeholder = await createFood({
-        source: 'custom',
-        name: ing.name,
-        kcal_100: 0,
-        protein_100: 0,
-        carbs_100: 0,
-        fat_100: 0,
-      });
-      foodId = placeholder.id;
+    if (!ing.food) {
+      skipped.push(ing.name);
+      continue;
     }
-    items.push({ food_id: foodId, qty: ing.grams, unit: 'g' });
+    items.push({ food_id: ing.food.id, qty: ing.grams, unit: 'g' });
   }
   const created = await createMeal({
     name: resolved.meal.name,
@@ -365,5 +370,5 @@ export async function savePlanAsMeal(resolved: ResolvedMeal): Promise<string> {
     servings: resolved.portions,
     items,
   });
-  return created.id;
+  return { mealId: created.id, skipped };
 }

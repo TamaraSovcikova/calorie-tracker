@@ -12,7 +12,6 @@ import { WeeklyBudgetCard } from '@/features/weekly-budget/WeeklyBudgetCard';
 import { useWeeklyBudget } from '@/features/weekly-budget/weeklyBudget';
 import { useProfile } from '@/db/repos/profile';
 import { todayLocal } from '@/lib/dates';
-import { formatKcal } from '@/lib/macros';
 
 export function PetPage() {
   const navigate = useNavigate();
@@ -33,9 +32,6 @@ export function PetPage() {
     );
   }
 
-  const goalPct =
-    dog.goalKcal > 0 ? Math.min(100, (dog.loggedKcal / dog.goalKcal) * 100) : 0;
-  const remaining = Math.max(0, Math.round(dog.goalKcal - dog.loggedKcal));
   const band = wellbeingBand(dog.wellbeing);
 
   return (
@@ -78,31 +74,6 @@ export function PetPage() {
           <p className="mt-2 text-xs text-muted-foreground">
             Logging every day keeps {dog.petName} thriving.
           </p>
-        </section>
-
-        {/* Today's calories at a glance. */}
-        <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">
-          <div className="text-xs uppercase tracking-wide text-muted-foreground">
-            Today
-          </div>
-          <div className="mt-1 flex items-baseline justify-between">
-            <span className="text-lg font-semibold tabular-nums">
-              {formatKcal(dog.loggedKcal)}
-              <span className="text-sm font-normal text-muted-foreground">
-                {' '}
-                / {formatKcal(dog.goalKcal)} kcal
-              </span>
-            </span>
-            <span className="text-sm text-muted-foreground tabular-nums">
-              {formatKcal(remaining)} left
-            </span>
-          </div>
-          <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-muted">
-            <div
-              className="h-full rounded-full bg-kcal transition-all duration-500"
-              style={{ width: `${goalPct}%` }}
-            />
-          </div>
         </section>
 
         {/* Weekly calorie budget — full breakdown lives here. */}

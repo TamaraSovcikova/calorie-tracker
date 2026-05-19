@@ -139,19 +139,6 @@ export function groupBySection(entries: DiaryEntry[]): EntriesBySection {
   return out;
 }
 
-/** For Phase 9 streak: which dates have at least one non-deleted entry? */
-export async function listLoggedDates(): Promise<LocalDate[]> {
-  const userId = currentUserId();
-  const all = await db.diary_entries
-    .where('user_id')
-    .equals(userId)
-    .filter((e) => !e.deleted_at)
-    .toArray();
-  const set = new Set<LocalDate>();
-  for (const e of all) set.add(e.date);
-  return [...set].sort();
-}
-
 /** The qty + unit of the most recent entry for a food, for pre-filling the
  *  add-quantity step so a daily food doesn't need re-entering each time. */
 export async function lastQuantityForFood(

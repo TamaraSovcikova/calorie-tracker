@@ -308,9 +308,15 @@ function MealCard({
     if (!resolved) return;
     setSaving(true);
     try {
-      await savePlanAsMeal(resolved);
+      const { skipped } = await savePlanAsMeal(resolved);
       setSaved(true);
-      toast({ message: `"${meal.name}" saved to your library`, variant: 'success' });
+      toast({
+        message:
+          skipped.length > 0
+            ? `"${meal.name}" saved — ${skipped.length} ingredient${skipped.length === 1 ? '' : 's'} had no nutrition data; add ${skipped.length === 1 ? 'it' : 'them'} in the meal editor`
+            : `"${meal.name}" saved to your library`,
+        variant: 'success',
+      });
     } catch {
       toast({ message: 'Could not save the meal — try again.', variant: 'error' });
     } finally {
