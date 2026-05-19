@@ -10,7 +10,10 @@
 import { getSyncConfig, syncBaseUrl } from '@/db/sync/config';
 import { createFood } from '@/db/repos/foods';
 import type { MealItemInput } from '@/db/repos/meals';
-import { lookupIngredientFood } from '@/features/meal-planner/mealPlanner';
+import {
+  lookupIngredientFood,
+  resetPlannerCaches,
+} from '@/features/meal-planner/mealPlanner';
 import { downscaleImage } from '@/features/photo-log/photoLog';
 
 export interface ScannedRecipe {
@@ -79,6 +82,7 @@ export interface ResolvedRecipe {
 export async function resolveScannedRecipe(
   recipe: ScannedRecipe,
 ): Promise<ResolvedRecipe> {
+  resetPlannerCaches(); // resolve against the current food library
   const items: MealItemInput[] = [];
   for (const ing of recipe.ingredients) {
     let food = await lookupIngredientFood(ing.name);

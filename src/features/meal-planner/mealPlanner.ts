@@ -10,8 +10,8 @@
  */
 
 import { db } from '@/db/dexie';
+import { currentUserId } from '@/db/userId';
 import { getSyncConfig, syncBaseUrl } from '@/db/sync/config';
-import { searchLocalFoods } from '@/db/repos/foods';
 import { createMeal, type MealItemInput } from '@/db/repos/meals';
 import { recentFoods, type DayTotals } from '@/db/repos/diary';
 import { computeMacros } from '@/features/food-search/foodMath';
@@ -160,11 +160,31 @@ function loadRecentFoods(): Promise<Food[]> {
   return recentsCache;
 }
 
+let allFoodsCache: Promise<Food[]> | null = null;
+
+/** Every food in the user's library — curated, custom, and cached search
+ *  hits (incl. barcode-scanned products). Cached for the session. */
+function loadAllFoods(): Promise<Food[]> {
+  if (!allFoodsCache) {
+    allFoodsCache = (async () => {
+      const uid = currentUserId();
+      return db.foods
+        .where('user_id')
+        .equals(uid)
+        .filter((f) => !f.deleted_at)
+        .toArray()
+        .catch(() => [] as Food[]);
+    })();
+  }
+  return allFoodsCache;
+}
+
 /** Clear per-session caches — call when the planner page opens so recents
  *  and lookups are fresh. */
 export function resetPlannerCaches(): void {
   lookupCache.clear();
   recentsCache = null;
+  allFoodsCache = null;
 }
 
 /** Significant (3+ char) words of a name. */
@@ -172,19 +192,58 @@ function sigWords(s: string): string[] {
   return (s.toLowerCase().match(/[a-z0-9]+/g) ?? []).filter((w) => w.length >= 3);
 }
 
-/** True when every significant word of the ingredient appears in the food
- *  name — strict enough to match "chicken breast" to a recent branded
- *  "Tesco Chicken Breast Fillets" without matching it to "chicken soup". */
-function nameContainsIngredient(food: Food, query: string): boolean {
-  const name = food.name.toLowerCase();
-  if (name === query) return true;
-  const words = sigWords(query);
-  if (words.length === 0) return name.includes(query);
-  return words.every((w) => name.includes(w));
+/** Two words match if equal, or one is a prefix of the other (shorter
+ *  ≥ 4 chars) — so "wrap"/"wraps", "tomato"/"tomatoes" match. */
+function wordsMatch(a: string, b: string): boolean {
+  if (a === b) return true;
+  const [short, long] = a.length <= b.length ? [a, b] : [b, a];
+  return short.length >= 4 && long.startsWith(short);
 }
 
-/** Resolve a free-text food name to a real Food (recents → curated/local
- *  → USDA), or null. Shared by the meal planner and photo logging. */
+/**
+ * Score how well a library food matches a free-text ingredient name.
+ * Returns 0 when it doesn't qualify.
+ *
+ * Tolerant of the AI producing a *more verbose* name than the stored
+ * product — e.g. "Lidl Rowan Hill Bakery 6 High Protein Tortilla Wraps"
+ * vs a stored "High Protein Tortilla Wraps": the match is driven by how
+ * much of the FOOD's name the query covers (recall), not the reverse, so
+ * extra brand words in the AI name don't break it. Recently-logged foods
+ * match more leniently — "use what you actually buy".
+ */
+function localMatchScore(
+  food: Food,
+  query: string,
+  queryWords: string[],
+  isRecent: boolean,
+): number {
+  const fname = food.name.trim().toLowerCase();
+  let base: number;
+  if (fname === query) {
+    base = 1.5;
+  } else {
+    const foodWords = sigWords(fname);
+    if (queryWords.length === 0 || foodWords.length === 0) return 0;
+    let shared = 0;
+    for (const fw of foodWords) {
+      if (queryWords.some((qw) => wordsMatch(qw, fw))) shared += 1;
+    }
+    const recall = shared / foodWords.length; // food name covered by query
+    const precision = shared / queryWords.length; // query covered by food
+    const minShared = isRecent ? 1 : Math.min(2, foodWords.length);
+    const minRecall = isRecent ? 0.34 : 0.6;
+    if (shared < minShared || recall < minRecall || precision < 0.2) return 0;
+    base = recall + precision * 0.15;
+  }
+  if (isRecent) base += 0.3; // prefer the brands the user actually logs
+  if (food.kcal_100 > 0) base += 0.05; // a real food beats an empty stub
+  if (food.source === 'curated' || food.source === 'custom') base += 0.03;
+  return base;
+}
+
+/** Resolve a free-text food name to a real Food (library fuzzy match,
+ *  recents-weighted → USDA), or null. Shared by the meal planner, photo
+ *  logging and recipe scanning. */
 export async function lookupIngredientFood(name: string): Promise<Food | null> {
   const key = name.trim().toLowerCase();
   if (!key) return null;
@@ -192,29 +251,35 @@ export async function lookupIngredientFood(name: string): Promise<Food | null> {
   if (cached) return cached;
 
   const promise = (async (): Promise<Food | null> => {
-    // 0. Recents — match against what the user actually logs, so a brand
-    //    they buy is used for the estimate rather than a generic entry.
-    const recents = await loadRecentFoods();
-    const recentHits = recents.filter((f) => nameContainsIngredient(f, key));
-    if (recentHits.length > 0) {
-      return [...recentHits].sort((a, b) => scoreFood(b, key) - scoreFood(a, key))[0];
-    }
+    const queryWords = sigWords(key);
+    const [recents, all] = await Promise.all([
+      loadRecentFoods(),
+      loadAllFoods(),
+    ]);
+    const recentIds = new Set(recents.map((f) => f.id));
 
-    // 1. Local DB — curated common foods, the user's products, cached hits.
-    const local = await searchLocalFoods(key, 25).catch(() => [] as Food[]);
-    if (local.length > 0) {
-      return [...local].sort((a, b) => scoreFood(b, key) - scoreFood(a, key))[0];
+    // 1. Best fuzzy match across the whole library.
+    let best: Food | null = null;
+    let bestScore = 0;
+    for (const f of all) {
+      const s = localMatchScore(f, key, queryWords, recentIds.has(f.id));
+      if (s > bestScore) {
+        bestScore = s;
+        best = f;
+      }
     }
-    // 2. USDA FoodData Central.
+    if (best) return best;
+
+    // 2. USDA FoodData Central — for generic ingredients not in the library.
     const apiKey = getUsdaApiKey();
     if (!apiKey) return null;
     try {
       const hits = await searchUsda(key, apiKey, { genericOnly: true });
       if (hits.length === 0) return null;
-      const best = [...hits].sort((a, b) => scoreFood(b, key) - scoreFood(a, key))[0];
-      // Cache into Dexie so the saved meal can reference it by id.
-      await db.foods.put(best).catch(() => undefined);
-      return best;
+      const top = [...hits].sort((a, b) => scoreFood(b, key) - scoreFood(a, key))[0];
+      // Cache into Dexie so a saved meal can reference it by id.
+      await db.foods.put(top).catch(() => undefined);
+      return top;
     } catch {
       return null; // rate-limited / offline / no match — fail soft
     }
