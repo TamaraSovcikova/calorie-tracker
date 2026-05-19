@@ -145,6 +145,7 @@ export function offProductToFood(p: OffProduct): Food | null {
     fat_100: p.nutriments?.['fat_100g'] ?? 0,
     serving_g: num(p.serving_quantity),
     custom_units: [],
+    image_url: p.image_front_small_url?.trim() || undefined,
     created_at: now,
     updated_at: now,
   };

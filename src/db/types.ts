@@ -106,6 +106,8 @@ export interface Food {
 
   /** User-starred for fast logging. Optional: pre-feature rows read false. */
   favorite?: boolean;
+  /** Thumbnail URL (Open Food Facts product image), when available. */
+  image_url?: string;
 
   created_at: ISOTimestamp;
   updated_at: ISOTimestamp;

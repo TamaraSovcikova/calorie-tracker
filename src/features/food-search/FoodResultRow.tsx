@@ -1,4 +1,4 @@
-import { ChevronRight, Star, Tag } from 'lucide-react';
+import { ChevronRight, Star, Tag, Utensils } from 'lucide-react';
 import type { Food } from '@/db/types';
 import { formatKcal } from '@/lib/macros';
 import { cn } from '@/lib/cn';
@@ -53,8 +53,20 @@ export function FoodResultRow({
       <button
         type="button"
         onClick={() => onClick(food)}
-        className="flex min-w-0 flex-1 items-center justify-between gap-3 rounded-lg px-3 py-3 text-left active:bg-muted"
+        className="flex min-w-0 flex-1 items-center gap-3 rounded-lg px-3 py-3 text-left active:bg-muted"
       >
+        {food.image_url ? (
+          <img
+            src={food.image_url}
+            alt=""
+            loading="lazy"
+            className="h-10 w-10 shrink-0 rounded-lg bg-muted object-cover"
+          />
+        ) : (
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted">
+            <Utensils className="h-4 w-4 text-muted-foreground" />
+          </div>
+        )}
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
             {food.source === 'custom' && (
