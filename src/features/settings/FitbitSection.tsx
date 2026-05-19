@@ -10,8 +10,10 @@ import {
   getConnectedAccountEmail,
   getFitbitClientId,
   getGoogleClientSecret,
+  getGoogleLoginHint,
   setFitbitClientId,
   setGoogleClientSecret,
+  setGoogleLoginHint,
   type FitbitDebugResult,
 } from '@/lib/fitbit-api';
 import { todayLocal } from '@/lib/dates';
@@ -24,6 +26,7 @@ export function FitbitSection() {
   const [draftSecret, setDraftSecret] = useState(
     () => getGoogleClientSecret() ?? '',
   );
+  const [draftHint, setDraftHint] = useState(() => getGoogleLoginHint() ?? '');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -32,10 +35,17 @@ export function FitbitSection() {
   const [savedSecret, setSavedSecret] = useState(
     () => getGoogleClientSecret() ?? '',
   );
+  const [savedHint, setSavedHint] = useState(() => getGoogleLoginHint() ?? '');
   useEffect(() => {
     setSavedId(getFitbitClientId() ?? '');
     setSavedSecret(getGoogleClientSecret() ?? '');
+    setSavedHint(getGoogleLoginHint() ?? '');
   }, []);
+
+  const credsDirty =
+    draftId.trim() !== savedId ||
+    draftSecret.trim() !== savedSecret ||
+    draftHint.trim() !== savedHint;
 
   const connected = tokens !== null && tokens !== undefined;
   const isLoading = tokens === undefined;
@@ -44,10 +54,13 @@ export function FitbitSection() {
   const handleSaveCreds = () => {
     const id = draftId.trim();
     const secret = draftSecret.trim();
+    const hint = draftHint.trim();
     setFitbitClientId(id || null);
     setGoogleClientSecret(secret || null);
+    setGoogleLoginHint(hint || null);
     setSavedId(id);
     setSavedSecret(secret);
+    setSavedHint(hint);
   };
 
   const handleConnect = async () => {
@@ -113,6 +126,19 @@ export function FitbitSection() {
         autoComplete="off"
         spellCheck={false}
       />
+      <LabeledInput
+        label="Google account email (optional)"
+        type="email"
+        placeholder="account your Fitbit is linked to"
+        value={draftHint}
+        onChange={(e) => setDraftHint(e.target.value)}
+        autoComplete="off"
+        spellCheck={false}
+      />
+      <p className="-mt-1 text-xs text-muted-foreground">
+        On a phone signed into several Google accounts, this sends you
+        straight to the right one when connecting.
+      </p>
       <div className="flex items-center justify-between gap-2">
         <a
           href="https://console.cloud.google.com/apis/credentials"
@@ -125,15 +151,9 @@ export function FitbitSection() {
         </a>
         <Button
           size="sm"
-          variant={
-            draftId.trim() !== savedId || draftSecret.trim() !== savedSecret
-              ? 'primary'
-              : 'secondary'
-          }
+          variant={credsDirty ? 'primary' : 'secondary'}
           onClick={handleSaveCreds}
-          disabled={
-            draftId.trim() === savedId && draftSecret.trim() === savedSecret
-          }
+          disabled={!credsDirty}
         >
           Save credentials
         </Button>

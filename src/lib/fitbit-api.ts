@@ -81,6 +81,24 @@ export function setGoogleClientSecret(secret: string | null): void {
   else localStorage.setItem(CLIENT_SECRET_LS, secret.trim());
 }
 
+const LOGIN_HINT_LS = 'calorie-tracker:google-login-hint';
+
+/**
+ * Optional preferred Google account email. Passed to the auth flow as
+ * `login_hint` so a multi-account phone doesn't default to the wrong
+ * Google account (e.g. a work account with no Fitbit / API access).
+ */
+export function getGoogleLoginHint(): string | null {
+  if (typeof localStorage === 'undefined') return null;
+  return localStorage.getItem(LOGIN_HINT_LS);
+}
+
+export function setGoogleLoginHint(email: string | null): void {
+  if (typeof localStorage === 'undefined') return;
+  if (!email || !email.trim()) localStorage.removeItem(LOGIN_HINT_LS);
+  else localStorage.setItem(LOGIN_HINT_LS, email.trim());
+}
+
 /** Email of the connected Google account, if known. */
 export function getConnectedAccountEmail(): string | null {
   if (typeof localStorage === 'undefined') return null;
@@ -187,6 +205,9 @@ export async function beginFitbitAuth(): Promise<string> {
     prompt: 'select_account consent',
     include_granted_scopes: 'true',
   });
+  // Steer multi-account devices straight to the intended Google account.
+  const hint = getGoogleLoginHint();
+  if (hint) params.set('login_hint', hint);
   return `${AUTH_BASE}?${params.toString()}`;
 }
 
