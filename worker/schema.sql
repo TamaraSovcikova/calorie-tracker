@@ -60,11 +60,16 @@ CREATE TABLE IF NOT EXISTS foods (
   fat_100         REAL NOT NULL,
   serving_g       REAL,
   custom_units    TEXT NOT NULL,  -- JSON [{label, grams}]
+  favorite        INTEGER,        -- 1 = user-starred; NULL = not (pre-feature)
   created_at      TEXT NOT NULL,
   updated_at      TEXT NOT NULL,
   deleted_at      TEXT
 );
 CREATE INDEX IF NOT EXISTS foods_updated_at ON foods (updated_at);
+
+-- Migration for databases created before the `favorite` column existed.
+--   wrangler d1 execute <db> --remote --command \
+--     "ALTER TABLE foods ADD COLUMN favorite INTEGER"
 
 CREATE TABLE IF NOT EXISTS meals (
   id          TEXT PRIMARY KEY,

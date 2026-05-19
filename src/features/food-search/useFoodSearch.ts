@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db/dexie';
 import { searchLocalFoods } from '@/db/repos/foods';
-import { recentFoods } from '@/db/repos/diary';
+import { frequentFoods, recentFoods } from '@/db/repos/diary';
+import { currentUserId } from '@/db/userId';
 import { OffRateLimitError, searchOff } from '@/lib/off-api';
 import {
   getUsdaApiKey,
@@ -35,6 +36,10 @@ import type { Food } from '@/db/types';
 
 export interface FoodSearchResult {
   query: string;
+  /** Starred foods — shown first when the search box is empty. */
+  favorites: Food[];
+  /** Most-logged foods, de-duped against favourites. */
+  frequent: Food[];
   recents: Food[];
   myProducts: Food[];
   common: Food[];
@@ -91,11 +96,30 @@ export function useFoodSearch(query: string): FoodSearchResult {
     return () => clearTimeout(t);
   }, [query]);
 
-  const recents = useLiveQuery(async () => {
-    const ids = await recentFoods(50);
-    if (ids.length === 0) return [];
-    const rows = await db.foods.bulkGet(ids);
-    return rows.filter((r): r is Food => !!r && !r.deleted_at);
+  // Empty-state lists (favourites / frequent / recents), computed together
+  // so each food shows in exactly one group: favourites > frequent > recent.
+  const emptyState = useLiveQuery(async () => {
+    const uid = currentUserId();
+    const favorites = (
+      await db.foods
+        .where('user_id')
+        .equals(uid)
+        .filter((f) => !!f.favorite && !f.deleted_at)
+        .toArray()
+    ).sort((a, b) => a.name.localeCompare(b.name));
+    const favIds = new Set(favorites.map((f) => f.id));
+
+    const frequent = (await db.foods.bulkGet(await frequentFoods(20))).filter(
+      (f): f is Food => !!f && !f.deleted_at && !favIds.has(f.id),
+    );
+    const freqIds = new Set(frequent.map((f) => f.id));
+
+    const recents = (await db.foods.bulkGet(await recentFoods(50))).filter(
+      (f): f is Food =>
+        !!f && !f.deleted_at && !favIds.has(f.id) && !freqIds.has(f.id),
+    );
+
+    return { favorites, frequent, recents };
   }, []);
 
   const [local, setLocal] = useState<Food[]>([]);
@@ -244,7 +268,9 @@ export function useFoodSearch(query: string): FoodSearchResult {
   return useMemo(
     () => ({
       query: debouncedQuery,
-      recents: recents ?? [],
+      favorites: emptyState?.favorites ?? [],
+      frequent: emptyState?.frequent ?? [],
+      recents: emptyState?.recents ?? [],
       myProducts: grouped.myProducts,
       common: grouped.common,
       packaged: grouped.packaged,
@@ -256,7 +282,7 @@ export function useFoodSearch(query: string): FoodSearchResult {
     }),
     [
       debouncedQuery,
-      recents,
+      emptyState,
       grouped,
       isSearching,
       rateLimitedSeconds,

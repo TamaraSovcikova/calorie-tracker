@@ -184,3 +184,24 @@ export async function recentFoods(limit = 30): Promise<string[]> {
   return ids;
 }
 
+/**
+ * Food ids ranked by how often they've been logged (most-logged first) —
+ * the "frequent foods" fast-logging list.
+ */
+export async function frequentFoods(limit = 20): Promise<string[]> {
+  const userId = currentUserId();
+  const counts = new Map<string, number>();
+  await db.diary_entries
+    .where('[user_id+date]')
+    .between([userId, '0000-00-00'], [userId, '9999-99-99'])
+    .each((e) => {
+      if (e.kind === 'food' && e.food_id && !e.deleted_at) {
+        counts.set(e.food_id, (counts.get(e.food_id) ?? 0) + 1);
+      }
+    });
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, limit)
+    .map(([id]) => id);
+}
+

@@ -104,6 +104,9 @@ export interface Food {
   serving_g?: number;
   custom_units: CustomUnit[];
 
+  /** User-starred for fast logging. Optional: pre-feature rows read false. */
+  favorite?: boolean;
+
   created_at: ISOTimestamp;
   updated_at: ISOTimestamp;
   deleted_at?: ISOTimestamp;

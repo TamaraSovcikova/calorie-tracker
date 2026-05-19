@@ -372,6 +372,7 @@ class SyncEngine {
       'fitbit_connected',
       'onboarded',
       'needs_profile',
+      'favorite',
     ]) {
       if (typeof r[k] === 'number') r[k] = r[k] === 1;
     }

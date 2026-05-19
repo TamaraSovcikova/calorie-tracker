@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { CoachTip } from '@/components/ui/CoachTip';
 import { useFoodSearch } from './useFoodSearch';
 import { FoodResultRow } from './FoodResultRow';
+import { toggleFavorite } from '@/db/repos/foods';
 import type { Food, MealSection } from '@/db/types';
 
 interface FoodSearchPanelProps {
@@ -50,6 +51,8 @@ export function FoodSearchPanel({
 }: FoodSearchPanelProps) {
   const [query, setQuery] = useState('');
   const {
+    favorites,
+    frequent,
     recents,
     myProducts,
     common,
@@ -62,7 +65,9 @@ export function FoodSearchPanel({
   } = useFoodSearch(query);
 
   const hasQuery = query.trim().length > 0;
-  const showRecents = !hasQuery && recents.length > 0;
+  const handleFav = (food: Food) => void toggleFavorite(food.id);
+  const emptyStateEmpty =
+    favorites.length === 0 && frequent.length === 0 && recents.length === 0;
   const noResults =
     hasQuery &&
     !isSearching &&
@@ -126,18 +131,50 @@ export function FoodSearchPanel({
             bare calories.
           </CoachTip>
         )}
-        {showRecents && (
-          <Group title="Recent" hint={`${recents.length}`}>
-            {recents.map((f) => (
-              <FoodResultRow key={f.id} food={f} onClick={onPick} />
-            ))}
-          </Group>
-        )}
-
-        {!showRecents && !hasQuery && (
-          <div className="rounded-2xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
-            Search by name, scan a barcode, or pick a saved meal.
-          </div>
+        {!hasQuery && (
+          <>
+            {favorites.length > 0 && (
+              <Group title="Favourites" hint={`${favorites.length}`}>
+                {favorites.map((f) => (
+                  <FoodResultRow
+                    key={f.id}
+                    food={f}
+                    onClick={onPick}
+                    onToggleFavorite={handleFav}
+                  />
+                ))}
+              </Group>
+            )}
+            {frequent.length > 0 && (
+              <Group title="Frequently logged">
+                {frequent.map((f) => (
+                  <FoodResultRow
+                    key={f.id}
+                    food={f}
+                    onClick={onPick}
+                    onToggleFavorite={handleFav}
+                  />
+                ))}
+              </Group>
+            )}
+            {recents.length > 0 && (
+              <Group title="Recent" hint={`${recents.length}`}>
+                {recents.map((f) => (
+                  <FoodResultRow
+                    key={f.id}
+                    food={f}
+                    onClick={onPick}
+                    onToggleFavorite={handleFav}
+                  />
+                ))}
+              </Group>
+            )}
+            {emptyStateEmpty && (
+              <div className="rounded-2xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
+                Search by name, scan a barcode, or pick a saved meal.
+              </div>
+            )}
+          </>
         )}
 
         {hasQuery && (
@@ -145,7 +182,12 @@ export function FoodSearchPanel({
             {myProducts.length > 0 && (
               <Group title="My Products">
                 {myProducts.map((f) => (
-                  <FoodResultRow key={f.id} food={f} onClick={onPick} />
+                  <FoodResultRow
+                    key={f.id}
+                    food={f}
+                    onClick={onPick}
+                    onToggleFavorite={handleFav}
+                  />
                 ))}
               </Group>
             )}
@@ -153,7 +195,12 @@ export function FoodSearchPanel({
             {common.length > 0 && (
               <Group title="Common foods" hint="USDA">
                 {common.map((f) => (
-                  <FoodResultRow key={f.id} food={f} onClick={onPick} />
+                  <FoodResultRow
+                    key={f.id}
+                    food={f}
+                    onClick={onPick}
+                    onToggleFavorite={handleFav}
+                  />
                 ))}
               </Group>
             )}
@@ -161,7 +208,12 @@ export function FoodSearchPanel({
             {showPackaged && packaged.length > 0 && (
               <Group title="Packaged products">
                 {packaged.map((f) => (
-                  <FoodResultRow key={f.id} food={f} onClick={onPick} />
+                  <FoodResultRow
+                    key={f.id}
+                    food={f}
+                    onClick={onPick}
+                    onToggleFavorite={handleFav}
+                  />
                 ))}
               </Group>
             )}
