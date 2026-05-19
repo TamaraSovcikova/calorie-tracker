@@ -16,6 +16,7 @@
 import { handleSync } from './sync';
 import { handleFoodFact } from './foodFacts';
 import { handleMealPlan } from './mealPlan';
+import { checkRateLimit } from './rateLimit';
 
 export interface Env {
   DB: D1Database;
@@ -137,6 +138,9 @@ export default {
 
       // /api/food-fact — AI nutrition fact for a logged food (cached).
       if (url.pathname === '/api/food-fact' && req.method === 'POST') {
+        if (!(await checkRateLimit(env, `fact:${userId}`, 30, 60))) {
+          return jsonResponse({ fact: null }, { status: 429 });
+        }
         try {
           return await handleFoodFact(req, env);
         } catch {
@@ -147,6 +151,16 @@ export default {
       // /api/meal-plan — AI meal-prep suggestions from the user's
       // ingredients + macro targets.
       if (url.pathname === '/api/meal-plan' && req.method === 'POST') {
+        if (!(await checkRateLimit(env, `plan:${userId}`, 6, 60))) {
+          return jsonResponse(
+            {
+              meals: [],
+              error:
+                'Too many plans in a short time — give it a minute and try again.',
+            },
+            { status: 429 },
+          );
+        }
         try {
           return await handleMealPlan(req, env);
         } catch {
