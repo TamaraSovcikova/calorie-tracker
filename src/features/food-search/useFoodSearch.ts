@@ -41,6 +41,8 @@ export interface FoodSearchResult {
   /** Most-logged foods, de-duped against favourites. */
   frequent: Food[];
   recents: Food[];
+  /** While searching: result foods the user has logged before. */
+  recentMatches: Food[];
   myProducts: Food[];
   common: Food[];
   packaged: Food[];
@@ -114,12 +116,14 @@ export function useFoodSearch(query: string): FoodSearchResult {
     );
     const freqIds = new Set(frequent.map((f) => f.id));
 
-    const recents = (await db.foods.bulkGet(await recentFoods(50))).filter(
+    const recentIdList = await recentFoods(50);
+    const recentIdSet = new Set(recentIdList);
+    const recents = (await db.foods.bulkGet(recentIdList)).filter(
       (f): f is Food =>
         !!f && !f.deleted_at && !favIds.has(f.id) && !freqIds.has(f.id),
     );
 
-    return { favorites, frequent, recents };
+    return { favorites, frequent, recents, recentIdSet };
   }, []);
 
   const [local, setLocal] = useState<Food[]>([]);
@@ -257,13 +261,30 @@ export function useFoodSearch(query: string): FoodSearchResult {
     const myIds = new Set(myProducts.map((f) => f.id));
     const byRelevance = (a: Food, b: Food) =>
       scoreFoodMatch(b, q) - scoreFoodMatch(a, q);
+    const commonNoMine = common.filter((f) => !myIds.has(f.id));
+    const packagedNoMine = packaged.filter((f) => !myIds.has(f.id));
+
+    // Pull recently-logged foods into their own group, just behind My
+    // Products — so re-searching something you've used before is quick.
+    const recentIdSet = emptyState?.recentIdSet ?? new Set<string>();
+    const seenRecent = new Set<string>();
+    const recentMatches: Food[] = [];
+    for (const f of [...commonNoMine, ...packagedNoMine]) {
+      if (recentIdSet.has(f.id) && !seenRecent.has(f.id)) {
+        seenRecent.add(f.id);
+        recentMatches.push(f);
+      }
+    }
     return {
       myProducts,
-      common: common.filter((f) => !myIds.has(f.id)).sort(byRelevance),
-      packaged: packaged.filter((f) => !myIds.has(f.id)).sort(byRelevance),
+      recentMatches: recentMatches.sort(byRelevance),
+      common: commonNoMine.filter((f) => !seenRecent.has(f.id)).sort(byRelevance),
+      packaged: packagedNoMine
+        .filter((f) => !seenRecent.has(f.id))
+        .sort(byRelevance),
       _localIds: localIds,
     };
-  }, [local, usda, off, showPackaged, debouncedQuery]);
+  }, [local, usda, off, showPackaged, debouncedQuery, emptyState]);
 
   return useMemo(
     () => ({
@@ -271,6 +292,7 @@ export function useFoodSearch(query: string): FoodSearchResult {
       favorites: emptyState?.favorites ?? [],
       frequent: emptyState?.frequent ?? [],
       recents: emptyState?.recents ?? [],
+      recentMatches: grouped.recentMatches,
       myProducts: grouped.myProducts,
       common: grouped.common,
       packaged: grouped.packaged,

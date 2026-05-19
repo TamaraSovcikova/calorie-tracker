@@ -54,6 +54,7 @@ export function FoodSearchPanel({
     favorites,
     frequent,
     recents,
+    recentMatches,
     myProducts,
     common,
     packaged,
@@ -72,6 +73,7 @@ export function FoodSearchPanel({
     hasQuery &&
     !isSearching &&
     myProducts.length === 0 &&
+    recentMatches.length === 0 &&
     common.length === 0 &&
     packaged.length === 0;
 
@@ -182,6 +184,19 @@ export function FoodSearchPanel({
             {myProducts.length > 0 && (
               <Group title="My Products">
                 {myProducts.map((f) => (
+                  <FoodResultRow
+                    key={f.id}
+                    food={f}
+                    onClick={onPick}
+                    onToggleFavorite={handleFav}
+                  />
+                ))}
+              </Group>
+            )}
+
+            {recentMatches.length > 0 && (
+              <Group title="Recently used">
+                {recentMatches.map((f) => (
                   <FoodResultRow
                     key={f.id}
                     food={f}
