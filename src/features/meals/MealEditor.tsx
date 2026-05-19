@@ -72,8 +72,20 @@ export function MealEditor({ mode }: MealEditorProps) {
   // (the "build a meal from selected foods" shortcut on the diary).
   useEffect(() => {
     if (mode !== 'create') return;
-    const state = location.state as { prefillItems?: MealItemInput[] } | null;
-    const prefill = state?.prefillItems;
+    const state = location.state as {
+      prefillItems?: MealItemInput[];
+      prefillName?: string;
+      prefillNotes?: string;
+      prefillServings?: number;
+    } | null;
+    if (!state) return;
+    // From the recipe scanner / other prefill flows.
+    if (state.prefillName) setName(state.prefillName);
+    if (state.prefillNotes) setNotes(state.prefillNotes);
+    if (state.prefillServings && state.prefillServings > 0) {
+      setServings(state.prefillServings);
+    }
+    const prefill = state.prefillItems;
     if (!prefill || prefill.length === 0) return;
     let cancelled = false;
     void (async () => {
@@ -250,11 +262,17 @@ export function MealEditor({ mode }: MealEditorProps) {
           onChange={(e) => setName(e.target.value)}
           autoFocus={mode === 'create'}
         />
-        <LabeledInput
-          label="Notes (optional)"
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-        />
+        <label className="block space-y-1">
+          <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Notes / method (optional)
+          </span>
+          <textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            rows={3}
+            className="flex w-full rounded-lg border border-input bg-background px-3 py-2 text-base placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
+          />
+        </label>
 
         <div className="space-y-1">
           <LabeledInput

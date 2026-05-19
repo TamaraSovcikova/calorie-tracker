@@ -17,6 +17,7 @@ import { handleSync } from './sync';
 import { handleFoodFact } from './foodFacts';
 import { handleMealPlan } from './mealPlan';
 import { handlePhotoFood } from './photoFood';
+import { handlePhotoRecipe } from './photoRecipe';
 import { checkRateLimit } from './rateLimit';
 
 export interface Env {
@@ -181,6 +182,21 @@ export default {
           return await handlePhotoFood(req, env);
         } catch {
           return jsonResponse({ foods: [], error: 'Photo analysis failed — try again.' });
+        }
+      }
+
+      // /api/photo-recipe — AI vision: extract a recipe from a screenshot.
+      if (url.pathname === '/api/photo-recipe' && req.method === 'POST') {
+        if (!(await checkRateLimit(env, `recipe:${userId}`, 12, 60))) {
+          return jsonResponse(
+            { recipe: null, error: 'Too many scans in a short time — wait a minute.' },
+            { status: 429 },
+          );
+        }
+        try {
+          return await handlePhotoRecipe(req, env);
+        } catch {
+          return jsonResponse({ recipe: null, error: 'Recipe scan failed — try again.' });
         }
       }
 

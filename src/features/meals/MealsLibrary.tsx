@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChefHat, Pencil, Plus, Search, Sparkles } from 'lucide-react';
+import { ChefHat, Pencil, Plus, ScanLine, Search, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { LogMealSheet } from './LogMealSheet';
+import { RecipeScanSheet } from '@/features/recipe-scan/RecipeScanSheet';
 import { useMealsWithTotals } from './useMealsWithTotals';
 import { formatServings } from './mealMath';
 import { formatKcal } from '@/lib/macros';
@@ -15,6 +16,7 @@ export function MealsLibrary() {
   const meals = useMealsWithTotals();
   const [query, setQuery] = useState('');
   const [logging, setLogging] = useState<Meal | null>(null);
+  const [scanOpen, setScanOpen] = useState(false);
 
   const filtered = useMemo(() => {
     if (!meals) return [];
@@ -37,6 +39,22 @@ export function MealsLibrary() {
           <div className="text-sm font-medium">Plan meals with AI</div>
           <div className="truncate text-xs text-muted-foreground">
             Turn your ingredients + targets into meal-prep recipes
+          </div>
+        </div>
+      </button>
+
+      <button
+        type="button"
+        onClick={() => setScanOpen(true)}
+        className="flex w-full items-center gap-3 rounded-2xl border border-primary/30 bg-primary/5 px-4 py-3 text-left transition-colors hover:bg-primary/10"
+      >
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/15">
+          <ScanLine className="h-4 w-4 text-primary" />
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="text-sm font-medium">Scan a recipe</div>
+          <div className="truncate text-xs text-muted-foreground">
+            Turn a recipe screenshot into a ready-to-edit meal
           </div>
         </div>
       </button>
@@ -127,6 +145,7 @@ export function MealsLibrary() {
         meal={logging}
         onClose={() => setLogging(null)}
       />
+      <RecipeScanSheet open={scanOpen} onClose={() => setScanOpen(false)} />
     </>
   );
 }
