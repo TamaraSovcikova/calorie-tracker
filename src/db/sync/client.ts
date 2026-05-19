@@ -367,6 +367,8 @@ class SyncEngine {
     const r = row as Record<string, unknown>;
     for (const k of [
       'eat_back_burned',
+      'weekly_budget_enabled',
+      'weekly_budget_floor',
       'fitbit_connected',
       'onboarded',
       'needs_profile',

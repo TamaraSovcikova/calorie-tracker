@@ -22,6 +22,9 @@ CREATE TABLE IF NOT EXISTS profiles (
   primary_macro     TEXT    NOT NULL,
   goal_weight_kg    REAL,
   eat_back_burned   INTEGER NOT NULL,
+  weekly_budget_enabled INTEGER,  -- NULL = off (pre-feature rows)
+  week_start_day        INTEGER,  -- 0=Sun..6=Sat; NULL = Monday
+  weekly_budget_floor   INTEGER,  -- NULL = off
   units             TEXT    NOT NULL,
   theme             TEXT    NOT NULL,
   plan              TEXT    NOT NULL,
@@ -30,6 +33,15 @@ CREATE TABLE IF NOT EXISTS profiles (
   created_at        TEXT    NOT NULL,
   updated_at        TEXT    NOT NULL
 );
+
+-- Migration for databases created before the weekly-budget columns. Run
+-- once on an existing D1; "duplicate column" on re-run is expected/benign.
+--   wrangler d1 execute <db> --remote --command \
+--     "ALTER TABLE profiles ADD COLUMN weekly_budget_enabled INTEGER"
+--   wrangler d1 execute <db> --remote --command \
+--     "ALTER TABLE profiles ADD COLUMN week_start_day INTEGER"
+--   wrangler d1 execute <db> --remote --command \
+--     "ALTER TABLE profiles ADD COLUMN weekly_budget_floor INTEGER"
 
 CREATE TABLE IF NOT EXISTS foods (
   id              TEXT PRIMARY KEY,

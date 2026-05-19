@@ -19,6 +19,9 @@ function buildDefaultProfile(userId: string): Profile {
     // Off by default: the Fitbit/exercise row shows activity calories but
     // doesn't inflate the target. The user can opt in under Goals.
     eat_back_burned: false,
+    weekly_budget_enabled: false,
+    week_start_day: 1, // Monday
+    weekly_budget_floor: false,
     units: 'metric',
     theme: 'system',
     plan: 'free',

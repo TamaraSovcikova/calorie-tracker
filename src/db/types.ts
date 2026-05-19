@@ -59,6 +59,18 @@ export interface Profile {
   units: UnitSystem;
   theme: 'system' | 'light' | 'dark';
 
+  /**
+   * Weekly calorie budget — when on, a day's target is recalculated as the
+   * week's remaining budget split over its remaining days, so going over
+   * (or under) on one day adjusts the rest. Optional: rows synced before
+   * the feature existed read as off / Monday.
+   */
+  weekly_budget_enabled?: boolean;
+  /** Day the budget week starts on: 0 = Sunday … 6 = Saturday. */
+  week_start_day?: number;
+  /** Soft floor — never drop a day's target below ~70% of the daily goal. */
+  weekly_budget_floor?: boolean;
+
   plan: 'free' | 'pro';
   fitbit_connected: boolean;
   onboarded: boolean;

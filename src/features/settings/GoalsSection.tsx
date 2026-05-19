@@ -5,6 +5,7 @@ import { Switch } from '@/components/ui/Switch';
 import { SettingCard } from './SettingCard';
 import { updateProfile } from '@/db/repos/profile';
 import { formatKcal } from '@/lib/macros';
+import { WEEK_DAY_LABELS } from '@/features/weekly-budget/weeklyBudget';
 import type { Profile } from '@/db/types';
 
 interface GoalsSectionProps {
@@ -145,6 +146,43 @@ export function GoalsSection({ profile }: GoalsSectionProps) {
         checked={profile.eat_back_burned}
         onChange={(v) => void updateProfile({ eat_back_burned: v })}
       />
+
+      <Switch
+        label="Weekly calorie budget"
+        description="Recalculate each day's target from the week's remaining budget (your daily goal × 7). Going over one day trims the rest of the week; going under banks calories forward — so overages aren't forgotten."
+        checked={!!profile.weekly_budget_enabled}
+        onChange={(v) => void updateProfile({ weekly_budget_enabled: v })}
+      />
+
+      {profile.weekly_budget_enabled && (
+        <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-3">
+          <label className="block space-y-1">
+            <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Week starts on
+            </span>
+            <Select
+              value={String(profile.week_start_day ?? 1)}
+              onChange={(e) =>
+                void updateProfile({
+                  week_start_day: parseInt(e.target.value, 10),
+                })
+              }
+            >
+              {WEEK_DAY_LABELS.map((label, i) => (
+                <option key={label} value={i}>
+                  {label}
+                </option>
+              ))}
+            </Select>
+          </label>
+          <Switch
+            label="Soft floor"
+            description="Never drop a day's target below 70% of your daily goal. If the week can't fully recover, it simply shows as over budget instead."
+            checked={!!profile.weekly_budget_floor}
+            onChange={(v) => void updateProfile({ weekly_budget_floor: v })}
+          />
+        </div>
+      )}
     </SettingCard>
   );
 }

@@ -36,6 +36,7 @@ import {
 } from '@/db/repos/diary';
 import { useExerciseDay, totalBurned } from '@/db/repos/exercise';
 import { useProfile } from '@/db/repos/profile';
+import { useWeeklyBudget } from '@/features/weekly-budget/weeklyBudget';
 import { MEAL_SECTIONS, type DiaryEntry, type MealSection } from '@/db/types';
 
 export function DiaryPage() {
@@ -46,6 +47,7 @@ export function DiaryPage() {
   const profile = useProfile();
   const entries = useDiaryDay(currentDate);
   const exercise = useExerciseDay(currentDate);
+  const weekly = useWeeklyBudget(currentDate, profile);
 
   // If Fitbit is connected, pulls daily calories burned and upserts an
   // exercise_entry row in the background. No-op when not connected.
@@ -236,7 +238,12 @@ export function DiaryPage() {
           </CoachTip>
         )}
         {profile && (
-          <MacroSummary profile={profile} totals={totals} burnedKcal={burned} />
+          <MacroSummary
+            profile={profile}
+            totals={totals}
+            burnedKcal={burned}
+            weekly={weekly}
+          />
         )}
 
         {loading ? (

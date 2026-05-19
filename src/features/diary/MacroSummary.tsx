@@ -4,7 +4,6 @@ import { MacroRing } from '@/components/MacroRing';
 import { MacroBar } from '@/components/MacroBar';
 import {
   MACRO_LABELS,
-  effectiveKcalTarget,
   formatKcal,
   macroTarget,
   macroValue,
@@ -12,22 +11,30 @@ import {
 } from '@/lib/macros';
 import type { DayTotals } from '@/db/repos/diary';
 import type { Profile } from '@/db/types';
+import type { WeeklyBudget } from '@/features/weekly-budget/weeklyBudget';
 import { cn } from '@/lib/cn';
 
 interface MacroSummaryProps {
   profile: Profile;
   totals: DayTotals;
   burnedKcal?: number;
+  /** When set, the day's target is the weekly-budget-adjusted figure. */
+  weekly?: WeeklyBudget | null;
 }
 
-export function MacroSummary({ profile, totals, burnedKcal = 0 }: MacroSummaryProps) {
+export function MacroSummary({
+  profile,
+  totals,
+  burnedKcal = 0,
+  weekly,
+}: MacroSummaryProps) {
   const [expanded, setExpanded] = useState(false);
 
-  // The headline "Daily target" always shows the fixed base goal so it
-  // never appears to drift. `effective` (base + burned, when eat-back is
-  // on) only drives the remaining/over and the ring fill.
-  const baseTarget = profile.kcal_target;
-  const effective = effectiveKcalTarget(profile, burnedKcal);
+  // With the weekly budget on, the day's target is the recalculated
+  // figure; otherwise it's the plain daily goal. `effective` adds burned
+  // calories on top when eat-back is enabled.
+  const baseTarget = weekly ? weekly.adjustedTarget : profile.kcal_target;
+  const effective = profile.eat_back_burned ? baseTarget + burnedKcal : baseTarget;
   const remaining = Math.max(0, Math.round(effective - totals.kcal));
   const ringValue = pct(totals.kcal, effective);
   const eatBack = profile.eat_back_burned && burnedKcal > 0;
@@ -50,7 +57,7 @@ export function MacroSummary({ profile, totals, burnedKcal = 0 }: MacroSummaryPr
         />
         <div className="min-w-0 flex-1">
           <div className="text-xs uppercase tracking-wide text-muted-foreground">
-            Daily target
+            {weekly ? "Today's target" : 'Daily target'}
           </div>
           <div className="text-lg font-semibold tabular-nums">
             {formatKcal(baseTarget)} kcal
@@ -100,6 +107,25 @@ export function MacroSummary({ profile, totals, burnedKcal = 0 }: MacroSummaryPr
           )}
         />
       </button>
+      {weekly && (
+        <div className="mt-4 space-y-1.5 border-t border-border pt-3">
+          <MacroBar
+            label="This week"
+            value={weekly.weekConsumed}
+            target={weekly.weeklyBudget}
+            colorVar="kcal"
+          />
+          <p className="text-xs text-muted-foreground">
+            {weekly.daysRemaining} day{weekly.daysRemaining === 1 ? '' : 's'} left
+            ·{' '}
+            {weekly.isAdjusted
+              ? weekly.adjustedTarget < weekly.dailyGoal
+                ? `today trimmed to ${formatKcal(weekly.adjustedTarget)} kcal to stay on budget`
+                : `today raised to ${formatKcal(weekly.adjustedTarget)} kcal from banked calories`
+              : `on track — ${formatKcal(weekly.adjustedTarget)} kcal/day`}
+          </p>
+        </div>
+      )}
       {expanded && (
         <div className="mt-4 grid gap-3 border-t border-border pt-4">
           <MacroBar
