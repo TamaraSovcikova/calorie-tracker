@@ -10,6 +10,7 @@ import { currentUserId } from '@/db/userId';
 import { getPet, updatePet } from '@/db/repos/pet';
 import { getProfile } from '@/db/repos/profile';
 import { shiftDate, todayLocal, type LocalDate } from '@/lib/dates';
+import { computeWeeklyBudget } from '@/features/weekly-budget/weeklyBudget';
 import { rollWellbeing, type DayOutcome } from './wellbeing';
 
 /** How that day went: logged at all, hit the goal, or went over. */
@@ -43,7 +44,14 @@ export async function runWellbeingRollForward(): Promise<void> {
   let cursor = shiftDate(pet.wellbeing_evaluated_date, 1);
   // Guard against a wildly stale evaluated_date producing an endless loop.
   for (let guard = 0; cursor <= yesterday && guard < 400; guard++) {
-    outcomes.push(await dayOutcome(cursor, profile.kcal_target));
+    // With the weekly budget on, judge each day against that day's
+    // recalculated target rather than the flat daily goal.
+    const wb = profile.weekly_budget_enabled
+      ? await computeWeeklyBudget(cursor, profile)
+      : null;
+    outcomes.push(
+      await dayOutcome(cursor, wb?.adjustedTarget ?? profile.kcal_target),
+    );
     cursor = shiftDate(cursor, 1);
   }
   if (outcomes.length === 0) return;

@@ -116,53 +116,45 @@ export interface WeeklyBudget {
 }
 
 /**
- * Live weekly-budget computation for the diary day `date`. Returns null
- * when the feature is disabled (so callers fall back to the daily goal).
+ * Weekly-budget computation for the diary day `date`. Returns null when
+ * the feature is disabled (so callers fall back to the daily goal). Async
+ * and hook-free so it can also be used outside React (e.g. the pet's
+ * wellbeing roll-forward).
  */
-export function useWeeklyBudget(
+export async function computeWeeklyBudget(
   date: LocalDate,
   profile: Profile | undefined,
-): WeeklyBudget | null {
-  const enabled = !!profile?.weekly_budget_enabled;
-  const weekStartDay = profile?.week_start_day ?? 1;
-  const dailyGoal = profile?.kcal_target ?? 0;
-  const floor = !!profile?.weekly_budget_floor;
+): Promise<WeeklyBudget | null> {
+  if (!profile?.weekly_budget_enabled) return null;
+  const weekStartDay = profile.week_start_day ?? 1;
+  const dailyGoal = profile.kcal_target ?? 0;
+  const floor = !!profile.weekly_budget_floor;
+  const dates = weekDates(date, weekStartDay);
 
-  const dates = enabled ? weekDates(date, weekStartDay) : [];
-  const first = dates[0];
-  const last = dates[6];
-
-  const perDay = useLiveQuery(async () => {
-    if (!enabled || !first || !last) return null;
-    const uid = currentUserId();
-    const rows = await db.diary_entries
-      .where('[user_id+date]')
-      .between([uid, first], [uid, last], true, true)
-      .filter((e) => !e.deleted_at)
-      .toArray();
-    const byDate = new Map<string, number>();
-    const loggedDates = new Set<string>();
-    for (const e of rows) {
-      byDate.set(e.date, (byDate.get(e.date) ?? 0) + e.kcal);
-      loggedDates.add(e.date);
-    }
-    return {
-      kcal: dates.map((d) => byDate.get(d) ?? 0),
-      logged: dates.map((d) => loggedDates.has(d)),
-    };
-  }, [enabled, first, last]);
-
-  if (!enabled || !perDay) return null;
+  const uid = currentUserId();
+  const rows = await db.diary_entries
+    .where('[user_id+date]')
+    .between([uid, dates[0]], [uid, dates[6]], true, true)
+    .filter((e) => !e.deleted_at)
+    .toArray();
+  const byDate = new Map<string, number>();
+  const loggedDates = new Set<string>();
+  for (const e of rows) {
+    byDate.set(e.date, (byDate.get(e.date) ?? 0) + e.kcal);
+    loggedDates.add(e.date);
+  }
+  const kcal = dates.map((d) => byDate.get(d) ?? 0);
+  const logged = dates.map((d) => loggedDates.has(d));
 
   // Un-logged past days + explicitly-untracked days count as on-target so
   // they don't skew the budget.
   const { effective, missedCount } = effectiveDailyKcal(
     dates,
-    perDay.kcal,
-    perDay.logged,
+    kcal,
+    logged,
     todayLocal(),
     dailyGoal,
-    parseUntrackedDates(profile?.untracked_dates),
+    parseUntrackedDates(profile.untracked_dates),
   );
 
   const dayIndex = Math.max(0, dates.indexOf(date));
@@ -194,4 +186,18 @@ export function useWeeklyBudget(
     weekStart: dates[0],
     weekDates: dates,
   };
+}
+
+/**
+ * Live weekly-budget computation for the diary day `date`. Returns null
+ * when the feature is disabled.
+ */
+export function useWeeklyBudget(
+  date: LocalDate,
+  profile: Profile | undefined,
+): WeeklyBudget | null {
+  return (
+    useLiveQuery(() => computeWeeklyBudget(date, profile), [date, profile]) ??
+    null
+  );
 }
