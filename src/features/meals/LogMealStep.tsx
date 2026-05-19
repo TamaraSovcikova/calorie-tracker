@@ -3,8 +3,14 @@ import { ArrowLeft, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { LabeledInput } from '@/components/ui/Input';
 import { useMealResolved } from './useMealResolved';
-import { multiplyTotals } from './mealMath';
+import { itemToQuantity, multiplyTotals } from './mealMath';
+import { computeMacros } from '@/features/food-search/foodMath';
 import { formatKcal } from '@/lib/macros';
+
+/** Trim a number to at most one decimal, dropping a trailing ".0". */
+function fmtQty(n: number): string {
+  return n.toFixed(1).replace(/\.0$/, '');
+}
 
 interface LogMealStepProps {
   mealId: string;
@@ -105,20 +111,40 @@ export function LogMealStep({
 
         <details className="rounded-xl border border-border bg-card">
           <summary className="cursor-pointer list-none px-4 py-3 text-sm font-medium">
-            Show ingredients
+            Show ingredient breakdown
           </summary>
           <ul className="divide-y divide-border px-4 pb-3 text-sm">
             {resolved.items.map((it) => {
               const food = resolved.foodsById.get(it.food_id);
+              // computeMacros on the stored item gives the WHOLE-batch
+              // contribution; one portion = ÷ servings, this entry = × mult.
+              const batch = food
+                ? computeMacros(food, itemToQuantity(it))
+                : { kcal: 0, protein: 0, carbs: 0, fat: 0 };
+              const factor = mult / resolved.servings;
+              const showBatch = mult !== resolved.servings;
               return (
-                <li key={it.id} className="flex justify-between py-2">
-                  <span className="truncate">{food?.name ?? '(deleted)'}</span>
-                  <span className="text-muted-foreground tabular-nums">
-                    {((it.qty / resolved.servings) * mult)
-                      .toFixed(1)
-                      .replace(/\.0$/, '')}{' '}
-                    {it.unit}
-                  </span>
+                <li key={it.id} className="py-2">
+                  <div className="flex justify-between gap-2">
+                    <span className="truncate font-medium">
+                      {food?.name ?? '(deleted)'}
+                    </span>
+                    <span className="shrink-0 text-muted-foreground tabular-nums">
+                      {fmtQty(it.qty * factor)} {it.unit}
+                    </span>
+                  </div>
+                  <div className="mt-0.5 text-xs text-muted-foreground tabular-nums">
+                    {formatKcal(batch.kcal * factor)} kcal ·{' '}
+                    {Math.round(batch.protein * factor)} P /{' '}
+                    {Math.round(batch.carbs * factor)} C /{' '}
+                    {Math.round(batch.fat * factor)} F
+                  </div>
+                  {showBatch && (
+                    <div className="text-[11px] text-muted-foreground/70 tabular-nums">
+                      whole batch: {fmtQty(it.qty)} {it.unit} ·{' '}
+                      {formatKcal(batch.kcal)} kcal
+                    </div>
+                  )}
                 </li>
               );
             })}
