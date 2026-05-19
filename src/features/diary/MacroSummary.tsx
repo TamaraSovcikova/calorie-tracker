@@ -124,6 +124,13 @@ export function MacroSummary({
                 : `today raised to ${formatKcal(weekly.adjustedTarget)} kcal from banked calories`
               : `on track — ${formatKcal(weekly.adjustedTarget)} kcal/day`}
           </p>
+          {weekly.missedCount > 0 && (
+            <p className="text-[11px] text-muted-foreground/70">
+              {weekly.missedCount} unlogged day
+              {weekly.missedCount === 1 ? '' : 's'} this week counted as
+              on-target.
+            </p>
+          )}
         </div>
       )}
       {expanded && (

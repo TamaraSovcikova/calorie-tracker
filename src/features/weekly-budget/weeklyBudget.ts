@@ -14,7 +14,12 @@ import { addDays } from 'date-fns';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db/dexie';
 import { currentUserId } from '@/db/userId';
-import { fromLocalDate, toLocalDate, type LocalDate } from '@/lib/dates';
+import {
+  fromLocalDate,
+  toLocalDate,
+  todayLocal,
+  type LocalDate,
+} from '@/lib/dates';
 import type { Profile } from '@/db/types';
 
 export const WEEK_DAY_LABELS = [
@@ -44,6 +49,35 @@ export function weekDates(date: LocalDate, weekStartDay: number): LocalDate[] {
   return Array.from({ length: 7 }, (_, i) => toLocalDate(addDays(start, i)));
 }
 
+/**
+ * Resolve each week-day's effective consumption for the budget maths.
+ *
+ * A *past* day with nothing logged at all is treated as a "missed" day and
+ * counted as exactly the daily goal — neither a saving nor an overage.
+ * That keeps an un-logged day neutral (mathematically the same as dropping
+ * it from the budget entirely), so a day you simply forgot to track can't
+ * inflate the rest of the week's targets. Today and future days are always
+ * taken at their actual logged value (today is still in progress).
+ */
+export function effectiveDailyKcal(
+  dates: LocalDate[],
+  kcal: number[],
+  logged: boolean[],
+  today: LocalDate,
+  dailyGoal: number,
+): { effective: number[]; missedCount: number } {
+  let missedCount = 0;
+  const effective = dates.map((d, i) => {
+    const missed = d < today && !logged[i];
+    if (missed) {
+      missedCount += 1;
+      return dailyGoal;
+    }
+    return kcal[i];
+  });
+  return { effective, missedCount };
+}
+
 export interface WeeklyBudget {
   /** Index of `date` within its week (0 = the start day). */
   dayIndex: number;
@@ -59,6 +93,8 @@ export interface WeeklyBudget {
   adjustedTarget: number;
   /** True when the adjusted target differs from the plain daily goal. */
   isAdjusted: boolean;
+  /** Past days this week with nothing logged (counted as on-target). */
+  missedCount: number;
   weekStart: LocalDate;
   weekDates: LocalDate[];
 }
@@ -89,21 +125,35 @@ export function useWeeklyBudget(
       .filter((e) => !e.deleted_at)
       .toArray();
     const byDate = new Map<string, number>();
+    const loggedDates = new Set<string>();
     for (const e of rows) {
       byDate.set(e.date, (byDate.get(e.date) ?? 0) + e.kcal);
+      loggedDates.add(e.date);
     }
-    return dates.map((d) => byDate.get(d) ?? 0);
+    return {
+      kcal: dates.map((d) => byDate.get(d) ?? 0),
+      logged: dates.map((d) => loggedDates.has(d)),
+    };
   }, [enabled, first, last]);
 
   if (!enabled || !perDay) return null;
 
+  // Un-logged past days are counted as on-target so they don't skew things.
+  const { effective, missedCount } = effectiveDailyKcal(
+    dates,
+    perDay.kcal,
+    perDay.logged,
+    todayLocal(),
+    dailyGoal,
+  );
+
   const dayIndex = Math.max(0, dates.indexOf(date));
   const daysRemaining = 7 - dayIndex;
   const weeklyBudget = dailyGoal * 7;
-  const consumedBeforeDay = perDay
+  const consumedBeforeDay = effective
     .slice(0, dayIndex)
     .reduce((a, b) => a + b, 0);
-  const weekConsumed = perDay
+  const weekConsumed = effective
     .slice(0, dayIndex + 1)
     .reduce((a, b) => a + b, 0);
 
@@ -122,6 +172,7 @@ export function useWeeklyBudget(
     weekConsumed,
     adjustedTarget,
     isAdjusted: Math.abs(adjustedTarget - dailyGoal) >= 1,
+    missedCount,
     weekStart: dates[0],
     weekDates: dates,
   };
