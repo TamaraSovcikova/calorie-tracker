@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS profiles (
   weekly_budget_enabled INTEGER,  -- NULL = off (pre-feature rows)
   week_start_day        INTEGER,  -- 0=Sun..6=Sat; NULL = Monday
   weekly_budget_floor   INTEGER,  -- NULL = off
+  untracked_dates       TEXT,     -- JSON array of YYYY-MM-DD; NULL = none
   units             TEXT    NOT NULL,
   theme             TEXT    NOT NULL,
   plan              TEXT    NOT NULL,
@@ -42,6 +43,8 @@ CREATE TABLE IF NOT EXISTS profiles (
 --     "ALTER TABLE profiles ADD COLUMN week_start_day INTEGER"
 --   wrangler d1 execute <db> --remote --command \
 --     "ALTER TABLE profiles ADD COLUMN weekly_budget_floor INTEGER"
+--   wrangler d1 execute <db> --remote --command \
+--     "ALTER TABLE profiles ADD COLUMN untracked_dates TEXT"
 
 CREATE TABLE IF NOT EXISTS foods (
   id              TEXT PRIMARY KEY,

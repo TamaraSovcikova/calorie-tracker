@@ -67,6 +67,7 @@ const COLUMNS: Record<TableName, string[]> = {
     'weekly_budget_enabled',
     'week_start_day',
     'weekly_budget_floor',
+    'untracked_dates',
     'units',
     'theme',
     'plan',

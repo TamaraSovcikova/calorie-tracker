@@ -53,6 +53,8 @@ describe('effectiveDailyKcal', () => {
   ];
   const today = '2026-05-20';
 
+  const none = new Set<string>();
+
   it('counts an un-logged past day as the daily goal', () => {
     const { effective, missedCount } = effectiveDailyKcal(
       dates,
@@ -60,6 +62,7 @@ describe('effectiveDailyKcal', () => {
       [false, true, false, false, false, false, false],
       today,
       2000,
+      none,
     );
     expect(effective[0]).toBe(2000); // Mon — missed, neutralised
     expect(effective[1]).toBe(1800); // Tue — logged, kept
@@ -73,6 +76,7 @@ describe('effectiveDailyKcal', () => {
       [true, true, false, false, false, false, false],
       today,
       2000,
+      none,
     );
     expect(effective[2]).toBe(0); // today, nothing logged yet
     expect(effective[3]).toBe(0); // future day
@@ -86,9 +90,24 @@ describe('effectiveDailyKcal', () => {
       [true, false, false, false, false, false, false],
       today,
       2000,
+      none,
     );
     expect(effective[0]).toBe(400); // logged — a real low day, not erased
     expect(effective[1]).toBe(2000); // un-logged past day
+    expect(missedCount).toBe(1);
+  });
+
+  it('neutralises a day the user explicitly marked untracked', () => {
+    const { effective, missedCount } = effectiveDailyKcal(
+      dates,
+      [400, 2000, 0, 0, 0, 0, 0],
+      [true, true, false, false, false, false, false],
+      today,
+      2000,
+      new Set(['2026-05-18']), // Mon marked untracked despite being logged
+    );
+    expect(effective[0]).toBe(2000); // overridden to on-target
+    expect(effective[1]).toBe(2000); // Tue — logged, kept
     expect(missedCount).toBe(1);
   });
 });

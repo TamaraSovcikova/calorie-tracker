@@ -49,15 +49,30 @@ export function weekDates(date: LocalDate, weekStartDay: number): LocalDate[] {
   return Array.from({ length: 7 }, (_, i) => toLocalDate(addDays(start, i)));
 }
 
+/** Parse the profile's stored JSON array of "untracked" dates. */
+export function parseUntrackedDates(raw: string | undefined): Set<string> {
+  if (!raw) return new Set();
+  try {
+    const arr = JSON.parse(raw) as unknown;
+    return new Set(
+      Array.isArray(arr) ? arr.filter((x): x is string => typeof x === 'string') : [],
+    );
+  } catch {
+    return new Set();
+  }
+}
+
 /**
  * Resolve each week-day's effective consumption for the budget maths.
  *
- * A *past* day with nothing logged at all is treated as a "missed" day and
- * counted as exactly the daily goal — neither a saving nor an overage.
- * That keeps an un-logged day neutral (mathematically the same as dropping
- * it from the budget entirely), so a day you simply forgot to track can't
- * inflate the rest of the week's targets. Today and future days are always
- * taken at their actual logged value (today is still in progress).
+ * A day is treated as "on-target" (counted as exactly the daily goal,
+ * neither a saving nor an overage) when:
+ *  - it is a *past* day with nothing logged at all — a day simply forgotten,
+ *    which would otherwise look like a full day of banked calories; or
+ *  - the user explicitly marked it "untracked" (e.g. a day they only
+ *    half-logged and don't want skewing the week).
+ * Counting it as the goal is mathematically the same as dropping the day
+ * from the budget. Every other day uses its real logged value.
  */
 export function effectiveDailyKcal(
   dates: LocalDate[],
@@ -65,11 +80,12 @@ export function effectiveDailyKcal(
   logged: boolean[],
   today: LocalDate,
   dailyGoal: number,
+  untracked: Set<string>,
 ): { effective: number[]; missedCount: number } {
   let missedCount = 0;
   const effective = dates.map((d, i) => {
-    const missed = d < today && !logged[i];
-    if (missed) {
+    const neutral = untracked.has(d) || (d < today && !logged[i]);
+    if (neutral) {
       missedCount += 1;
       return dailyGoal;
     }
@@ -138,13 +154,15 @@ export function useWeeklyBudget(
 
   if (!enabled || !perDay) return null;
 
-  // Un-logged past days are counted as on-target so they don't skew things.
+  // Un-logged past days + explicitly-untracked days count as on-target so
+  // they don't skew the budget.
   const { effective, missedCount } = effectiveDailyKcal(
     dates,
     perDay.kcal,
     perDay.logged,
     todayLocal(),
     dailyGoal,
+    parseUntrackedDates(profile?.untracked_dates),
   );
 
   const dayIndex = Math.max(0, dates.indexOf(date));

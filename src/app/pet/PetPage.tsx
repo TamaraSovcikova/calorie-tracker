@@ -8,12 +8,18 @@ import { RenamePetSheet } from '@/features/pet/RenamePetSheet';
 import { useDogState } from '@/features/pet/useDogState';
 import { useDailyGreeting } from '@/features/pet/useDailyGreeting';
 import { wellbeingBand } from '@/features/pet/petLogic';
+import { WeeklyBudgetCard } from '@/features/weekly-budget/WeeklyBudgetCard';
+import { useWeeklyBudget } from '@/features/weekly-budget/weeklyBudget';
+import { useProfile } from '@/db/repos/profile';
+import { todayLocal } from '@/lib/dates';
 import { formatKcal } from '@/lib/macros';
 
 export function PetPage() {
   const navigate = useNavigate();
   const greeting = useDailyGreeting();
   const dog = useDogState({ greeting });
+  const profile = useProfile();
+  const weekly = useWeeklyBudget(todayLocal(), profile);
   const [renameOpen, setRenameOpen] = useState(false);
 
   if (!dog.ready) {
@@ -98,6 +104,9 @@ export function PetPage() {
             />
           </div>
         </section>
+
+        {/* Weekly calorie budget — full breakdown lives here. */}
+        {weekly && <WeeklyBudgetCard weekly={weekly} />}
       </div>
 
       <RenamePetSheet

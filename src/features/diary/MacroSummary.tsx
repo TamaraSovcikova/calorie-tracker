@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ChevronDown } from 'lucide-react';
+import { ArrowDown, ArrowUp, ChevronDown } from 'lucide-react';
 import { MacroRing } from '@/components/MacroRing';
 import { MacroBar } from '@/components/MacroBar';
 import {
@@ -36,6 +36,16 @@ export function MacroSummary({
   const baseTarget = weekly ? weekly.adjustedTarget : profile.kcal_target;
   const effective = profile.eat_back_burned ? baseTarget + burnedKcal : baseTarget;
   const remaining = Math.max(0, Math.round(effective - totals.kcal));
+
+  // Tint today's target when the weekly budget has moved it: green when
+  // raised (banked room), amber when trimmed. Full breakdown is on the
+  // Pet page.
+  const targetTone =
+    weekly && weekly.isAdjusted
+      ? weekly.adjustedTarget > weekly.dailyGoal
+        ? 'up'
+        : 'down'
+      : null;
   const ringValue = pct(totals.kcal, effective);
   const eatBack = profile.eat_back_burned && burnedKcal > 0;
   const primary = profile.primary_macro;
@@ -59,7 +69,15 @@ export function MacroSummary({
           <div className="text-xs uppercase tracking-wide text-muted-foreground">
             {weekly ? "Today's target" : 'Daily target'}
           </div>
-          <div className="text-lg font-semibold tabular-nums">
+          <div
+            className={cn(
+              'flex items-center gap-1 text-lg font-semibold tabular-nums',
+              targetTone === 'up' && 'text-primary',
+              targetTone === 'down' && 'text-amber-600 dark:text-amber-400',
+            )}
+          >
+            {targetTone === 'up' && <ArrowUp className="h-4 w-4 shrink-0" />}
+            {targetTone === 'down' && <ArrowDown className="h-4 w-4 shrink-0" />}
             {formatKcal(baseTarget)} kcal
           </div>
           <div className="mt-1 text-sm text-muted-foreground tabular-nums">
@@ -107,32 +125,6 @@ export function MacroSummary({
           )}
         />
       </button>
-      {weekly && (
-        <div className="mt-4 space-y-1.5 border-t border-border pt-3">
-          <MacroBar
-            label="This week"
-            value={weekly.weekConsumed}
-            target={weekly.weeklyBudget}
-            colorVar="kcal"
-          />
-          <p className="text-xs text-muted-foreground">
-            {weekly.daysRemaining} day{weekly.daysRemaining === 1 ? '' : 's'} left
-            ·{' '}
-            {weekly.isAdjusted
-              ? weekly.adjustedTarget < weekly.dailyGoal
-                ? `today trimmed to ${formatKcal(weekly.adjustedTarget)} kcal to stay on budget`
-                : `today raised to ${formatKcal(weekly.adjustedTarget)} kcal from banked calories`
-              : `on track — ${formatKcal(weekly.adjustedTarget)} kcal/day`}
-          </p>
-          {weekly.missedCount > 0 && (
-            <p className="text-[11px] text-muted-foreground/70">
-              {weekly.missedCount} unlogged day
-              {weekly.missedCount === 1 ? '' : 's'} this week counted as
-              on-target.
-            </p>
-          )}
-        </div>
-      )}
       {expanded && (
         <div className="mt-4 grid gap-3 border-t border-border pt-4">
           <MacroBar

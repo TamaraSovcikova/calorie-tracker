@@ -22,6 +22,7 @@ function buildDefaultProfile(userId: string): Profile {
     weekly_budget_enabled: false,
     week_start_day: 1, // Monday
     weekly_budget_floor: false,
+    untracked_dates: '[]',
     units: 'metric',
     theme: 'system',
     plan: 'free',

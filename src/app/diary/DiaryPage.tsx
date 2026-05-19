@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { format } from 'date-fns';
 import {
+  CalendarCheck,
+  CalendarOff,
   ChevronLeft,
   ChevronRight,
   CopyPlus,
@@ -35,8 +37,11 @@ import {
   ZERO_TOTALS,
 } from '@/db/repos/diary';
 import { useExerciseDay, totalBurned } from '@/db/repos/exercise';
-import { useProfile } from '@/db/repos/profile';
-import { useWeeklyBudget } from '@/features/weekly-budget/weeklyBudget';
+import { updateProfile, useProfile } from '@/db/repos/profile';
+import {
+  parseUntrackedDates,
+  useWeeklyBudget,
+} from '@/features/weekly-budget/weeklyBudget';
 import { MEAL_SECTIONS, type DiaryEntry, type MealSection } from '@/db/types';
 
 export function DiaryPage() {
@@ -112,6 +117,18 @@ export function DiaryPage() {
   };
 
   const onToday = isToday(currentDate);
+
+  // "Untracked" days count as on-target for the weekly budget.
+  const untrackedDays = parseUntrackedDates(profile?.untracked_dates);
+  const isUntracked = untrackedDays.has(currentDate);
+  const toggleUntracked = () => {
+    if (!profile) return;
+    const next = new Set(untrackedDays);
+    if (next.has(currentDate)) next.delete(currentDate);
+    else next.add(currentDate);
+    void updateProfile({ untracked_dates: JSON.stringify([...next].sort()) });
+    setMenuOpen(false);
+  };
 
   const loading = entries === undefined;
   const totals = entries ? sumTotals(entries) : ZERO_TOTALS;
@@ -200,6 +217,22 @@ export function DiaryPage() {
                         Build a meal from foods
                       </button>
                     )}
+                    {profile?.weekly_budget_enabled && (
+                      <button
+                        type="button"
+                        onClick={toggleUntracked}
+                        className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-sm hover:bg-muted"
+                      >
+                        {isUntracked ? (
+                          <CalendarCheck className="h-4 w-4 shrink-0 text-muted-foreground" />
+                        ) : (
+                          <CalendarOff className="h-4 w-4 shrink-0 text-muted-foreground" />
+                        )}
+                        {isUntracked
+                          ? 'Mark day as tracked'
+                          : 'Mark day as untracked'}
+                      </button>
+                    )}
                   </div>
                 </>
               )}
@@ -227,6 +260,15 @@ export function DiaryPage() {
             Tap the foods you want, then{' '}
             <span className="font-medium text-foreground">Create meal</span>.
             Meal and quick-add entries can't be used as ingredients.
+          </div>
+        )}
+        {isUntracked && !selectMode && (
+          <div className="flex items-start gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+            <CalendarOff className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            <span>
+              This day is marked untracked — your weekly budget counts it as
+              on-target, not by what's logged here.
+            </span>
           </div>
         )}
         {!selectMode && <DogHero />}

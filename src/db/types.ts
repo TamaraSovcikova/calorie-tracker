@@ -70,6 +70,13 @@ export interface Profile {
   week_start_day?: number;
   /** Soft floor — never drop a day's target below ~70% of the daily goal. */
   weekly_budget_floor?: boolean;
+  /**
+   * JSON array of dates (YYYY-MM-DD) the user marked "untracked" — those
+   * days count as exactly on-target for the weekly budget regardless of
+   * what is (or isn't) logged. Stored as a string so it round-trips
+   * through sync without any JSON transform.
+   */
+  untracked_dates?: string;
 
   plan: 'free' | 'pro';
   fitbit_connected: boolean;
