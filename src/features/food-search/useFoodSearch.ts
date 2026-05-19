@@ -18,13 +18,13 @@ import type { Food } from '@/db/types';
 
 /**
  * Combines:
- *  - recents (the last ~30 foods logged, across all sections)
+ *  - recents (the last ~50 foods logged, across all sections)
  *  - local search across My Products + cached USDA/OFF rows
  *  - live USDA FoodData Central search (generic + branded)
  *  - live Open Food Facts search (rate-limited 10/min, packaged-product DB)
  *
  * Result groups returned to the UI:
- *   recents       — last ~30 foods logged, any section
+ *   recents       — last ~50 foods logged, any section
  *   myProducts    — user's manually-added products (source='custom')
  *   common        — USDA Foundation / SR Legacy / Survey (FNDDS)
  *   packaged      — USDA Branded + OFF (hidden when showPackaged=false)
@@ -92,7 +92,7 @@ export function useFoodSearch(query: string): FoodSearchResult {
   }, [query]);
 
   const recents = useLiveQuery(async () => {
-    const ids = await recentFoods(30);
+    const ids = await recentFoods(50);
     if (ids.length === 0) return [];
     const rows = await db.foods.bulkGet(ids);
     return rows.filter((r): r is Food => !!r && !r.deleted_at);

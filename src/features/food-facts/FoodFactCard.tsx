@@ -23,8 +23,8 @@ export function FoodFactCard() {
   if (!fact) return null;
 
   return createPortal(
-    <div className="pointer-events-none fixed inset-x-0 bottom-40 z-[150] flex justify-center px-4 sm:bottom-24">
-      <div className="pointer-events-auto flex w-full max-w-md animate-slide-up gap-3 rounded-2xl border border-primary/30 bg-primary/5 p-4 shadow-lg">
+    <div className="pointer-events-none fixed inset-x-0 top-[max(env(safe-area-inset-top),0.75rem)] z-[170] flex justify-center px-4">
+      <div className="pointer-events-auto flex w-full max-w-md animate-fade-in gap-3 rounded-2xl border border-primary/40 bg-card p-4 shadow-xl">
         <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/15">
           <Lightbulb className="h-4 w-4 text-primary" />
         </div>

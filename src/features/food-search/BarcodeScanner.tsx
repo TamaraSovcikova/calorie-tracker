@@ -46,6 +46,11 @@ export function BarcodeScanner({ onCode }: BarcodeScannerProps) {
 
   useEffect(() => {
     let cancelled = false;
+    // ZXing fires the decode callback once per frame. Without this guard
+    // it can fire onCode dozens of times for a single barcode (especially
+    // before `controls` is assigned, so `controls.stop()` no-ops) — which
+    // hammered the Open Food Facts rate limit and made lookups fail.
+    let fired = false;
     let controls: IScannerControls | null = null;
     const reader = new BrowserMultiFormatReader(HINTS);
 
@@ -56,9 +61,10 @@ export function BarcodeScanner({ onCode }: BarcodeScannerProps) {
           undefined, // pick default rear camera
           videoRef.current,
           (result: Result | undefined) => {
-            if (!result || cancelled) return;
+            if (!result || cancelled || fired) return;
             const code = result.getText();
             if (code) {
+              fired = true;
               controls?.stop();
               onCode(code);
             }
