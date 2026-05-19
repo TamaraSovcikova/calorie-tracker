@@ -67,7 +67,15 @@ export interface ResolvedMeal {
   unresolvedCount: number;
 }
 
-const ZERO: DayTotals = { kcal: 0, protein: 0, carbs: 0, fat: 0 };
+const ZERO: DayTotals = {
+  kcal: 0,
+  protein: 0,
+  carbs: 0,
+  fat: 0,
+  fiber: 0,
+  sugar: 0,
+  sodium: 0,
+};
 
 // ------------------------------------------------------------- request
 
@@ -224,6 +232,9 @@ function perGram(food: Food | null): DayTotals {
     protein: food.protein_100 / 100,
     carbs: food.carbs_100 / 100,
     fat: food.fat_100 / 100,
+    fiber: (food.fiber_100 ?? 0) / 100,
+    sugar: (food.sugar_100 ?? 0) / 100,
+    sodium: (food.sodium_100 ?? 0) / 100,
   };
 }
 
@@ -234,6 +245,9 @@ function totalsFor(grams: number[], perG: DayTotals[]): DayTotals {
       protein: acc.protein + g * perG[i].protein,
       carbs: acc.carbs + g * perG[i].carbs,
       fat: acc.fat + g * perG[i].fat,
+      fiber: acc.fiber + g * perG[i].fiber,
+      sugar: acc.sugar + g * perG[i].sugar,
+      sodium: acc.sodium + g * perG[i].sodium,
     }),
     { ...ZERO },
   );
@@ -315,6 +329,9 @@ export async function resolveAndFitMeal(
         protein: (macros?.protein ?? 0) / portions,
         carbs: (macros?.carbs ?? 0) / portions,
         fat: (macros?.fat ?? 0) / portions,
+        fiber: (macros?.fiber ?? 0) / portions,
+        sugar: (macros?.sugar ?? 0) / portions,
+        sodium: (macros?.sodium ?? 0) / portions,
       },
     };
   });
@@ -325,6 +342,9 @@ export async function resolveAndFitMeal(
       protein: acc.protein + i.perPortion.protein,
       carbs: acc.carbs + i.perPortion.carbs,
       fat: acc.fat + i.perPortion.fat,
+      fiber: acc.fiber + i.perPortion.fiber,
+      sugar: acc.sugar + i.perPortion.sugar,
+      sodium: acc.sodium + i.perPortion.sodium,
     }),
     { ...ZERO },
   );

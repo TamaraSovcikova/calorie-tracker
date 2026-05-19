@@ -121,6 +121,9 @@ function EditFoodEntryInner({
       protein: macros.protein,
       carbs: macros.carbs,
       fat: macros.fat,
+      fiber: macros.fiber,
+      sugar: macros.sugar,
+      sodium: macros.sodium,
     });
     onClose();
   };
@@ -175,6 +178,9 @@ function EditMealEntryInner({
       protein: totals.protein,
       carbs: totals.carbs,
       fat: totals.fat,
+      fiber: totals.fiber,
+      sugar: totals.sugar,
+      sodium: totals.sodium,
     });
     onClose();
   };

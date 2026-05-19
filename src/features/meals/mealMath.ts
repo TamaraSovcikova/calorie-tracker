@@ -25,7 +25,15 @@ export function computeMealTotals(
   items: MealItem[],
   foodsById: Map<string, Food>,
 ): DayTotals {
-  const totals: DayTotals = { kcal: 0, protein: 0, carbs: 0, fat: 0 };
+  const totals: DayTotals = {
+    kcal: 0,
+    protein: 0,
+    carbs: 0,
+    fat: 0,
+    fiber: 0,
+    sugar: 0,
+    sodium: 0,
+  };
   for (const item of items) {
     const food = foodsById.get(item.food_id);
     if (!food) continue;
@@ -34,6 +42,9 @@ export function computeMealTotals(
     totals.protein += macros.protein;
     totals.carbs += macros.carbs;
     totals.fat += macros.fat;
+    totals.fiber += macros.fiber;
+    totals.sugar += macros.sugar;
+    totals.sodium += macros.sodium;
   }
   return totals;
 }
@@ -44,6 +55,9 @@ export function multiplyTotals(t: DayTotals, factor: number): DayTotals {
     protein: t.protein * factor,
     carbs: t.carbs * factor,
     fat: t.fat * factor,
+    fiber: t.fiber * factor,
+    sugar: t.sugar * factor,
+    sodium: t.sodium * factor,
   };
 }
 

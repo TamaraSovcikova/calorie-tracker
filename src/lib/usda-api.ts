@@ -140,6 +140,9 @@ const NUTRIENT_NUMBER_KCAL = '208';
 const NUTRIENT_NUMBER_PROTEIN = '203';
 const NUTRIENT_NUMBER_CARBS = '205';
 const NUTRIENT_NUMBER_FAT = '204';
+const NUTRIENT_NUMBER_FIBER = '291'; // Fiber, total dietary (g)
+const NUTRIENT_NUMBER_SUGAR = '269'; // Sugars, total (g)
+const NUTRIENT_NUMBER_SODIUM = '307'; // Sodium, Na (mg)
 
 function valueByNutrientNumber(
   nutrients: UsdaNutrient[] | undefined,
@@ -261,6 +264,12 @@ export function usdaHitToFood(hit: UsdaHit): Food | null {
     protein_100: protein,
     carbs_100: carbs,
     fat_100: fat,
+    fiber_100:
+      valueByNutrientNumber(nutrients, NUTRIENT_NUMBER_FIBER) || undefined,
+    sugar_100:
+      valueByNutrientNumber(nutrients, NUTRIENT_NUMBER_SUGAR) || undefined,
+    sodium_100:
+      valueByNutrientNumber(nutrients, NUTRIENT_NUMBER_SODIUM) || undefined,
     serving_g: servingG,
     custom_units: customUnits,
     created_at: now,

@@ -23,6 +23,10 @@ export interface ResolvedMacros {
   protein: number;
   carbs: number;
   fat: number;
+  /** Micronutrients — fibre/sugar in grams, sodium in mg. */
+  fiber: number;
+  sugar: number;
+  sodium: number;
   /** grams of the food consumed at this quantity */
   grams: number;
   /** snake_case unit label for storage on DiaryEntry */
@@ -60,6 +64,9 @@ export function computeMacros(food: Food, state: QuantityState): ResolvedMacros 
     protein: food.protein_100 * factor,
     carbs: food.carbs_100 * factor,
     fat: food.fat_100 * factor,
+    fiber: (food.fiber_100 ?? 0) * factor,
+    sugar: (food.sugar_100 ?? 0) * factor,
+    sodium: (food.sodium_100 ?? 0) * factor,
     grams,
     unit:
       state.mode === 'g'

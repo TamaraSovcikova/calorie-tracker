@@ -101,6 +101,12 @@ export interface Food {
   carbs_100: number;
   fat_100: number;
 
+  /** Per-100g micronutrients — fibre/sugar in grams, sodium in mg.
+   *  Optional: curated and pre-feature rows may not have them. */
+  fiber_100?: number;
+  sugar_100?: number;
+  sodium_100?: number;
+
   serving_g?: number;
   custom_units: CustomUnit[];
 
@@ -161,6 +167,11 @@ export interface DiaryEntry {
   protein: number;
   carbs: number;
   fat: number;
+  /** Snapshot micronutrients — fibre/sugar in grams, sodium in mg.
+   *  Optional: entries logged before the feature existed lack them. */
+  fiber?: number;
+  sugar?: number;
+  sodium?: number;
 
   created_at: ISOTimestamp;
   updated_at: ISOTimestamp;

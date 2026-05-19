@@ -58,6 +58,9 @@ CREATE TABLE IF NOT EXISTS foods (
   protein_100     REAL NOT NULL,
   carbs_100       REAL NOT NULL,
   fat_100         REAL NOT NULL,
+  fiber_100       REAL,           -- g per 100g
+  sugar_100       REAL,           -- g per 100g
+  sodium_100      REAL,           -- mg per 100g
   serving_g       REAL,
   custom_units    TEXT NOT NULL,  -- JSON [{label, grams}]
   favorite        INTEGER,        -- 1 = user-starred; NULL = not (pre-feature)
@@ -73,6 +76,12 @@ CREATE INDEX IF NOT EXISTS foods_updated_at ON foods (updated_at);
 --     "ALTER TABLE foods ADD COLUMN favorite INTEGER"
 --   wrangler d1 execute <db> --remote --command \
 --     "ALTER TABLE foods ADD COLUMN image_url TEXT"
+--   wrangler d1 execute <db> --remote --command \
+--     "ALTER TABLE foods ADD COLUMN fiber_100 REAL"
+--   wrangler d1 execute <db> --remote --command \
+--     "ALTER TABLE foods ADD COLUMN sugar_100 REAL"
+--   wrangler d1 execute <db> --remote --command \
+--     "ALTER TABLE foods ADD COLUMN sodium_100 REAL"
 
 CREATE TABLE IF NOT EXISTS meals (
   id          TEXT PRIMARY KEY,
@@ -121,11 +130,22 @@ CREATE TABLE IF NOT EXISTS diary_entries (
   protein             REAL NOT NULL,
   carbs               REAL NOT NULL,
   fat                 REAL NOT NULL,
+  fiber               REAL,
+  sugar               REAL,
+  sodium              REAL,
   created_at          TEXT NOT NULL,
   updated_at          TEXT NOT NULL,
   deleted_at          TEXT
 );
 CREATE INDEX IF NOT EXISTS diary_entries_date ON diary_entries (date);
+
+-- Migration for databases created before the diary micronutrient columns.
+--   wrangler d1 execute <db> --remote --command \
+--     "ALTER TABLE diary_entries ADD COLUMN fiber REAL"
+--   wrangler d1 execute <db> --remote --command \
+--     "ALTER TABLE diary_entries ADD COLUMN sugar REAL"
+--   wrangler d1 execute <db> --remote --command \
+--     "ALTER TABLE diary_entries ADD COLUMN sodium REAL"
 CREATE INDEX IF NOT EXISTS diary_entries_updated_at ON diary_entries (updated_at);
 
 CREATE TABLE IF NOT EXISTS exercise_entries (

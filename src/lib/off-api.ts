@@ -92,6 +92,18 @@ interface OffNutriments {
   ['proteins_100g']?: number;
   ['carbohydrates_100g']?: number;
   ['fat_100g']?: number;
+  ['fiber_100g']?: number;
+  ['sugars_100g']?: number;
+  ['sodium_100g']?: number; // grams
+  ['salt_100g']?: number; // grams
+}
+
+/** Sodium per 100g in mg, derived from OFF's sodium (g) or salt (g). */
+function sodiumMg100(n: OffNutriments | undefined): number | undefined {
+  if (!n) return undefined;
+  if (typeof n['sodium_100g'] === 'number') return n['sodium_100g'] * 1000;
+  if (typeof n['salt_100g'] === 'number') return (n['salt_100g'] / 2.5) * 1000;
+  return undefined;
 }
 
 interface OffProduct {
@@ -143,6 +155,9 @@ export function offProductToFood(p: OffProduct): Food | null {
     protein_100: p.nutriments?.['proteins_100g'] ?? 0,
     carbs_100: p.nutriments?.['carbohydrates_100g'] ?? 0,
     fat_100: p.nutriments?.['fat_100g'] ?? 0,
+    fiber_100: p.nutriments?.['fiber_100g'],
+    sugar_100: p.nutriments?.['sugars_100g'],
+    sodium_100: sodiumMg100(p.nutriments),
     serving_g: num(p.serving_quantity),
     custom_units: [],
     image_url: p.image_front_small_url?.trim() || undefined,

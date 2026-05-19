@@ -29,7 +29,15 @@ const profile = (over: Partial<Profile> = {}): Profile =>
     ...over,
   }) as Profile;
 
-const totals: DayTotals = { kcal: 1500, protein: 120, carbs: 100, fat: 40 };
+const totals: DayTotals = {
+  kcal: 1500,
+  protein: 120,
+  carbs: 100,
+  fat: 40,
+  fiber: 20,
+  sugar: 35,
+  sodium: 1800,
+};
 
 describe('macroTarget / macroValue', () => {
   it('reads the matching profile target', () => {

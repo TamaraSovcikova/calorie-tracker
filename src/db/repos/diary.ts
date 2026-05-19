@@ -19,6 +19,9 @@ export interface CreateDiaryEntryInput {
   protein: number;
   carbs: number;
   fat: number;
+  fiber: number;
+  sugar: number;
+  sodium: number;
 }
 
 export async function createDiaryEntry(
@@ -107,9 +110,21 @@ export interface DayTotals {
   protein: number;
   carbs: number;
   fat: number;
+  /** Micronutrients — fibre/sugar in grams, sodium in mg. */
+  fiber: number;
+  sugar: number;
+  sodium: number;
 }
 
-export const ZERO_TOTALS: DayTotals = { kcal: 0, protein: 0, carbs: 0, fat: 0 };
+export const ZERO_TOTALS: DayTotals = {
+  kcal: 0,
+  protein: 0,
+  carbs: 0,
+  fat: 0,
+  fiber: 0,
+  sugar: 0,
+  sodium: 0,
+};
 
 export function sumTotals(entries: DiaryEntry[]): DayTotals {
   return entries.reduce<DayTotals>(
@@ -118,6 +133,9 @@ export function sumTotals(entries: DiaryEntry[]): DayTotals {
       protein: acc.protein + e.protein,
       carbs: acc.carbs + e.carbs,
       fat: acc.fat + e.fat,
+      fiber: acc.fiber + (e.fiber ?? 0),
+      sugar: acc.sugar + (e.sugar ?? 0),
+      sodium: acc.sodium + (e.sodium ?? 0),
     }),
     { ...ZERO_TOTALS },
   );

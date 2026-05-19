@@ -68,6 +68,9 @@ export function PhotoFoodStep({ date, section, onDone }: PhotoFoodStepProps) {
           protein: r.macros!.protein,
           carbs: r.macros!.carbs,
           fat: r.macros!.fat,
+          fiber: r.macros!.fiber,
+          sugar: r.macros!.sugar,
+          sodium: r.macros!.sodium,
         });
       }
       toast({

@@ -108,7 +108,8 @@ export function MealEditor({ mode }: MealEditorProps) {
   }, [mode, resolved]);
 
   const totals = useMemo(() => {
-    if (items.length === 0) return { kcal: 0, protein: 0, carbs: 0, fat: 0 };
+    if (items.length === 0)
+      return { kcal: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, sugar: 0, sodium: 0 };
     const foodsById = new Map<string, Food>();
     for (const it of items) if (it.food) foodsById.set(it.food_id, it.food);
     return computeMealTotals(

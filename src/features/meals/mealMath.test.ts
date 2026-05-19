@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Food, MealItem } from '@/db/types';
+import type { DayTotals } from '@/db/repos/diary';
 import {
   computeMealTotals,
   formatServings,
@@ -88,15 +89,35 @@ describe('computeMealTotals', () => {
       protein: 0,
       carbs: 0,
       fat: 0,
+      fiber: 0,
+      sugar: 0,
+      sodium: 0,
     });
   });
+});
+
+/** Build a full DayTotals from a partial, defaulting every field to 0. */
+const dt = (o: Partial<DayTotals>): DayTotals => ({
+  kcal: 0,
+  protein: 0,
+  carbs: 0,
+  fat: 0,
+  fiber: 0,
+  sugar: 0,
+  sodium: 0,
+  ...o,
 });
 
 describe('multiplyTotals', () => {
   it('scales every macro by the factor', () => {
     expect(
-      multiplyTotals({ kcal: 100, protein: 10, carbs: 20, fat: 5 }, 2.5),
-    ).toEqual({ kcal: 250, protein: 25, carbs: 50, fat: 12.5 });
+      multiplyTotals(
+        dt({ kcal: 100, protein: 10, carbs: 20, fat: 5, fiber: 4, sodium: 200 }),
+        2.5,
+      ),
+    ).toEqual(
+      dt({ kcal: 250, protein: 25, carbs: 50, fat: 12.5, fiber: 10, sodium: 500 }),
+    );
   });
 });
 
@@ -117,17 +138,20 @@ describe('getServings', () => {
 describe('perServingTotals', () => {
   it('divides a whole-batch total by the servings count', () => {
     expect(
-      perServingTotals({ kcal: 1000, protein: 50, carbs: 200, fat: 30 }, 5),
-    ).toEqual({ kcal: 200, protein: 10, carbs: 40, fat: 6 });
+      perServingTotals(
+        dt({ kcal: 1000, protein: 50, carbs: 200, fat: 30, sodium: 500 }),
+        5,
+      ),
+    ).toEqual(dt({ kcal: 200, protein: 10, carbs: 40, fat: 6, sodium: 100 }));
   });
 
   it('is a no-op for a single-serving batch', () => {
-    const t = { kcal: 420, protein: 30, carbs: 40, fat: 12 };
+    const t = dt({ kcal: 420, protein: 30, carbs: 40, fat: 12 });
     expect(perServingTotals(t, 1)).toEqual(t);
   });
 
   it('treats a non-positive servings count as 1', () => {
-    const t = { kcal: 420, protein: 30, carbs: 40, fat: 12 };
+    const t = dt({ kcal: 420, protein: 30, carbs: 40, fat: 12 });
     expect(perServingTotals(t, 0)).toEqual(t);
   });
 });

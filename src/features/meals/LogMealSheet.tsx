@@ -63,6 +63,9 @@ function LogMealInner({ meal, onClose }: { meal: Meal; onClose: () => void }) {
       protein: totals.protein,
       carbs: totals.carbs,
       fat: totals.fat,
+      fiber: totals.fiber,
+      sugar: totals.sugar,
+      sodium: totals.sodium,
     });
     toast({
       message: `${meal.name} added to ${MEAL_SECTION_LABELS[section]} · ${formatDayHeader(date)}`,

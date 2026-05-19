@@ -145,6 +145,11 @@ export function MacroSummary({
             target={profile.fat_g}
             colorVar="fat"
           />
+          <div className="flex justify-between gap-2 border-t border-border pt-3 text-xs text-muted-foreground tabular-nums">
+            <span>Fibre {Math.round(totals.fiber)} g</span>
+            <span>Sugar {Math.round(totals.sugar)} g</span>
+            <span>Sodium {Math.round(totals.sodium).toLocaleString()} mg</span>
+          </div>
         </div>
       )}
     </section>

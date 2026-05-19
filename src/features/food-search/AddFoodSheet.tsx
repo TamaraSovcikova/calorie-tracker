@@ -110,6 +110,9 @@ export function AddFoodSheet({ open, onClose, date, section }: AddFoodSheetProps
       protein: v.protein,
       carbs: v.carbs,
       fat: v.fat,
+      fiber: 0,
+      sugar: 0,
+      sodium: 0,
     });
     toast({
       message: `${formatKcal(v.kcal)} kcal added to ${SECTION_LABEL[section]}`,
@@ -134,6 +137,9 @@ export function AddFoodSheet({ open, onClose, date, section }: AddFoodSheetProps
       protein: macros.protein,
       carbs: macros.carbs,
       fat: macros.fat,
+      fiber: macros.fiber,
+      sugar: macros.sugar,
+      sodium: macros.sodium,
     });
     toast({
       message: `${foodName} added to ${SECTION_LABEL[section]}`,
@@ -314,6 +320,9 @@ function MealPortionStep({
       protein: totals.protein,
       carbs: totals.carbs,
       fat: totals.fat,
+      fiber: totals.fiber,
+      sugar: totals.sugar,
+      sodium: totals.sodium,
     });
     toast({
       message: `${meal.name} added to ${SECTION_LABEL[section]}`,
