@@ -26,6 +26,7 @@ import { db } from '@/db/dexie';
 import { lookupBarcode, OffRateLimitError } from '@/lib/off-api';
 import { MealPicker } from '@/features/meals/MealPicker';
 import { LogMealStep } from '@/features/meals/LogMealStep';
+import { PhotoFoodStep } from '@/features/photo-log/PhotoFoodStep';
 import { multiplyTotals } from '@/features/meals/mealMath';
 import { useMealResolved } from '@/features/meals/useMealResolved';
 import type { LocalDate } from '@/lib/dates';
@@ -62,7 +63,7 @@ function rememberedQuantity(
   return state;
 }
 
-type Tab = 'search' | 'scan' | 'meals' | 'quick';
+type Tab = 'search' | 'scan' | 'photo' | 'meals' | 'quick';
 
 const SECTION_LABEL: Record<MealSection, string> = {
   breakfast: 'Breakfast',
@@ -187,6 +188,7 @@ export function AddFoodSheet({ open, onClose, date, section }: AddFoodSheetProps
             options={[
               { value: 'search', label: 'Search' },
               { value: 'scan', label: 'Scan' },
+              { value: 'photo', label: 'Photo' },
               { value: 'meals', label: 'Meals' },
               { value: 'quick', label: 'Quick' },
             ]}
@@ -216,6 +218,9 @@ export function AddFoodSheet({ open, onClose, date, section }: AddFoodSheetProps
               <BarcodeScanner onCode={handleBarcode} />
             </Suspense>
           </>
+        )}
+        {tab === 'photo' && (
+          <PhotoFoodStep date={date} section={section} onDone={handleClose} />
         )}
         {tab === 'meals' && <MealPicker onPick={handlePickMeal} />}
         {tab === 'quick' && <QuickAddForm onSave={handleQuickAdd} />}

@@ -175,7 +175,9 @@ function nameContainsIngredient(food: Food, query: string): boolean {
   return words.every((w) => name.includes(w));
 }
 
-async function lookupIngredientFood(name: string): Promise<Food | null> {
+/** Resolve a free-text food name to a real Food (recents → curated/local
+ *  → USDA), or null. Shared by the meal planner and photo logging. */
+export async function lookupIngredientFood(name: string): Promise<Food | null> {
   const key = name.trim().toLowerCase();
   if (!key) return null;
   const cached = lookupCache.get(key);

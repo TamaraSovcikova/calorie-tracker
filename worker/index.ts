@@ -16,6 +16,7 @@
 import { handleSync } from './sync';
 import { handleFoodFact } from './foodFacts';
 import { handleMealPlan } from './mealPlan';
+import { handlePhotoFood } from './photoFood';
 import { checkRateLimit } from './rateLimit';
 
 export interface Env {
@@ -165,6 +166,21 @@ export default {
           return await handleMealPlan(req, env);
         } catch {
           return jsonResponse({ meals: [], error: 'Planner failed — try again.' });
+        }
+      }
+
+      // /api/photo-food — AI vision: identify foods in a meal photo.
+      if (url.pathname === '/api/photo-food' && req.method === 'POST') {
+        if (!(await checkRateLimit(env, `photo:${userId}`, 12, 60))) {
+          return jsonResponse(
+            { foods: [], error: 'Too many photos in a short time — wait a minute.' },
+            { status: 429 },
+          );
+        }
+        try {
+          return await handlePhotoFood(req, env);
+        } catch {
+          return jsonResponse({ foods: [], error: 'Photo analysis failed — try again.' });
         }
       }
 
