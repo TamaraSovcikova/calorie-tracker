@@ -42,6 +42,7 @@ import {
   parseUntrackedDates,
   useWeeklyBudget,
 } from '@/features/weekly-budget/weeklyBudget';
+import { WeeklyDigestCard } from '@/features/digest/WeeklyDigestCard';
 import { MEAL_SECTIONS, type DiaryEntry, type MealSection } from '@/db/types';
 
 export function DiaryPage() {
@@ -272,6 +273,7 @@ export function DiaryPage() {
           </div>
         )}
         {!selectMode && <DogHero />}
+        {!selectMode && onToday && <WeeklyDigestCard />}
         {!selectMode && (
           <CoachTip id="diary-basics">
             Tap the date above to jump to any day. Use a section's{' '}
