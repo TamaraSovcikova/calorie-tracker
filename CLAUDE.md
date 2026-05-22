@@ -13,7 +13,7 @@ Built-in features: food logging (search / barcode / photo / quick / saved meals)
 - **Backend:** Cloudflare Workers (single worker serves SPA from `./dist` + `/api/*` + `/gh-api/*` proxy), Cloudflare D1 (SQLite), Cloudflare Workers AI (Mistral Small 3.1 vision; Llama 3.1 8B + 8B-fast for text).
 - **External data sources:** Open Food Facts (no key; rate-limited), USDA FoodData Central (bundled free key), Google Health API (via `/gh-api/` proxy with the user's OAuth token).
 - **Hosting:** Cloudflare. Same Worker hosts the static SPA via the assets binding AND the sync + AI endpoints.
-- **Tests:** Vitest. 100 tests across 9 files. No e2e (small private app).
+- **Tests:** Vitest. 107 tests across 9 files. No e2e (small private app).
 
 ## Layout
 
@@ -109,11 +109,11 @@ What's stubbed / known limitations:
 - **AI photo logging + recipe scanning** verified end-to-end via curl with food photos. Success path with arbitrary real-world recipe screenshots untested against many examples.
 - **Manual-entry foods don't capture micronutrients** (only OFF / USDA do). Means user-typed foods log as 0g fibre / sugar / sodium.
 - **`fitbit_tokens` OAuth tokens at rest are plaintext** in D1. Acceptable for private Cloudflare account; flagged in audit.
-- **No e2e tests.** Worker logic verified live + 100 unit tests for pure helpers (mealMath, weeklyBudget, foodMath, macros, tdee, units, petLogic, wellbeing, activityCalories).
+- **No e2e tests.** Worker logic verified live + 107 unit tests for pure helpers (mealMath, weeklyBudget, foodMath, macros, tdee, units, petLogic, wellbeing, activityCalories).
 - **Pet wellbeing's "missed day" still penalises logging discipline.** The weekly budget neutralises missed days; wellbeing does not (intentional - logging is the consistency meter).
 - Some leftover UX-audit items deferred: water tracking, micronutrient targets (not just totals).
 
-Last updated: 2026-05-22 by claude-code. Last shipping commit: `6a1ee2d` ("let users attach a photo to saved meals"); chart-clarity commit `2c5633e` shipped in the same deploy (Version ID `eee2b5cb`).
+Last updated: 2026-05-22 by claude-code. Last shipping commit: `a12a396` ("narrow sleep window and add pet event reactions"), Version ID `c6894eda`. Earlier the same day: meal photos + chart clarity (`6a1ee2d`/`2c5633e`, Version `eee2b5cb`); new dog poses + dev pose tooling (`f664231`/`c926925`, Version `f95165d5`).
 
 ## Project-specific decisions
 
@@ -141,6 +141,10 @@ Last updated: 2026-05-22 by claude-code. Last shipping commit: `6a1ee2d` ("let u
 - **Weights are kg in storage; UI converts at display time** via `profile.units` ('metric' / 'imperial'). Same for serving sizes.
 - **`pruneStaleSearchCache`** runs at boot to drop cached OFF / USDA foods older than 60 days that aren't referenced by any diary entry or saved meal. Custom + curated never pruned.
 - **The pet feature is intentionally not optional.** It IS the user's daily-check-in motivator; removing it would gut the app.
+- **Two pet axes: fullness (moment-to-moment) and wellbeing (long-arc 0-100).** Fullness is derived from today's kcal vs goal in `fullnessState`; over-goal bands are full (+0-5%), stuffed (+5-12%), too_stuffed (+12-25%), overeaten (+25%+). Skeleton is a separate neglect axis (3+ days no logging, `SKELETON_DAYS` in `petLogic.ts`) and is a hard override - it beats sleep, greeting and the low-wellbeing sad pose. Pose priority in `dogPose`: reaction > justAte > skeleton > greeting > sleep (11pm-4am) > sad (wellbeing < 25, unless a fed state) > happy (content + thriving) > fullness.
+- **Pet reactions go through the `petReaction` store, not component state.** `pulseReaction(pose, holdMs, delayMs)` is fired from data-mutation sites (`createDiaryEntry`/`copyDayEntries` -> eating; `RenamePetSheet` -> love) and from `useDogState` fullness-transition detection (happy on reaching goal, surprised on overeating, both delayed past the eating beat). `useDogState` reads the store and feeds it to `dogPose` as the top transient. Only today-dated logs pulse eating (past back-fills don't). Keep the eating-beat duration (`EAT_BEAT_MS`, 2800) in step between `diary.ts` and `useDogState.ts` - they intentionally duplicate the constant to avoid an import cycle (diary repo <-> pet feature).
+- **Dog art pipeline: drop a master PNG in `src/assets/pet/raw/`, run `python3 scripts/process-pet-art.py`** (rembg background-removal + autocrop + 640px webp). Don't hand-place webps. Then add the import + `POSE_SRC` entry in `Dog.tsx`, the union member in `petLogic.ts`'s `DogPose`, a status line in `dogStatusLine`, and (if it should rest rather than roam) add it to `RESTFUL` in `DogPlayground.tsx` and `ALL_POSES` in `devPose.ts`.
+- **Dev-only pet pose override.** `window.__dog` console helpers + an on-screen `DevPosePanel` (Pet page) force any pose for testing. Gated everywhere by `import.meta.env.DEV` (override honoured only in dev in `useDogState`; console installed via a dev-gated dynamic import in `main.tsx`; panel self-guards). Confirmed absent from prod bundles by grepping `dist/`.
 
 ## Project-specific gotchas
 
@@ -195,11 +199,13 @@ Pattern: most tested code is pure (`mealMath`, `weeklyBudget`, etc.). Hooks and 
 
 ## What's currently being worked on
 
-Nothing actively. Last work shipped (2026-05-22):
+Nothing actively. Last work shipped (2026-05-22, newest first):
+- **Pet event reactions + sleep window.** The dog now sleeps only 11pm-4am (was 10pm-6am). New `petReaction` store (`src/features/pet/petReaction.ts`) fires transient animation beats: an eating beat on every today-dated log (pulsed from `createDiaryEntry` + `copyDayEntries` - the single choke point all log paths share, so the long-dead `justAte` path is finally driven), a love beat on rename, and milestone beats (happy on hitting goal, surprised on crossing into overeaten) sequenced ~2.8s after the eating beat via fullness-transition detection in `useDogState`. Reactions are the top pose transient, below only the dev override.
+- **New dog poses + dev pose tooling.** Added `skeleton` (3+ days no logging, hard override), `too_stuffed` (+12-25% over goal) and `overeaten` (+25%+); old `stuffed` repurposed for the gentle +5-12% band (full is now +0-5%). Art runs through `scripts/process-pet-art.py` (raw PNG -> 640px webp). Dev-only pose override (`window.__dog` console + on-screen `DevPosePanel`) for testing every state on localhost; stripped from prod via `import.meta.env.DEV` (verified by a dist grep).
 - **Meal photos.** Users can attach a photo to a saved meal in the MealEditor (reuses `downscaleImage` at 640px -> JPEG data URL stored in the new nullable `meals.image_url` D1 column; synced like any other meal column). Thumbnail shows in MealsLibrary rows. D1 migration `ALTER TABLE meals ADD COLUMN image_url TEXT` applied to remote. NOTE: same "AI macros are never trusted" reasoning does NOT apply here - this is a decorative user photo, not a data source.
 - **"Last N days" chart clarity.** Added a colour legend (green = on target ±10%, orange = over/under, grey = no entries), a dashed daily-target reference line, and a status word in the bar tooltip. Weekday labels moved to their own row so the target line aligns to a clean 96px plot area.
 
-Possible follow-up: meal photo also showing in `LogMealSheet` / `MealPicker` (currently editor + library only).
+Possible follow-ups: meal photo also in `LogMealSheet` / `MealPicker` (currently editor + library only); the happy/surprised milestone beats fire on any fullness transition into full/overeaten, so a goal that drops mid-day (weekly-budget recompute) could trigger one without a log - acceptable but noted.
 
 Open follow-ups noted in `AUDIT_3.md`:
 
