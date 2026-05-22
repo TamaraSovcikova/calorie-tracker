@@ -132,6 +132,9 @@ export interface Meal {
    * this field existed read as 1 via `getServings()`.
    */
   servings?: number;
+  /** User-attached meal photo, stored as a downscaled JPEG data URL.
+   *  Optional: pre-feature rows and meals without a photo read undefined. */
+  image_url?: string;
   created_at: ISOTimestamp;
   updated_at: ISOTimestamp;
   deleted_at?: ISOTimestamp;

@@ -1,13 +1,16 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft,
   Copy,
+  ImagePlus,
   Loader2,
   Plus,
   Save,
   Trash2,
+  X,
 } from 'lucide-react';
+import { downscaleImage } from '@/features/photo-log/photoLog';
 import { Button } from '@/components/ui/Button';
 import { LabeledInput } from '@/components/ui/Input';
 import { Sheet } from '@/components/ui/Sheet';
@@ -50,6 +53,15 @@ function inputToDraft(input: MealItemInput, food: Food | undefined, uiKey: strin
 let _key = 0;
 const nextKey = () => `${Date.now()}-${_key++}`;
 
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
+}
+
 interface MealEditorProps {
   mode: 'create' | 'edit';
 }
@@ -64,9 +76,25 @@ export function MealEditor({ mode }: MealEditorProps) {
   const [notes, setNotes] = useState('');
   const [servings, setServings] = useState(1);
   const [items, setItems] = useState<DraftItem[]>([]);
+  const [imageUrl, setImageUrl] = useState<string | undefined>(undefined);
+  const [imageBusy, setImageBusy] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+
+  const handlePickPhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // allow re-picking the same file
+    if (!file) return;
+    setImageBusy(true);
+    try {
+      const small = await downscaleImage(file, 640);
+      setImageUrl(await blobToDataUrl(small));
+    } finally {
+      setImageBusy(false);
+    }
+  };
 
   // Create mode: hydrate from diary entries passed in via router state
   // (the "build a meal from selected foods" shortcut on the diary).
@@ -108,6 +136,7 @@ export function MealEditor({ mode }: MealEditorProps) {
     setName(resolved.meal.name);
     setNotes(resolved.meal.notes ?? '');
     setServings(getServings(resolved.meal));
+    setImageUrl(resolved.meal.image_url ?? undefined);
     setItems(
       resolved.items.map((it) =>
         inputToDraft(
@@ -170,12 +199,15 @@ export function MealEditor({ mode }: MealEditorProps) {
           name: trimmed,
           notes: notes.trim() || undefined,
           servings: safeServings,
+          image_url: imageUrl,
           items: itemInputs,
         });
       } else if (id) {
         await updateMeal(id, {
           name: trimmed,
           notes: notes.trim() || undefined,
+          // undefined clears the column in Dexie (photo removed).
+          image_url: imageUrl,
           servings: safeServings,
         });
         await replaceMealItems(id, itemInputs);
@@ -262,6 +294,59 @@ export function MealEditor({ mode }: MealEditorProps) {
           onChange={(e) => setName(e.target.value)}
           autoFocus={mode === 'create'}
         />
+
+        <div className="space-y-1">
+          <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            Photo (optional)
+          </span>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handlePickPhoto}
+          />
+          {imageUrl ? (
+            <div className="relative overflow-hidden rounded-xl border border-border">
+              <img src={imageUrl} alt="" className="h-40 w-full object-cover" />
+              <div className="absolute right-2 top-2 flex gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="rounded-full bg-background/90 p-2 text-foreground shadow-sm hover:bg-background"
+                  aria-label="Replace photo"
+                >
+                  <ImagePlus className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setImageUrl(undefined)}
+                  className="rounded-full bg-background/90 p-2 text-destructive shadow-sm hover:bg-background"
+                  aria-label="Remove photo"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={imageBusy}
+              className="flex h-24 w-full flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-border text-sm text-muted-foreground hover:bg-muted/40 disabled:opacity-60"
+            >
+              {imageBusy ? (
+                <Loader2 className="h-5 w-5 animate-spin" />
+              ) : (
+                <>
+                  <ImagePlus className="h-5 w-5" />
+                  Add a photo
+                </>
+              )}
+            </button>
+          )}
+        </div>
+
         <label className="block space-y-1">
           <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
             Notes / method (optional)

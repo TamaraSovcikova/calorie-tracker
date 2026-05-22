@@ -104,28 +104,42 @@ export function MealsLibrary() {
               <button
                 type="button"
                 onClick={() => setLogging(meal)}
-                className="min-w-0 flex-1 rounded-l-2xl px-4 py-3 text-left hover:bg-muted/40 active:scale-[0.99] transition-transform"
+                className="flex min-w-0 flex-1 items-center gap-3 rounded-l-2xl px-4 py-3 text-left hover:bg-muted/40 active:scale-[0.99] transition-transform"
               >
-                <div className="truncate text-sm font-medium">{meal.name}</div>
-                <div className="mt-0.5 truncate text-xs text-muted-foreground tabular-nums">
-                  {itemCount} {itemCount === 1 ? 'item' : 'items'}
-                  <span className="mx-1.5">·</span>
-                  <span className="font-medium text-foreground">
-                    {formatKcal(totals.kcal)}
-                  </span>{' '}
-                  kcal{servings > 1 ? '/portion' : ''}
-                  {servings > 1 && (
-                    <>
-                      <span className="mx-1.5">·</span>
-                      makes {formatServings(servings)}
-                    </>
-                  )}
-                </div>
-                {meal.notes && (
-                  <div className="mt-0.5 truncate text-xs text-muted-foreground">
-                    {meal.notes}
+                {meal.image_url ? (
+                  <img
+                    src={meal.image_url}
+                    alt=""
+                    loading="lazy"
+                    className="h-11 w-11 shrink-0 rounded-lg bg-muted object-cover"
+                  />
+                ) : (
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-muted">
+                    <ChefHat className="h-5 w-5 text-muted-foreground" />
                   </div>
                 )}
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm font-medium">{meal.name}</div>
+                  <div className="mt-0.5 truncate text-xs text-muted-foreground tabular-nums">
+                    {itemCount} {itemCount === 1 ? 'item' : 'items'}
+                    <span className="mx-1.5">·</span>
+                    <span className="font-medium text-foreground">
+                      {formatKcal(totals.kcal)}
+                    </span>{' '}
+                    kcal{servings > 1 ? '/portion' : ''}
+                    {servings > 1 && (
+                      <>
+                        <span className="mx-1.5">·</span>
+                        makes {formatServings(servings)}
+                      </>
+                    )}
+                  </div>
+                  {meal.notes && (
+                    <div className="mt-0.5 truncate text-xs text-muted-foreground">
+                      {meal.notes}
+                    </div>
+                  )}
+                </div>
               </button>
               <button
                 type="button"

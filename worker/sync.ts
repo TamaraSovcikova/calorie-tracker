@@ -105,6 +105,7 @@ const COLUMNS: Record<TableName, string[]> = {
     'name',
     'notes',
     'servings',
+    'image_url',
     'created_at',
     'updated_at',
     'deleted_at',

@@ -15,6 +15,8 @@ export interface CreateMealInput {
   notes?: string;
   /** How many portions the batch makes (defaults to 1). */
   servings?: number;
+  /** Downscaled JPEG data URL for the meal photo (optional). */
+  image_url?: string;
   items: MealItemInput[];
 }
 
@@ -33,6 +35,7 @@ export async function createMeal(input: CreateMealInput): Promise<Meal> {
     name: input.name,
     notes: input.notes,
     servings: normaliseServings(input.servings),
+    image_url: input.image_url,
     created_at: now,
     updated_at: now,
   };
@@ -88,6 +91,7 @@ export async function duplicateMeal(id: string): Promise<Meal | undefined> {
     name: `Copy of ${original.name}`,
     notes: original.notes,
     servings: original.servings,
+    image_url: original.image_url,
     items: items.map((it) => ({ food_id: it.food_id, qty: it.qty, unit: it.unit })),
   });
 }
