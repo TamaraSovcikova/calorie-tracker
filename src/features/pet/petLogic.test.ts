@@ -36,12 +36,22 @@ describe('fullnessState', () => {
     expect(fullnessState(0, 0, at('13:00'))).toBe('content');
   });
 
-  it('is stuffed when well over the goal', () => {
-    expect(fullnessState(2300, 2000, at('20:00'))).toBe('stuffed');
-  });
-
   it('is full when the goal is essentially met', () => {
     expect(fullnessState(2000, 2000, at('19:00'))).toBe('full');
+  });
+
+  it('steps through the over-goal bands', () => {
+    // full up to +5%, then stuffed, too_stuffed, overeaten
+    expect(fullnessState(2040, 2000, at('20:00'))).toBe('full'); // +2%
+    expect(fullnessState(2150, 2000, at('20:00'))).toBe('stuffed'); // +7.5%
+    expect(fullnessState(2300, 2000, at('20:00'))).toBe('too_stuffed'); // +15%
+    expect(fullnessState(2600, 2000, at('20:00'))).toBe('overeaten'); // +30%
+  });
+
+  it('places the band boundaries on the lower edge', () => {
+    expect(fullnessState(2100, 2000, at('20:00'))).toBe('stuffed'); // exactly +5%
+    expect(fullnessState(2240, 2000, at('20:00'))).toBe('too_stuffed'); // exactly +12%
+    expect(fullnessState(2500, 2000, at('20:00'))).toBe('overeaten'); // exactly +25%
   });
 
   it('is hungry mid-afternoon with little logged', () => {
@@ -90,15 +100,67 @@ describe('dogPose', () => {
     expect(dogPose({ ...base, fullness: 'stuffed', wellbeing: 10 })).toBe('stuffed');
   });
 
+  it('shows the over-full pose (not sad) despite low wellbeing', () => {
+    expect(dogPose({ ...base, fullness: 'too_stuffed', wellbeing: 10 })).toBe(
+      'too_stuffed',
+    );
+    expect(dogPose({ ...base, fullness: 'overeaten', wellbeing: 10 })).toBe(
+      'overeaten',
+    );
+  });
+
   it('is happy when content and thriving', () => {
     expect(dogPose({ ...base, fullness: 'content', wellbeing: 90 })).toBe('happy');
   });
 
   it('falls through to the fullness state otherwise', () => {
-    const states: FullnessState[] = ['hungry', 'peckish', 'content', 'full', 'stuffed'];
+    const states: FullnessState[] = [
+      'hungry',
+      'peckish',
+      'content',
+      'full',
+      'stuffed',
+      'too_stuffed',
+      'overeaten',
+    ];
     for (const f of states) {
       expect(dogPose({ ...base, fullness: f })).toBe(f);
     }
+  });
+
+  describe('skeleton (neglect) override', () => {
+    it('shows the skeleton after 3+ days without logging', () => {
+      expect(dogPose({ ...base, fullness: 'hungry', daysSinceLastLog: 3 })).toBe(
+        'skeleton',
+      );
+      expect(dogPose({ ...base, fullness: 'content', daysSinceLastLog: 9 })).toBe(
+        'skeleton',
+      );
+    });
+
+    it('does not show before the 3-day threshold', () => {
+      expect(dogPose({ ...base, fullness: 'hungry', daysSinceLastLog: 2 })).toBe(
+        'hungry',
+      );
+    });
+
+    it('hard-overrides night sleep, greeting and sad', () => {
+      expect(
+        dogPose({ fullness: 'hungry', wellbeing: 60, now: at('03:00'), daysSinceLastLog: 4 }),
+      ).toBe('skeleton');
+      expect(
+        dogPose({ ...base, fullness: 'hungry', greeting: true, daysSinceLastLog: 4 }),
+      ).toBe('skeleton');
+      expect(
+        dogPose({ ...base, fullness: 'hungry', wellbeing: 5, daysSinceLastLog: 4 }),
+      ).toBe('skeleton');
+    });
+
+    it('yields to a fresh log (eating wins, and logging resets the count)', () => {
+      expect(
+        dogPose({ ...base, fullness: 'content', justAte: true, daysSinceLastLog: 5 }),
+      ).toBe('eating');
+    });
   });
 });
 

@@ -6,7 +6,14 @@
  * "Wellbeing" is the long-arc 0-100 score (see wellbeing.ts).
  */
 
-export type FullnessState = 'hungry' | 'peckish' | 'content' | 'full' | 'stuffed';
+export type FullnessState =
+  | 'hungry'
+  | 'peckish'
+  | 'content'
+  | 'full'
+  | 'stuffed'
+  | 'too_stuffed'
+  | 'overeaten';
 
 export type DogPose =
   | 'hungry'
@@ -14,6 +21,9 @@ export type DogPose =
   | 'content'
   | 'full'
   | 'stuffed'
+  | 'too_stuffed'
+  | 'overeaten'
+  | 'skeleton'
   | 'eating'
   | 'happy'
   | 'sad'
@@ -62,8 +72,15 @@ export function expectedIntakeFraction(now: Date): number {
 
 /**
  * The dog's fullness given calories logged so far today. Hitting the goal
- * makes him full; well over it, stuffed; otherwise it's how the logged
- * total compares with what's expected for the time of day.
+ * makes him full; over it, progressively less comfortable (stuffed ->
+ * too_stuffed -> overeaten); otherwise it's how the logged total compares
+ * with what's expected for the time of day.
+ *
+ * Over-goal bands (goalRatio = logged / goal):
+ *   0.98 - 1.05  full        (on target, happy)
+ *   1.05 - 1.12  stuffed     (slightly over, comfortably full)
+ *   1.12 - 1.25  too_stuffed (over by a fair bit, not happy)
+ *   >= 1.25      overeaten   (well over, stuffed and unwell)
  */
 export function fullnessState(
   loggedKcal: number,
@@ -72,7 +89,9 @@ export function fullnessState(
 ): FullnessState {
   if (goalKcal <= 0) return 'content';
   const goalRatio = loggedKcal / goalKcal;
-  if (goalRatio > 1.1) return 'stuffed';
+  if (goalRatio >= 1.25) return 'overeaten';
+  if (goalRatio >= 1.12) return 'too_stuffed';
+  if (goalRatio >= 1.05) return 'stuffed';
   if (goalRatio >= 0.98) return 'full';
 
   const expectedKcal = goalKcal * expectedIntakeFraction(now);
@@ -88,29 +107,56 @@ export interface DogPoseInput {
   fullness: FullnessState;
   wellbeing: number;
   now: Date;
+  /**
+   * Whole days since the user last logged anything (0 = logged today).
+   * 3 or more triggers the neglected "skeleton" pose. Undefined treated
+   * as 0 (e.g. a brand-new user who has never logged - no guilt-trip).
+   */
+  daysSinceLastLog?: number;
   /** Transient: the user just logged food. */
   justAte?: boolean;
   /** Transient: the app was just opened (home-screen greeting). */
   greeting?: boolean;
 }
 
+/** Days of no logging at all before the dog shows the skeleton pose. */
+export const SKELETON_DAYS = 3;
+
+/** Fullness states that count as "fed" - they suppress the sad pose. */
+const FED_STATES: ReadonlySet<FullnessState> = new Set<FullnessState>([
+  'full',
+  'stuffed',
+  'too_stuffed',
+  'overeaten',
+]);
+
 /**
- * Which pose/animation the dog shows right now. Transients (eating,
- * greeting) win; then night-time sleep; then a sad override for very low
- * wellbeing; otherwise the fullness state, brightened to "happy" when the
- * dog is both content and thriving.
+ * Which pose/animation the dog shows right now. A fresh log (eating) wins
+ * outright. Then prolonged neglect is a hard override - the skeleton shows
+ * day or night until the user logs again. Otherwise: greeting transient,
+ * night-time sleep, a sad override for very low wellbeing, then the
+ * fullness state, brightened to "happy" when content and thriving.
  */
 export function dogPose(input: DogPoseInput): DogPose {
   const { fullness, wellbeing, now, justAte, greeting } = input;
+  const daysSinceLastLog = input.daysSinceLastLog ?? 0;
+
+  // A fresh log always wins (and, by definition, resets the neglect count).
   if (justAte) return 'eating';
+
+  // Prolonged neglect is a hard override: ignores sleep, greeting and sad
+  // until the user logs something.
+  if (daysSinceLastLog >= SKELETON_DAYS) return 'skeleton';
+
   if (greeting) return 'greeting';
 
   const h = now.getHours();
   if (h >= 22 || h < 6) return 'sleeping';
 
-  // Very low wellbeing reads as sad — unless he's well-fed right now, in
-  // which case the fed pose wins (a stuffed dog still looks comfy).
-  if (wellbeing < 25 && fullness !== 'full' && fullness !== 'stuffed') {
+  // Very low wellbeing reads as sad - unless he's fed right now, in which
+  // case the fullness pose wins (it already conveys today's state, whether
+  // comfy or over-full).
+  if (wellbeing < 25 && !FED_STATES.has(fullness)) {
     return 'sad';
   }
   if (fullness === 'content' && wellbeing >= 80) return 'happy';
@@ -129,21 +175,27 @@ export function wellbeingBand(score: number): WellbeingBand {
 export function dogStatusLine(pose: DogPose, name: string): string {
   switch (pose) {
     case 'hungry':
-      return `${name} is hungry — time to log a meal.`;
+      return `${name} is hungry - time to log a meal.`;
     case 'peckish':
       return `${name} is getting peckish.`;
     case 'eating':
       return `${name} is tucking in!`;
     case 'happy':
-      return `${name} is delighted — right on track.`;
+      return `${name} is delighted - right on track.`;
     case 'content':
       return `${name} is content.`;
     case 'full':
       return `${name} is full and happy.`;
     case 'stuffed':
       return `${name} is comfortably stuffed.`;
+    case 'too_stuffed':
+      return `${name} is too stuffed - that was a bit much.`;
+    case 'overeaten':
+      return `${name} overdid it and feels stuffed and queasy.`;
+    case 'skeleton':
+      return `${name} feels forgotten - log something to bring them back.`;
     case 'sad':
-      return `${name} could use some care — log something today.`;
+      return `${name} could use some care - log something today.`;
     case 'sleeping':
       return `${name} is fast asleep.`;
     case 'greeting':

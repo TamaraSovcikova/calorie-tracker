@@ -22,7 +22,16 @@ const AIR_FRICTION = 0.992;
 const THROW_CAP = 34;
 const WALK_SPEED = 1.45; // px/frame at 60fps — a calm stroll
 
-const RESTFUL = new Set<DogPose>(['full', 'stuffed', 'sleeping', 'sad', 'eating']);
+const RESTFUL = new Set<DogPose>([
+  'full',
+  'stuffed',
+  'too_stuffed',
+  'overeaten',
+  'skeleton',
+  'sleeping',
+  'sad',
+  'eating',
+]);
 
 /** Transient expression/action poses the dog flashes between behaviours. */
 const BEAT_POSES: DogPose[] = [

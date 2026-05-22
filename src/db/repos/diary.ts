@@ -105,6 +105,29 @@ export function useDiaryDay(date: LocalDate): DiaryEntry[] | undefined {
   );
 }
 
+/**
+ * The most recent date (YYYY-MM-DD) on which anything was logged, or
+ * undefined if the user has never logged. Walks the [user_id+date] index
+ * in reverse, skipping soft-deleted-only days. Used by the pet's neglect
+ * ("skeleton") state.
+ */
+export async function lastLoggedDate(): Promise<LocalDate | undefined> {
+  const userId = currentUserId();
+  // Reverse index walk; .first() stops at the most recent live entry.
+  const row = await db.diary_entries
+    .where('[user_id+date]')
+    .between([userId, '0000-00-00'], [userId, '9999-99-99'])
+    .reverse()
+    .filter((e) => !e.deleted_at)
+    .first();
+  return row?.date;
+}
+
+/** Live version of {@link lastLoggedDate}. */
+export function useLastLoggedDate(): LocalDate | undefined {
+  return useLiveQuery(() => lastLoggedDate(), []);
+}
+
 export interface DayTotals {
   kcal: number;
   protein: number;

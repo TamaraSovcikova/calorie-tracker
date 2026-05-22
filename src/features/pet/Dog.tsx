@@ -11,6 +11,9 @@ import sadUrl from '@/assets/pet/dog-sad.webp';
 import sleepingUrl from '@/assets/pet/dog-sleeping.webp';
 import stretchingUrl from '@/assets/pet/dog-stretching.webp';
 import stuffedUrl from '@/assets/pet/dog-stuffed.webp';
+import tooStuffedUrl from '@/assets/pet/dog-too-stuffed.webp';
+import overeatenUrl from '@/assets/pet/dog-overeaten.webp';
+import skeletonUrl from '@/assets/pet/dog-skeleton.webp';
 import boredUrl from '@/assets/pet/dog-bored.webp';
 import curiousUrl from '@/assets/pet/dog-curious.webp';
 import loveUrl from '@/assets/pet/dog-love.webp';
@@ -24,6 +27,9 @@ const POSE_SRC: Record<DogPose, string> = {
   content: contentUrl,
   full: fullUrl,
   stuffed: stuffedUrl,
+  too_stuffed: tooStuffedUrl,
+  overeaten: overeatenUrl,
+  skeleton: skeletonUrl,
   eating: eatingUrl,
   happy: happyUrl,
   sad: sadUrl,
