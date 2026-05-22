@@ -2,9 +2,13 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { v4 as uuid } from 'uuid';
 import { db } from '../dexie';
 import { currentUserId } from '../userId';
-import type { LocalDate } from '@/lib/dates';
+import { todayLocal, type LocalDate } from '@/lib/dates';
 import type { DiaryEntry, MealSection } from '../types';
 import { MEAL_SECTIONS } from '../types';
+import { pulseReaction } from '@/features/pet/petReaction';
+
+/** Eating-beat length after a log (ms). Kept in step with useDogState. */
+const EAT_BEAT_MS = 2800;
 
 export interface CreateDiaryEntryInput {
   date: LocalDate;
@@ -36,6 +40,8 @@ export async function createDiaryEntry(
     ...input,
   };
   await db.diary_entries.put(entry);
+  // Today's logs make the dog tuck in. Past-date back-fills don't.
+  if (entry.date === todayLocal()) pulseReaction('eating', EAT_BEAT_MS);
   return entry;
 }
 
@@ -89,6 +95,7 @@ export async function copyDayEntries(
     deleted_at: undefined,
   }));
   await db.diary_entries.bulkPut(copies);
+  if (to === todayLocal()) pulseReaction('eating', EAT_BEAT_MS);
   return copies.length;
 }
 

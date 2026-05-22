@@ -113,6 +113,11 @@ export interface DogPoseInput {
    * as 0 (e.g. a brand-new user who has never logged - no guilt-trip).
    */
   daysSinceLastLog?: number;
+  /**
+   * Transient: an active event reaction (eating after a log, love after a
+   * rename, etc.). Wins over everything except a dev-forced pose.
+   */
+  reaction?: DogPose;
   /** Transient: the user just logged food. */
   justAte?: boolean;
   /** Transient: the app was just opened (home-screen greeting). */
@@ -131,15 +136,19 @@ const FED_STATES: ReadonlySet<FullnessState> = new Set<FullnessState>([
 ]);
 
 /**
- * Which pose/animation the dog shows right now. A fresh log (eating) wins
- * outright. Then prolonged neglect is a hard override - the skeleton shows
- * day or night until the user logs again. Otherwise: greeting transient,
+ * Which pose/animation the dog shows right now. An active event reaction
+ * (eating after a log, etc.) wins outright, then a fresh-log shorthand.
+ * Then prolonged neglect is a hard override - the skeleton shows day or
+ * night until the user logs again. Otherwise: greeting transient,
  * night-time sleep, a sad override for very low wellbeing, then the
  * fullness state, brightened to "happy" when content and thriving.
  */
 export function dogPose(input: DogPoseInput): DogPose {
-  const { fullness, wellbeing, now, justAte, greeting } = input;
+  const { fullness, wellbeing, now, reaction, justAte, greeting } = input;
   const daysSinceLastLog = input.daysSinceLastLog ?? 0;
+
+  // A live event reaction is the top transient.
+  if (reaction) return reaction;
 
   // A fresh log always wins (and, by definition, resets the neglect count).
   if (justAte) return 'eating';
@@ -150,8 +159,9 @@ export function dogPose(input: DogPoseInput): DogPose {
 
   if (greeting) return 'greeting';
 
+  // The dog sleeps in the small hours (11pm - 4am).
   const h = now.getHours();
-  if (h >= 22 || h < 6) return 'sleeping';
+  if (h >= 23 || h < 4) return 'sleeping';
 
   // Very low wellbeing reads as sad - unless he's fed right now, in which
   // case the fullness pose wins (it already conveys today's state, whether

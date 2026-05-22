@@ -83,13 +83,33 @@ describe('dogPose', () => {
     expect(dogPose({ ...base, fullness: 'hungry', greeting: true })).toBe('greeting');
   });
 
-  it('sleeps at night', () => {
+  it('sleeps only in the small hours (11pm - 4am)', () => {
     expect(dogPose({ fullness: 'content', wellbeing: 60, now: at('23:30') })).toBe(
       'sleeping',
     );
     expect(dogPose({ fullness: 'hungry', wellbeing: 60, now: at('03:00') })).toBe(
       'sleeping',
     );
+    // Awake again at the edges of the old, wider window.
+    expect(dogPose({ fullness: 'content', wellbeing: 60, now: at('22:30') })).toBe(
+      'content',
+    );
+    expect(dogPose({ fullness: 'content', wellbeing: 60, now: at('04:30') })).toBe(
+      'content',
+    );
+  });
+
+  it('shows an active reaction over everything (except a dev override)', () => {
+    expect(
+      dogPose({
+        ...base,
+        fullness: 'hungry',
+        reaction: 'love',
+        greeting: true,
+        daysSinceLastLog: 9,
+        now: at('23:30'),
+      }),
+    ).toBe('love');
   });
 
   it('looks sad on very low wellbeing', () => {

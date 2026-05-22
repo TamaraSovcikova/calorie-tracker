@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/Button';
 import { LabeledInput } from '@/components/ui/Input';
 import { toast } from '@/components/ui/toast';
 import { renamePet } from '@/db/repos/pet';
+import { pulseReaction } from './petReaction';
 
 interface RenamePetSheetProps {
   open: boolean;
@@ -38,6 +39,7 @@ function RenameForm({
     const trimmed = name.trim();
     if (!trimmed) return;
     await renamePet(trimmed);
+    pulseReaction('love', 3000);
     toast({ message: `Your dog is now ${trimmed}`, variant: 'success' });
     onClose();
   };

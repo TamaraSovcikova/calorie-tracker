@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { differenceInCalendarDays } from 'date-fns';
 import { useProfile } from '@/db/repos/profile';
 import { usePet } from '@/db/repos/pet';
@@ -17,6 +18,10 @@ import {
   type FullnessState,
 } from './petLogic';
 import { useDevPoseStore } from './devPose';
+import { pulseReaction, usePetReaction } from './petReaction';
+
+/** How long the eating beat plays after a log (ms). */
+const EAT_BEAT_MS = 2800;
 
 export interface DogState {
   pose: DogPose;
@@ -64,11 +69,35 @@ export function useDogState(opts: DogStateOptions = {}): DogState {
     : 0;
 
   const fullness = fullnessState(totals.kcal, goalKcal, now);
+  const ready = !!profile && !!pet && entries !== undefined;
+
+  // Celebrate / react to fullness milestones as they happen. The reaction
+  // is delayed past the eating beat so a log shows: eat -> then the cheer
+  // or the "whoa, that's a lot". Only fires on a genuine change once the
+  // data has settled, never on the initial load.
+  const prevFullness = useRef<FullnessState | null>(null);
+  useEffect(() => {
+    if (!ready) return;
+    const prev = prevFullness.current;
+    prevFullness.current = fullness;
+    if (prev === null || prev === fullness) return;
+    if (fullness === 'overeaten') {
+      pulseReaction('surprised', 2400, EAT_BEAT_MS);
+    } else if (fullness === 'full') {
+      pulseReaction('happy', 2600, EAT_BEAT_MS);
+    }
+  }, [ready, fullness]);
+
+  // An active event reaction (eating after a log, love after a rename, the
+  // milestone beats above) is the top transient.
+  const reaction = usePetReaction((s) => s.reaction) ?? undefined;
+
   const livePose = dogPose({
     fullness,
     wellbeing,
     now,
     daysSinceLastLog,
+    reaction,
     justAte: opts.justAte,
     greeting: opts.greeting,
   });
@@ -87,6 +116,6 @@ export function useDogState(opts: DogStateOptions = {}): DogState {
     loggedKcal: totals.kcal,
     goalKcal,
     statusLine: dogStatusLine(pose, petName),
-    ready: !!profile && !!pet && entries !== undefined,
+    ready,
   };
 }
