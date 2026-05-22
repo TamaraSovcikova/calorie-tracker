@@ -4,6 +4,7 @@ import { Loader2, Utensils } from 'lucide-react';
 import { PageHeader } from '@/components/PageHeader';
 import { Button } from '@/components/ui/Button';
 import { DogPlayground } from '@/features/pet/DogPlayground';
+import { DevPosePanel } from '@/features/pet/DevPosePanel';
 import { RenamePetSheet } from '@/features/pet/RenamePetSheet';
 import { useDogState } from '@/features/pet/useDogState';
 import { useDailyGreeting } from '@/features/pet/useDailyGreeting';
@@ -43,6 +44,7 @@ export function PetPage() {
         onTitleClick={() => setRenameOpen(true)}
       />
       <div className="mx-auto max-w-md animate-fade-in space-y-4 px-4 py-4">
+        {import.meta.env.DEV && <DevPosePanel />}
         {/* The dog's playground — grab and fling him, he roams on his own. */}
         <section className="flex flex-col items-center rounded-3xl border border-border bg-card px-4 pb-5 pt-2 shadow-sm">
           <DogPlayground pose={dog.pose} className="h-72 w-full" />

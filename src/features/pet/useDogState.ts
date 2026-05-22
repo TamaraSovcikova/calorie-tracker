@@ -1,8 +1,14 @@
+import { differenceInCalendarDays } from 'date-fns';
 import { useProfile } from '@/db/repos/profile';
 import { usePet } from '@/db/repos/pet';
-import { sumTotals, useDiaryDay, ZERO_TOTALS } from '@/db/repos/diary';
+import {
+  sumTotals,
+  useDiaryDay,
+  useLastLoggedDate,
+  ZERO_TOTALS,
+} from '@/db/repos/diary';
 import { useWeeklyBudget } from '@/features/weekly-budget/weeklyBudget';
-import { todayLocal } from '@/lib/dates';
+import { fromLocalDate, todayLocal } from '@/lib/dates';
 import {
   dogPose,
   dogStatusLine,
@@ -10,6 +16,7 @@ import {
   type DogPose,
   type FullnessState,
 } from './petLogic';
+import { useDevPoseStore } from './devPose';
 
 export interface DogState {
   pose: DogPose;
@@ -40,6 +47,7 @@ export function useDogState(opts: DogStateOptions = {}): DogState {
   const pet = usePet();
   const entries = useDiaryDay(todayLocal());
   const weekly = useWeeklyBudget(todayLocal(), profile);
+  const lastLogged = useLastLoggedDate();
 
   const totals = entries ? sumTotals(entries) : ZERO_TOTALS;
   // With the weekly budget on, the dog reads today's adjusted target.
@@ -48,14 +56,28 @@ export function useDogState(opts: DogStateOptions = {}): DogState {
   const petName = pet?.name ?? 'Biscuit';
   const now = new Date();
 
+  // Days since the last logged entry. A user who has never logged (no
+  // lastLogged date) gets 0, so a brand-new install isn't greeted by a
+  // skeleton.
+  const daysSinceLastLog = lastLogged
+    ? differenceInCalendarDays(now, fromLocalDate(lastLogged))
+    : 0;
+
   const fullness = fullnessState(totals.kcal, goalKcal, now);
-  const pose = dogPose({
+  const livePose = dogPose({
     fullness,
     wellbeing,
     now,
+    daysSinceLastLog,
     justAte: opts.justAte,
     greeting: opts.greeting,
   });
+
+  // Dev-only: a forced pose from the dev console / panel wins. Stripped in
+  // production builds (import.meta.env.DEV is false), so live state always
+  // applies for real users.
+  const forcedPose = useDevPoseStore((s) => s.forced);
+  const pose = import.meta.env.DEV && forcedPose ? forcedPose : livePose;
 
   return {
     pose,

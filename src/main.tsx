@@ -66,6 +66,12 @@ async function boot(): Promise<void> {
   registerPwa();
   void requestPersistentStorage();
 
+  // Dev-only: expose `window.__dog` pose helpers for testing the pet's
+  // states. Dynamic import + DEV guard keeps it out of production bundles.
+  if (import.meta.env.DEV) {
+    void import('./features/pet/devPose').then((m) => m.installDogDevConsole());
+  }
+
   const rootElement = document.getElementById('root');
   if (!rootElement) throw new Error('Root element not found');
 
