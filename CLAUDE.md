@@ -113,7 +113,7 @@ What's stubbed / known limitations:
 - **Pet wellbeing's "missed day" still penalises logging discipline.** The weekly budget neutralises missed days; wellbeing does not (intentional - logging is the consistency meter).
 - Some leftover UX-audit items deferred: water tracking, micronutrient targets (not just totals).
 
-Last updated: 2026-05-20 by claude-code (this onboarding pass). Last shipping commit: `9944d23` ("recents priority in search").
+Last updated: 2026-05-22 by claude-code. Last shipping commit: `6a1ee2d` ("let users attach a photo to saved meals"); chart-clarity commit `2c5633e` shipped in the same deploy (Version ID `eee2b5cb`).
 
 ## Project-specific decisions
 
@@ -195,7 +195,11 @@ Pattern: most tested code is pure (`mealMath`, `weeklyBudget`, etc.). Hooks and 
 
 ## What's currently being worked on
 
-Nothing actively. Last work shipped: the recents-priority search and the branded-ingredient fuzzy-match fix (`9944d23` + `b9240b1`).
+Nothing actively. Last work shipped (2026-05-22):
+- **Meal photos.** Users can attach a photo to a saved meal in the MealEditor (reuses `downscaleImage` at 640px -> JPEG data URL stored in the new nullable `meals.image_url` D1 column; synced like any other meal column). Thumbnail shows in MealsLibrary rows. D1 migration `ALTER TABLE meals ADD COLUMN image_url TEXT` applied to remote. NOTE: same "AI macros are never trusted" reasoning does NOT apply here - this is a decorative user photo, not a data source.
+- **"Last N days" chart clarity.** Added a colour legend (green = on target ±10%, orange = over/under, grey = no entries), a dashed daily-target reference line, and a status word in the bar tooltip. Weekday labels moved to their own row so the target line aligns to a clean 96px plot area.
+
+Possible follow-up: meal photo also showing in `LogMealSheet` / `MealPicker` (currently editor + library only).
 
 Open follow-ups noted in `AUDIT_3.md`:
 
