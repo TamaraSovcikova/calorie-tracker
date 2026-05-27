@@ -178,9 +178,15 @@ function clearPkce(): void {
 
 /**
  * Build the Google authorize URL. access_type=offline + prompt=consent are
- * required for Google to issue a refresh_token; select_account forces the
- * chooser so multi-account users do not get auto-signed-in to the wrong
- * (often Workspace-restricted) account.
+ * required for Google to issue a refresh_token.
+ *
+ * Account selection: if the user has set their Google email (login_hint),
+ * we send them STRAIGHT to that account (`prompt=consent` only). Pairing
+ * `login_hint` with `prompt=select_account` is what caused the bug Tamara
+ * hit - select_account forces the chooser, which on a phone defaults to the
+ * primary (often Workspace-restricted) account and the hint is ignored. With
+ * no hint we keep `select_account` so the user at least gets the chooser
+ * instead of being silently signed into the wrong account.
  */
 export async function beginFitbitAuth(): Promise<string> {
   const clientId = getFitbitClientId();
@@ -193,6 +199,7 @@ export async function beginFitbitAuth(): Promise<string> {
 
   storePkce({ verifier, state, redirectUri, createdAt: Date.now() });
 
+  const hint = getGoogleLoginHint();
   const params = new URLSearchParams({
     response_type: 'code',
     client_id: clientId,
@@ -202,11 +209,10 @@ export async function beginFitbitAuth(): Promise<string> {
     state,
     redirect_uri: redirectUri,
     access_type: 'offline',
-    prompt: 'select_account consent',
+    // With a known account, go directly to it; otherwise force the chooser.
+    prompt: hint ? 'consent' : 'select_account consent',
     include_granted_scopes: 'true',
   });
-  // Steer multi-account devices straight to the intended Google account.
-  const hint = getGoogleLoginHint();
   if (hint) params.set('login_hint', hint);
   return `${AUTH_BASE}?${params.toString()}`;
 }

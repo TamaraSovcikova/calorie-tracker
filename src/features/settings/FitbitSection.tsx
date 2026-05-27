@@ -127,7 +127,7 @@ export function FitbitSection() {
         spellCheck={false}
       />
       <LabeledInput
-        label="Google account email (optional)"
+        label="Google account email (recommended)"
         type="email"
         placeholder="account your Fitbit is linked to"
         value={draftHint}
@@ -136,8 +136,10 @@ export function FitbitSection() {
         spellCheck={false}
       />
       <p className="-mt-1 text-xs text-muted-foreground">
-        On a phone signed into several Google accounts, this sends you
-        straight to the right one when connecting.
+        On a phone signed into several Google accounts, set this and we take
+        you straight to it - skipping the chooser that otherwise defaults to
+        your primary (often work) account. Use the exact email your Fitbit is
+        linked to.
       </p>
       <div className="flex items-center justify-between gap-2">
         <a
@@ -284,6 +286,16 @@ export function FitbitSection() {
         <p className="font-mono break-all text-foreground/80">
           {typeof window !== 'undefined' ? window.location.origin : 'http://localhost:5173'}
           /auth/fitbit/callback
+        </p>
+        <p>
+          <span className="font-medium text-amber-700 dark:text-amber-300">
+            "Access blocked / app not verified"?
+          </span>{' '}
+          While the OAuth app is in "Testing" mode, only allow-listed accounts
+          can connect. In Google Cloud Console → APIs &amp; Services → OAuth
+          consent screen → <span className="font-medium">Test users</span>, add
+          the exact Google account you set above. Without this, Google rejects
+          the connection even if the right account is chosen.
         </p>
         <p>
           <span className="font-medium text-amber-700 dark:text-amber-300">
