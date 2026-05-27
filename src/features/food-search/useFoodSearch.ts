@@ -44,6 +44,9 @@ export interface FoodSearchResult {
   /** While searching: result foods the user has logged before. */
   recentMatches: Food[];
   myProducts: Food[];
+  /** Packaged foods already in the user's library (scanned / cached). Always
+   *  shown, regardless of the show-packaged toggle. */
+  library: Food[];
   common: Food[];
   packaged: Food[];
   isSearching: boolean;
@@ -69,15 +72,36 @@ const DEBOUNCE_MS = 350;
 function scoreFoodMatch(food: Food, q: string): number {
   if (!q) return 0;
   const name = food.name.toLowerCase();
+  const hay = `${name} ${(food.brand ?? '').toLowerCase()}`.trim();
+  const tokens = q.split(/\s+/).filter(Boolean);
   let score = 0;
+
+  // Whole-query signals on the name (exact > prefix > contained anywhere).
   if (name === q) score += 1000;
   else if (name.startsWith(q)) score += 500;
-  else {
-    const words = name.split(/[^a-z0-9]+/).filter(Boolean);
-    if (words.includes(q)) score += 400;
-    else if (words.some((w) => w.startsWith(q))) score += 200;
-    else if (name.includes(q)) score += 80;
+  else if (hay.includes(q)) score += 120;
+
+  // Per-token coverage so multi-word / out-of-order queries rank sensibly:
+  // "whey protein" should beat "protein bar" for "Gold Standard Whey
+  // Protein". Word-boundary hits beat prefix hits beat anywhere-substring.
+  const nameWords = name.split(/[^a-z0-9]+/).filter(Boolean);
+  let tokenHits = 0;
+  for (const t of tokens) {
+    if (nameWords.includes(t)) {
+      score += 120;
+      tokenHits++;
+    } else if (nameWords.some((w) => w.startsWith(t))) {
+      score += 70;
+      tokenHits++;
+    } else if (hay.includes(t)) {
+      score += 30;
+      tokenHits++;
+    }
   }
+  if (tokens.length > 0 && tokenHits === tokens.length) score += 150;
+
+  // Dataset quality: curated staples + the user's own products rank above
+  // clean USDA generics, which rank above composite Survey dishes.
   if (food.source === 'curated') score += 450;
   else if (food.source === 'custom') score += 300;
   else if (food.usda_data_type === 'foundation') score += 250;
@@ -225,9 +249,7 @@ export function useFoodSearch(query: string): FoodSearchResult {
   // ---------- Group + dedupe + rank ----------
   const grouped = useMemo(() => {
     const q = debouncedQuery.toLowerCase().trim();
-    const localIds = new Set(local.map((f) => f.id));
     const usdaIds = new Set(usda.map((f) => f.id));
-    const offIds = new Set(off.map((f) => f.id));
 
     const myProducts = local.filter((f) => f.source === 'custom');
 
@@ -244,32 +266,38 @@ export function useFoodSearch(query: string): FoodSearchResult {
     const liveUsdaCommon = usda.filter((f) => f.usda_data_type !== 'branded');
     const common = [...curated, ...liveUsdaCommon, ...cachedUsdaCommon];
 
-    // Packaged = USDA Branded + OFF (live and cached), de-duped.
-    const cachedPackaged = local.filter(
+    // Packaged items ALREADY in the user's library (barcode-scanned or
+    // previously cached). Always searchable - hiding the user's own saved
+    // foods behind the show-packaged toggle was the "I can't find my whey
+    // protein" bug.
+    const localPackaged = local.filter(
       (f) =>
-        ((f.source === 'usda' && f.usda_data_type === 'branded') ||
-          f.source === 'off') &&
-        !usdaIds.has(f.id) &&
-        !offIds.has(f.id),
+        f.source === 'off' ||
+        (f.source === 'usda' && f.usda_data_type === 'branded'),
     );
-    const liveUsdaBranded = usda.filter((f) => f.usda_data_type === 'branded');
-    const packaged = showPackaged
-      ? [...liveUsdaBranded, ...off, ...cachedPackaged]
-      : [];
+    const localPackagedIds = new Set(localPackaged.map((f) => f.id));
 
-    // Strip myProducts from common/packaged to avoid double-listing.
+    // Live remote packaged hits (USDA Branded + OFF), minus anything we
+    // already hold locally. Gated by the toggle in the UI - and when it's
+    // off we don't even fetch these.
+    const liveUsdaBranded = usda.filter((f) => f.usda_data_type === 'branded');
+    const livePackaged = [...liveUsdaBranded, ...off].filter(
+      (f) => !localPackagedIds.has(f.id),
+    );
+
     const myIds = new Set(myProducts.map((f) => f.id));
     const byRelevance = (a: Food, b: Food) =>
       scoreFoodMatch(b, q) - scoreFoodMatch(a, q);
     const commonNoMine = common.filter((f) => !myIds.has(f.id));
-    const packagedNoMine = packaged.filter((f) => !myIds.has(f.id));
+    const libraryNoMine = localPackaged.filter((f) => !myIds.has(f.id));
+    const packagedNoMine = livePackaged.filter((f) => !myIds.has(f.id));
 
     // Pull recently-logged foods into their own group, just behind My
     // Products — so re-searching something you've used before is quick.
     const recentIdSet = emptyState?.recentIdSet ?? new Set<string>();
     const seenRecent = new Set<string>();
     const recentMatches: Food[] = [];
-    for (const f of [...commonNoMine, ...packagedNoMine]) {
+    for (const f of [...commonNoMine, ...libraryNoMine, ...packagedNoMine]) {
       if (recentIdSet.has(f.id) && !seenRecent.has(f.id)) {
         seenRecent.add(f.id);
         recentMatches.push(f);
@@ -278,13 +306,13 @@ export function useFoodSearch(query: string): FoodSearchResult {
     return {
       myProducts,
       recentMatches: recentMatches.sort(byRelevance),
+      library: libraryNoMine.filter((f) => !seenRecent.has(f.id)).sort(byRelevance),
       common: commonNoMine.filter((f) => !seenRecent.has(f.id)).sort(byRelevance),
       packaged: packagedNoMine
         .filter((f) => !seenRecent.has(f.id))
         .sort(byRelevance),
-      _localIds: localIds,
     };
-  }, [local, usda, off, showPackaged, debouncedQuery, emptyState]);
+  }, [local, usda, off, debouncedQuery, emptyState]);
 
   return useMemo(
     () => ({
@@ -294,6 +322,7 @@ export function useFoodSearch(query: string): FoodSearchResult {
       recents: emptyState?.recents ?? [],
       recentMatches: grouped.recentMatches,
       myProducts: grouped.myProducts,
+      library: grouped.library,
       common: grouped.common,
       packaged: grouped.packaged,
       isSearching,

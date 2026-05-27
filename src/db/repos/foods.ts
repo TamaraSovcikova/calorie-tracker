@@ -78,21 +78,32 @@ export function useMyProducts(): Food[] | undefined {
 }
 
 /**
- * Search local foods by name (case-insensitive substring).
- * Used by the add-food sheet to surface user's library + recently-cached
- * Open Food Facts hits ahead of a fresh OFF call.
+ * Search local foods across name + brand. Tokenised AND match: every
+ * whitespace-separated query word must appear somewhere in the food's
+ * "name brand" text (case-insensitive substring). More forgiving than a
+ * whole-string substring - "whey protein", "protein powder" and "optimum
+ * protein" all match a "Gold Standard Whey Protein Powder" by "Optimum
+ * Nutrition", regardless of word order.
+ *
+ * Used by the add-food sheet to surface the user's library + recently-cached
+ * Open Food Facts / USDA hits ahead of (and alongside) a fresh remote call.
  */
 export async function searchLocalFoods(query: string, limit = 20): Promise<Food[]> {
   const q = query.trim().toLowerCase();
   if (!q) return [];
+  const tokens = q.split(/\s+/).filter(Boolean);
   const userId = currentUserId();
   const matches = await db.foods
     .where('user_id')
     .equals(userId)
-    .filter((f) => !f.deleted_at && f.name.toLowerCase().includes(q))
-    .limit(limit * 2)
+    .filter((f) => {
+      if (f.deleted_at) return false;
+      const hay = `${f.name} ${f.brand ?? ''}`.toLowerCase();
+      return tokens.every((t) => hay.includes(t));
+    })
+    .limit(limit * 3)
     .toArray();
-  // custom first, then OFF, then most-recently-updated
+  // custom first, then OFF/USDA, then most-recently-updated
   return matches
     .sort((a, b) => {
       if (a.source !== b.source) return a.source === 'custom' ? -1 : 1;

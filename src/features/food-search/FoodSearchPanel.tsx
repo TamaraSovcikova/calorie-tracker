@@ -56,6 +56,7 @@ export function FoodSearchPanel({
     recents,
     recentMatches,
     myProducts,
+    library,
     common,
     packaged,
     isSearching,
@@ -74,6 +75,7 @@ export function FoodSearchPanel({
     !isSearching &&
     myProducts.length === 0 &&
     recentMatches.length === 0 &&
+    library.length === 0 &&
     common.length === 0 &&
     packaged.length === 0;
 
@@ -207,6 +209,19 @@ export function FoodSearchPanel({
               </Group>
             )}
 
+            {library.length > 0 && (
+              <Group title="Saved & scanned">
+                {library.map((f) => (
+                  <FoodResultRow
+                    key={f.id}
+                    food={f}
+                    onClick={onPick}
+                    onToggleFavorite={handleFav}
+                  />
+                ))}
+              </Group>
+            )}
+
             {common.length > 0 && (
               <Group title="Common foods" hint="USDA">
                 {common.map((f) => (
@@ -235,7 +250,8 @@ export function FoodSearchPanel({
 
             {!showPackaged && (
               <p className="px-2 text-[11px] text-muted-foreground">
-                Packaged products are hidden — toggle in Settings → Food sources.
+                New packaged products from the web are hidden (your saved &
+                scanned ones still show) - toggle in Settings → Food sources.
               </p>
             )}
 
