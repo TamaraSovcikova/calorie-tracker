@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
-import { ChefHat, ChevronRight, Search } from 'lucide-react';
+import { ChefHat, ChevronRight, Search, Star } from 'lucide-react';
 import { Input } from '@/components/ui/Input';
-import { useMeals } from '@/db/repos/meals';
+import { useMealsWithTotals } from './useMealsWithTotals';
+import { matchesMealQuery } from './mealMath';
 import type { Meal } from '@/db/types';
 
 interface MealPickerProps {
@@ -9,14 +10,12 @@ interface MealPickerProps {
 }
 
 export function MealPicker({ onPick }: MealPickerProps) {
-  const meals = useMeals();
+  const meals = useMealsWithTotals();
   const [query, setQuery] = useState('');
 
   const filtered = useMemo(() => {
     if (!meals) return [];
-    const q = query.trim().toLowerCase();
-    if (!q) return meals;
-    return meals.filter((m) => m.name.toLowerCase().includes(q));
+    return meals.filter((m) => matchesMealQuery(m.haystack, query));
   }, [meals, query]);
 
   if (!meals) {
@@ -56,22 +55,30 @@ export function MealPicker({ onPick }: MealPickerProps) {
         </div>
       ) : (
         <ul className="divide-y divide-border">
-          {filtered.map((m) => (
-            <li key={m.id}>
+          {filtered.map(({ meal }) => (
+            <li key={meal.id}>
               <button
                 type="button"
-                onClick={() => onPick(m)}
+                onClick={() => onPick(meal)}
                 className="flex w-full items-center justify-between gap-3 px-4 py-3 text-left hover:bg-muted/40 active:bg-muted"
               >
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm font-medium">{m.name}</div>
-                  {m.notes && (
-                    <div className="mt-0.5 truncate text-xs text-muted-foreground">
-                      {m.notes}
-                    </div>
+                <div className="flex min-w-0 flex-1 items-center gap-2">
+                  {meal.favorite && (
+                    <Star
+                      className="h-3.5 w-3.5 shrink-0 text-amber-500"
+                      fill="currentColor"
+                    />
                   )}
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-medium">{meal.name}</div>
+                    {meal.notes && (
+                      <div className="mt-0.5 truncate text-xs text-muted-foreground">
+                        {meal.notes}
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
               </button>
             </li>
           ))}

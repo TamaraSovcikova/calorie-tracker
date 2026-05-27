@@ -79,6 +79,16 @@ export async function updateMeal(id: string, patch: Partial<Meal>): Promise<void
   await db.meals.update(id, { ...patch, updated_at: new Date().toISOString() });
 }
 
+/** Star / unstar a meal for fast access (pins it to the top of the list). */
+export async function toggleMealFavorite(id: string): Promise<void> {
+  const meal = await db.meals.get(id);
+  if (!meal) return;
+  await db.meals.update(id, {
+    favorite: !meal.favorite,
+    updated_at: new Date().toISOString(),
+  });
+}
+
 export async function softDeleteMeal(id: string): Promise<void> {
   await db.meals.update(id, { deleted_at: new Date().toISOString() });
 }

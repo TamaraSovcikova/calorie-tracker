@@ -2,10 +2,12 @@ import { describe, expect, it } from 'vitest';
 import type { Food, MealItem } from '@/db/types';
 import type { DayTotals } from '@/db/repos/diary';
 import {
+  compareMealsForList,
   computeMealTotals,
   formatServings,
   getServings,
   itemToQuantity,
+  matchesMealQuery,
   multiplyTotals,
   perServingTotals,
 } from './mealMath';
@@ -162,5 +164,55 @@ describe('formatServings', () => {
     expect(formatServings(5)).toBe('5 portions');
     expect(formatServings(1.5)).toBe('1.5 portions');
     expect(formatServings(2.04)).toBe('2 portions');
+  });
+});
+
+describe('matchesMealQuery', () => {
+  const hay = 'high protein chicken bowl jasmine rice broccoli';
+
+  it('matches an empty query (shows everything)', () => {
+    expect(matchesMealQuery(hay, '')).toBe(true);
+    expect(matchesMealQuery(hay, '   ')).toBe(true);
+  });
+
+  it('matches a single word anywhere in the haystack', () => {
+    expect(matchesMealQuery(hay, 'chicken')).toBe(true);
+    expect(matchesMealQuery(hay, 'rice')).toBe(true);
+  });
+
+  it('is case-insensitive', () => {
+    expect(matchesMealQuery(hay, 'CHICKEN')).toBe(true);
+  });
+
+  it('requires every word (AND) but ignores word order', () => {
+    expect(matchesMealQuery(hay, 'rice chicken')).toBe(true);
+    expect(matchesMealQuery(hay, 'chicken tofu')).toBe(false);
+  });
+
+  it('matches on an ingredient even when the name does not contain it', () => {
+    // "broccoli" is an ingredient in the haystack, not the meal name word.
+    expect(matchesMealQuery(hay, 'broccoli')).toBe(true);
+  });
+});
+
+describe('compareMealsForList', () => {
+  const meal = (favorite: boolean, updated_at: string) => ({ favorite, updated_at });
+
+  it('sorts favourites ahead of non-favourites', () => {
+    expect(
+      compareMealsForList(meal(false, '2026-05-27'), meal(true, '2026-01-01')),
+    ).toBeGreaterThan(0);
+    expect(
+      compareMealsForList(meal(true, '2026-01-01'), meal(false, '2026-05-27')),
+    ).toBeLessThan(0);
+  });
+
+  it('falls back to most-recently-updated within the same favourite state', () => {
+    expect(
+      compareMealsForList(meal(true, '2026-05-27'), meal(true, '2026-05-20')),
+    ).toBeLessThan(0);
+    expect(
+      compareMealsForList(meal(false, '2026-05-20'), meal(false, '2026-05-27')),
+    ).toBeGreaterThan(0);
   });
 });

@@ -83,3 +83,34 @@ export function formatServings(servings: number): string {
   const n = Math.round(servings * 10) / 10;
   return `${n} ${n === 1 ? 'portion' : 'portions'}`;
 }
+
+/**
+ * Tokenised AND search: every whitespace-separated query word must appear
+ * somewhere in the haystack (name + notes + ingredient names). More natural
+ * than a whole-string substring - "chicken rice" matches a meal named "Rice
+ * bowl" containing chicken, regardless of word order. Empty query matches.
+ */
+export function matchesMealQuery(haystack: string, query: string): boolean {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  const h = haystack.toLowerCase();
+  return q
+    .split(/\s+/)
+    .filter(Boolean)
+    .every((token) => h.includes(token));
+}
+
+/**
+ * List sort comparator: favourites first, then most-recently-updated. Used
+ * for the meal library + the in-diary meal picker so starred staples pin to
+ * the top everywhere.
+ */
+export function compareMealsForList(
+  a: Pick<Meal, 'favorite' | 'updated_at'>,
+  b: Pick<Meal, 'favorite' | 'updated_at'>,
+): number {
+  const fa = a.favorite ? 1 : 0;
+  const fb = b.favorite ? 1 : 0;
+  if (fa !== fb) return fb - fa; // favourites first
+  return a.updated_at < b.updated_at ? 1 : -1; // newest-updated first
+}

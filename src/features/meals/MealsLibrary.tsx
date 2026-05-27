@@ -1,12 +1,23 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChefHat, Pencil, Plus, ScanLine, Search, Sparkles } from 'lucide-react';
+import {
+  ChefHat,
+  Pencil,
+  Plus,
+  ScanLine,
+  Search,
+  Sparkles,
+  Star,
+} from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { Sheet } from '@/components/ui/Sheet';
+import { cn } from '@/lib/cn';
 import { LogMealSheet } from './LogMealSheet';
 import { RecipeScanSheet } from '@/features/recipe-scan/RecipeScanSheet';
 import { useMealsWithTotals } from './useMealsWithTotals';
-import { formatServings } from './mealMath';
+import { formatServings, matchesMealQuery } from './mealMath';
+import { toggleMealFavorite } from '@/db/repos/meals';
 import { formatKcal } from '@/lib/macros';
 import type { Meal } from '@/db/types';
 
@@ -17,53 +28,25 @@ export function MealsLibrary() {
   const [query, setQuery] = useState('');
   const [logging, setLogging] = useState<Meal | null>(null);
   const [scanOpen, setScanOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const filtered = useMemo(() => {
     if (!meals) return [];
-    const q = query.trim().toLowerCase();
-    if (!q) return meals;
-    return meals.filter((m) => m.meal.name.toLowerCase().includes(q));
+    return meals.filter((m) => matchesMealQuery(m.haystack, query));
   }, [meals, query]);
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => navigate('/meals/plan')}
-        className="flex w-full items-center gap-3 rounded-2xl border border-primary/30 bg-primary/5 px-4 py-3 text-left transition-colors hover:bg-primary/10"
-      >
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/15">
-          <Sparkles className="h-4 w-4 text-primary" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="text-sm font-medium">Plan meals with AI</div>
-          <div className="truncate text-xs text-muted-foreground">
-            Turn your ingredients + targets into meal-prep recipes
-          </div>
-        </div>
-      </button>
-
-      <button
-        type="button"
-        onClick={() => setScanOpen(true)}
-        className="flex w-full items-center gap-3 rounded-2xl border border-primary/30 bg-primary/5 px-4 py-3 text-left transition-colors hover:bg-primary/10"
-      >
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/15">
-          <ScanLine className="h-4 w-4 text-primary" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="text-sm font-medium">Scan a recipe</div>
-          <div className="truncate text-xs text-muted-foreground">
-            Turn a recipe screenshot into a ready-to-edit meal
-          </div>
-        </div>
-      </button>
+      <Button block variant="primary" onClick={() => setMenuOpen(true)}>
+        <Plus className="h-4 w-4" />
+        New meal
+      </Button>
 
       {meals && meals.length > 0 && (
         <div className="relative">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="Search meals…"
+            placeholder="Search by name, note, or ingredient…"
             className="pl-9"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -143,6 +126,27 @@ export function MealsLibrary() {
               </button>
               <button
                 type="button"
+                onClick={() => void toggleMealFavorite(meal.id)}
+                aria-label={
+                  meal.favorite
+                    ? `Unstar ${meal.name}`
+                    : `Star ${meal.name}`
+                }
+                aria-pressed={!!meal.favorite}
+                className={cn(
+                  'tap-target rounded-lg p-2.5 hover:bg-muted',
+                  meal.favorite
+                    ? 'text-amber-500'
+                    : 'text-muted-foreground hover:text-foreground',
+                )}
+              >
+                <Star
+                  className="h-4 w-4"
+                  fill={meal.favorite ? 'currentColor' : 'none'}
+                />
+              </button>
+              <button
+                type="button"
                 onClick={() => navigate(`/meals/${meal.id}/edit`)}
                 aria-label={`Edit ${meal.name}`}
                 className="tap-target mr-1 rounded-lg p-2.5 text-muted-foreground hover:bg-muted hover:text-foreground"
@@ -160,6 +164,71 @@ export function MealsLibrary() {
         onClose={() => setLogging(null)}
       />
       <RecipeScanSheet open={scanOpen} onClose={() => setScanOpen(false)} />
+
+      <Sheet
+        open={menuOpen}
+        onClose={() => setMenuOpen(false)}
+        title="New meal"
+        fullScreenMobile={false}
+      >
+        <div className="space-y-2 p-4">
+          <NewMealOption
+            icon={<Plus className="h-4 w-4 text-primary" />}
+            title="Blank meal"
+            subtitle="Build it from scratch, ingredient by ingredient"
+            onClick={() => {
+              setMenuOpen(false);
+              navigate('/meals/new');
+            }}
+          />
+          <NewMealOption
+            icon={<ScanLine className="h-4 w-4 text-primary" />}
+            title="Scan a recipe"
+            subtitle="Turn a recipe screenshot into a ready-to-edit meal"
+            onClick={() => {
+              setMenuOpen(false);
+              setScanOpen(true);
+            }}
+          />
+          <NewMealOption
+            icon={<Sparkles className="h-4 w-4 text-primary" />}
+            title="Plan with AI"
+            subtitle="Turn your ingredients + targets into meal-prep recipes"
+            onClick={() => {
+              setMenuOpen(false);
+              navigate('/meals/plan');
+            }}
+          />
+        </div>
+      </Sheet>
     </>
+  );
+}
+
+function NewMealOption({
+  icon,
+  title,
+  subtitle,
+  onClick,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  subtitle: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="flex w-full items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3 text-left transition-colors hover:bg-muted/50"
+    >
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/15">
+        {icon}
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="text-sm font-medium">{title}</div>
+        <div className="truncate text-xs text-muted-foreground">{subtitle}</div>
+      </div>
+    </button>
   );
 }

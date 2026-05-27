@@ -135,6 +135,9 @@ export interface Meal {
   /** User-attached meal photo, stored as a downscaled JPEG data URL.
    *  Optional: pre-feature rows and meals without a photo read undefined. */
   image_url?: string;
+  /** Starred for fast access - favourites pin to the top of the meal list.
+   *  Optional/nullable: pre-feature rows read undefined (falsy). */
+  favorite?: boolean;
   created_at: ISOTimestamp;
   updated_at: ISOTimestamp;
   deleted_at?: ISOTimestamp;

@@ -3,7 +3,12 @@ import { db } from '@/db/dexie';
 import { currentUserId } from '@/db/userId';
 import type { DayTotals } from '@/db/repos/diary';
 import type { Food, Meal, MealItem } from '@/db/types';
-import { computeMealTotals, getServings, perServingTotals } from './mealMath';
+import {
+  compareMealsForList,
+  computeMealTotals,
+  getServings,
+  perServingTotals,
+} from './mealMath';
 
 export interface MealWithTotals {
   meal: Meal;
@@ -12,6 +17,8 @@ export interface MealWithTotals {
   /** How many portions the batch makes (always ≥ 1). */
   servings: number;
   itemCount: number;
+  /** Lowercased name + notes + ingredient names, for free-text search. */
+  haystack: string;
 }
 
 /**
@@ -47,15 +54,25 @@ export function useMealsWithTotals(): MealWithTotals[] | undefined {
       else itemsByMeal.set(it.meal_id, [it]);
     }
 
-    return meals.map((meal) => {
-      const mealItems = itemsByMeal.get(meal.id) ?? [];
-      const servings = getServings(meal);
-      return {
-        meal,
-        servings,
-        totals: perServingTotals(computeMealTotals(mealItems, foodsById), servings),
-        itemCount: mealItems.length,
-      };
-    });
+    return meals
+      .map((meal): MealWithTotals => {
+        const mealItems = itemsByMeal.get(meal.id) ?? [];
+        const servings = getServings(meal);
+        const ingredientNames = mealItems
+          .map((it) => foodsById.get(it.food_id)?.name ?? '')
+          .filter(Boolean);
+        const haystack = [meal.name, meal.notes ?? '', ...ingredientNames]
+          .join(' ')
+          .toLowerCase();
+        return {
+          meal,
+          servings,
+          totals: perServingTotals(computeMealTotals(mealItems, foodsById), servings),
+          itemCount: mealItems.length,
+          haystack,
+        };
+      })
+      // Favourites pinned to the top, then most-recently-updated.
+      .sort((a, b) => compareMealsForList(a.meal, b.meal));
   }, []);
 }
