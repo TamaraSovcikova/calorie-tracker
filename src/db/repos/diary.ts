@@ -233,6 +233,54 @@ export async function recentFoods(limit = 30): Promise<string[]> {
 }
 
 /**
+ * How many times each saved meal has been logged (kind='meal'), keyed by
+ * meal_id. Powers the "Most logged" sort + the section a meal is most often
+ * logged into (a fallback for category auto-suggest).
+ */
+export async function mealLogStats(): Promise<
+  Map<string, { count: number; topSection: MealSection | undefined }>
+> {
+  const userId = currentUserId();
+  const stats = new Map<
+    string,
+    { count: number; sections: Map<MealSection, number> }
+  >();
+  await db.diary_entries
+    .where('[user_id+date]')
+    .between([userId, '0000-00-00'], [userId, '9999-99-99'])
+    .each((e) => {
+      if (e.kind !== 'meal' || !e.meal_id || e.deleted_at) return;
+      const cur = stats.get(e.meal_id) ?? { count: 0, sections: new Map() };
+      cur.count += 1;
+      cur.sections.set(e.section, (cur.sections.get(e.section) ?? 0) + 1);
+      stats.set(e.meal_id, cur);
+    });
+  const out = new Map<
+    string,
+    { count: number; topSection: MealSection | undefined }
+  >();
+  for (const [mealId, { count, sections }] of stats) {
+    let topSection: MealSection | undefined;
+    let topN = 0;
+    for (const [section, n] of sections) {
+      if (n > topN) {
+        topN = n;
+        topSection = section;
+      }
+    }
+    out.set(mealId, { count, topSection });
+  }
+  return out;
+}
+
+/** Live version of {@link mealLogStats}. */
+export function useMealLogStats():
+  | Map<string, { count: number; topSection: MealSection | undefined }>
+  | undefined {
+  return useLiveQuery(() => mealLogStats(), []);
+}
+
+/**
  * Food ids ranked by how often they've been logged (most-logged first) —
  * the "frequent foods" fast-logging list.
  */

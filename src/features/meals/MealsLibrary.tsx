@@ -8,32 +8,76 @@ import {
   Search,
   Sparkles,
   Star,
+  Wand2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { Select } from '@/components/ui/Select';
 import { Sheet } from '@/components/ui/Sheet';
 import { cn } from '@/lib/cn';
 import { LogMealSheet } from './LogMealSheet';
 import { RecipeScanSheet } from '@/features/recipe-scan/RecipeScanSheet';
+import { CategoriseSheet } from './CategoriseSheet';
 import { useMealsWithTotals } from './useMealsWithTotals';
 import { formatServings, matchesMealQuery } from './mealMath';
+import { CATEGORY_LABEL, MEAL_CATEGORIES } from './mealCategory';
 import { toggleMealFavorite } from '@/db/repos/meals';
+import { useMealLogStats } from '@/db/repos/diary';
 import { formatKcal } from '@/lib/macros';
-import type { Meal } from '@/db/types';
+import type { Meal, MealCategory } from '@/db/types';
+
+type MealFilter = 'all' | 'favorites' | MealCategory;
+type MealSort = 'recent' | 'name' | 'calories' | 'logged';
 
 /** Meals sub-tab of the Library: saved meal templates, tap to log. */
 export function MealsLibrary() {
   const navigate = useNavigate();
   const meals = useMealsWithTotals();
+  const logStats = useMealLogStats();
   const [query, setQuery] = useState('');
+  const [filter, setFilter] = useState<MealFilter>('all');
+  const [sort, setSort] = useState<MealSort>('recent');
   const [logging, setLogging] = useState<Meal | null>(null);
   const [scanOpen, setScanOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [categoriseOpen, setCategoriseOpen] = useState(false);
 
-  const filtered = useMemo(() => {
+  const uncategorised = useMemo(
+    () => (meals ?? []).filter((m) => !m.meal.category),
+    [meals],
+  );
+
+  const visible = useMemo(() => {
     if (!meals) return [];
-    return meals.filter((m) => matchesMealQuery(m.haystack, query));
-  }, [meals, query]);
+    let list = meals.filter((m) => matchesMealQuery(m.haystack, query));
+    if (filter === 'favorites') list = list.filter((m) => m.meal.favorite);
+    else if (filter !== 'all') list = list.filter((m) => m.meal.category === filter);
+    // Favourites stay pinned on top, then the chosen sort key.
+    return [...list].sort((a, b) => {
+      const fa = a.meal.favorite ? 1 : 0;
+      const fb = b.meal.favorite ? 1 : 0;
+      if (fa !== fb) return fb - fa;
+      switch (sort) {
+        case 'name':
+          return a.meal.name.localeCompare(b.meal.name);
+        case 'calories':
+          return b.totals.kcal - a.totals.kcal;
+        case 'logged':
+          return (
+            (logStats?.get(b.meal.id)?.count ?? 0) -
+            (logStats?.get(a.meal.id)?.count ?? 0)
+          );
+        default:
+          return a.meal.updated_at < b.meal.updated_at ? 1 : -1;
+      }
+    });
+  }, [meals, query, filter, sort, logStats]);
+
+  const filterChips: { value: MealFilter; label: string }[] = [
+    { value: 'all', label: 'All' },
+    { value: 'favorites', label: '★ Favourites' },
+    ...MEAL_CATEGORIES.map((c) => ({ value: c, label: CATEGORY_LABEL[c] })),
+  ];
 
   return (
     <>
@@ -43,15 +87,67 @@ export function MealsLibrary() {
       </Button>
 
       {meals && meals.length > 0 && (
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Search by name, note, or ingredient…"
-            className="pl-9"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
-        </div>
+        <>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Search by name, note, or ingredient…"
+              className="pl-9"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
+          </div>
+
+          <div className="-mx-4 flex gap-1.5 overflow-x-auto px-4 pb-0.5">
+            {filterChips.map((chip) => (
+              <button
+                key={chip.value}
+                type="button"
+                onClick={() => setFilter(chip.value)}
+                aria-pressed={filter === chip.value}
+                className={cn(
+                  'shrink-0 rounded-full px-3 py-1.5 text-xs font-medium transition-colors',
+                  filter === chip.value
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-muted text-muted-foreground hover:bg-muted/70',
+                )}
+              >
+                {chip.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-xs text-muted-foreground">
+              {visible.length} {visible.length === 1 ? 'meal' : 'meals'}
+            </span>
+            <Select
+              aria-label="Sort meals"
+              value={sort}
+              onChange={(e) => setSort(e.target.value as MealSort)}
+              className="h-9 w-auto text-sm"
+            >
+              <option value="recent">Recent</option>
+              <option value="name">Name A-Z</option>
+              <option value="calories">Calories</option>
+              <option value="logged">Most logged</option>
+            </Select>
+          </div>
+
+          {uncategorised.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setCategoriseOpen(true)}
+              className="flex w-full items-center gap-2 rounded-xl border border-dashed border-primary/40 bg-primary/5 px-3 py-2 text-left text-xs text-primary hover:bg-primary/10"
+            >
+              <Wand2 className="h-3.5 w-3.5 shrink-0" />
+              <span className="flex-1">
+                Auto-categorise {uncategorised.length} uncategorised{' '}
+                {uncategorised.length === 1 ? 'meal' : 'meals'}
+              </span>
+            </button>
+          )}
+        </>
       )}
 
       {!meals ? (
@@ -73,13 +169,15 @@ export function MealsLibrary() {
             Create your first meal
           </Button>
         </div>
-      ) : filtered.length === 0 ? (
+      ) : visible.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
-          No meals match "{query}".
+          {query.trim()
+            ? `No meals match "${query}".`
+            : 'No meals in this filter.'}
         </div>
       ) : (
         <ul className="space-y-2">
-          {filtered.map(({ meal, totals, itemCount, servings }) => (
+          {visible.map(({ meal, totals, itemCount, servings }) => (
             <li
               key={meal.id}
               className="flex items-center gap-1 rounded-2xl border border-border bg-card"
@@ -102,7 +200,14 @@ export function MealsLibrary() {
                   </div>
                 )}
                 <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm font-medium">{meal.name}</div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="truncate text-sm font-medium">{meal.name}</span>
+                    {meal.category && (
+                      <span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                        {CATEGORY_LABEL[meal.category]}
+                      </span>
+                    )}
+                  </div>
                   <div className="mt-0.5 truncate text-xs text-muted-foreground tabular-nums">
                     {itemCount} {itemCount === 1 ? 'item' : 'items'}
                     <span className="mx-1.5">·</span>
@@ -164,6 +269,13 @@ export function MealsLibrary() {
         onClose={() => setLogging(null)}
       />
       <RecipeScanSheet open={scanOpen} onClose={() => setScanOpen(false)} />
+
+      <CategoriseSheet
+        open={categoriseOpen}
+        meals={uncategorised}
+        logStats={logStats}
+        onClose={() => setCategoriseOpen(false)}
+      />
 
       <Sheet
         open={menuOpen}

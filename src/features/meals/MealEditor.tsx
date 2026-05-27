@@ -15,6 +15,8 @@ import { Button } from '@/components/ui/Button';
 import { LabeledInput } from '@/components/ui/Input';
 import { Sheet } from '@/components/ui/Sheet';
 import { IngredientPickerSheet } from './IngredientPickerSheet';
+import { MealCategoryPicker } from './MealCategoryPicker';
+import { suggestMealCategory } from './mealCategory';
 import { QuantityStep } from '@/features/food-search/QuantityStep';
 import { useMealResolved } from './useMealResolved';
 import {
@@ -33,7 +35,7 @@ import {
   type MealItemInput,
 } from '@/db/repos/meals';
 import { db } from '@/db/dexie';
-import type { Food } from '@/db/types';
+import type { Food, MealCategory } from '@/db/types';
 import { formatGrams, formatKcal } from '@/lib/macros';
 
 interface DraftItem {
@@ -75,6 +77,9 @@ export function MealEditor({ mode }: MealEditorProps) {
   const [name, setName] = useState('');
   const [notes, setNotes] = useState('');
   const [servings, setServings] = useState(1);
+  const [category, setCategory] = useState<MealCategory | undefined>(undefined);
+  // Once the user taps a category, stop following the auto-suggestion.
+  const [categoryTouched, setCategoryTouched] = useState(false);
   const [items, setItems] = useState<DraftItem[]>([]);
   const [imageUrl, setImageUrl] = useState<string | undefined>(undefined);
   const [imageBusy, setImageBusy] = useState(false);
@@ -137,6 +142,9 @@ export function MealEditor({ mode }: MealEditorProps) {
     setNotes(resolved.meal.notes ?? '');
     setServings(getServings(resolved.meal));
     setImageUrl(resolved.meal.image_url ?? undefined);
+    setCategory(resolved.meal.category);
+    // An already-categorised meal shouldn't be overridden by the suggestion.
+    setCategoryTouched(!!resolved.meal.category);
     setItems(
       resolved.items.map((it) =>
         inputToDraft(
@@ -170,6 +178,14 @@ export function MealEditor({ mode }: MealEditorProps) {
     [totals, servings],
   );
 
+  // Auto-suggest a category from the name + ingredient names. Followed live
+  // until the user taps a category; then their choice sticks.
+  const suggestedCategory = useMemo(() => {
+    const text = [name, ...items.map((it) => it.food?.name ?? '')].join(' ');
+    return suggestMealCategory(text);
+  }, [name, items]);
+  const effectiveCategory = categoryTouched ? category : suggestedCategory;
+
   const addIngredient = (input: MealItemInput, food: Food) =>
     setItems((curr) => [...curr, inputToDraft(input, food, nextKey())]);
 
@@ -200,6 +216,7 @@ export function MealEditor({ mode }: MealEditorProps) {
           notes: notes.trim() || undefined,
           servings: safeServings,
           image_url: imageUrl,
+          category: effectiveCategory,
           items: itemInputs,
         });
       } else if (id) {
@@ -209,6 +226,7 @@ export function MealEditor({ mode }: MealEditorProps) {
           // undefined clears the column in Dexie (photo removed).
           image_url: imageUrl,
           servings: safeServings,
+          category: effectiveCategory,
         });
         await replaceMealItems(id, itemInputs);
       }
@@ -293,6 +311,15 @@ export function MealEditor({ mode }: MealEditorProps) {
           value={name}
           onChange={(e) => setName(e.target.value)}
           autoFocus={mode === 'create'}
+        />
+
+        <MealCategoryPicker
+          value={effectiveCategory}
+          suggested={!categoryTouched && !!suggestedCategory}
+          onChange={(cat) => {
+            setCategory(cat);
+            setCategoryTouched(true);
+          }}
         />
 
         <div className="space-y-1">

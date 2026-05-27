@@ -120,11 +120,17 @@ export interface Food {
   deleted_at?: ISOTimestamp;
 }
 
+/** Coarse meal-type used for filtering the library. */
+export type MealCategory = 'breakfast' | 'lunch' | 'dinner' | 'snack' | 'other';
+
 export interface Meal {
   id: ID;
   user_id: ID;
   name: string;
   notes?: string;
+  /** Coarse meal-type for filter chips. Optional/nullable: pre-feature and
+   *  un-categorised rows read undefined. */
+  category?: MealCategory;
   /**
    * How many portions the batch makes. Ingredients are entered as the
    * whole batch (e.g. all the groceries cooked at once); per-portion
