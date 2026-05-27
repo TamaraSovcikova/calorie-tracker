@@ -54,6 +54,16 @@ export function BarcodeScanner({ onCode }: BarcodeScannerProps) {
     let controls: IScannerControls | null = null;
     const reader = new BrowserMultiFormatReader(HINTS);
 
+    // Confidence gate: a single frame can mis-decode a 1D barcode into a
+    // different, still-checksum-valid number (a transposed digit on EAN-13
+    // passes the check digit ~10% of the time). That wrong code looks up as
+    // "not found", which is the "it says the item doesn't exist, but works
+    // if I try again" bug. Requiring the SAME code on two consecutive frames
+    // before accepting filters out one-off misreads with no real delay.
+    const REQUIRED_AGREEING = 2;
+    let lastCode: string | null = null;
+    let agreeCount = 0;
+
     void (async () => {
       try {
         if (!videoRef.current) return;
@@ -63,7 +73,15 @@ export function BarcodeScanner({ onCode }: BarcodeScannerProps) {
           (result: Result | undefined) => {
             if (!result || cancelled || fired) return;
             const code = result.getText();
-            if (code) {
+            if (!code) return;
+            // Count consecutive identical reads; reset on any disagreement.
+            if (code === lastCode) {
+              agreeCount += 1;
+            } else {
+              lastCode = code;
+              agreeCount = 1;
+            }
+            if (agreeCount >= REQUIRED_AGREEING) {
               fired = true;
               controls?.stop();
               onCode(code);

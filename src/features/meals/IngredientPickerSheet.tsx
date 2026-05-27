@@ -8,6 +8,7 @@ import { ManualEntryForm } from '@/features/food-search/ManualEntryForm';
 import type { QuantityState, ResolvedMacros } from '@/features/food-search/foodMath';
 import { lookupBarcode, OffRateLimitError } from '@/lib/off-api';
 import { db } from '@/db/dexie';
+import { currentUserId } from '@/db/userId';
 import type { Food } from '@/db/types';
 import type { MealItemInput } from '@/db/repos/meals';
 
@@ -73,6 +74,18 @@ export function IngredientPickerSheet({
     setScanError(null);
     setStep({ kind: 'looking-up', barcode: code });
     try {
+      // Use a library copy if we already have this barcode - instant, offline.
+      const cached = await db.foods
+        .where('user_id')
+        .equals(currentUserId())
+        .filter(
+          (f) => !f.deleted_at && (f.id === `off:${code}` || f.off_barcode === code),
+        )
+        .first();
+      if (cached) {
+        setStep({ kind: 'quantity', food: cached });
+        return;
+      }
       const food = await lookupBarcode(code);
       if (food) {
         await db.foods.put(food);
