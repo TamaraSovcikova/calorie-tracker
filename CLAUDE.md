@@ -113,7 +113,7 @@ What's stubbed / known limitations:
 - **Pet wellbeing's "missed day" still penalises logging discipline.** The weekly budget neutralises missed days; wellbeing does not (intentional - logging is the consistency meter).
 - Some leftover UX-audit items deferred: water tracking, micronutrient targets (not just totals).
 
-Last updated: 2026-05-27 by claude-code. Last shipping commit: `161113c` ("declutter meals library with favourites and richer search"), Version ID `9e189184`. Earlier (2026-05-22): pet reactions + sleep window (`a12a396`, `c6894eda`); meal photos + chart clarity (`6a1ee2d`/`2c5633e`); dog poses + dev tooling (`c926925`).
+Last updated: 2026-05-27 by claude-code. Last shipping commit: `f19590b` ("meal categories with filter chips, sort, and auto-categorise"), Version ID `84cc3366`. Earlier same day: meals favourites + richer search (`161113c`, `9e189184`). 2026-05-22: pet reactions + sleep window (`a12a396`); meal photos + chart clarity; dog poses + dev tooling.
 
 ## Project-specific decisions
 
@@ -200,9 +200,9 @@ Pattern: most tested code is pure (`mealMath`, `weeklyBudget`, etc.). Hooks and 
 
 ## What's currently being worked on
 
-**Meals reorganisation (in progress).** Goal: the Meals library felt crowded at ~15 meals. Phased plan agreed: favourites + category model, categories auto-suggested with confirm, Phase 1 first.
+**Meals reorganisation (SHIPPED, both phases).** Goal: the Meals library felt crowded at ~15 meals. Favourites + category model, categories auto-suggested with confirm.
 - **Phase 1 (SHIPPED, `161113c`).** Decluttered: two CTA banners -> one "New meal" menu sheet (blank / scan recipe / plan with AI); removed the duplicate Library header "New" button. Meal favourites: `meals.favorite` (nullable; `ALTER TABLE meals ADD COLUMN favorite INTEGER` applied; added to `worker/sync.ts` meals columns; `favorite` was already in the client `normaliseInbound` boolean list). Favourites pin to the top in `MealsLibrary` + `MealPicker` (both now use `useMealsWithTotals`, sorted via `compareMealsForList`). Search upgraded to tokenised AND across name + notes + ingredient names (`matchesMealQuery`, fed by a per-meal `haystack` from `useMealsWithTotals`).
-- **Phase 2 (IN PROGRESS).** Optional `category` per meal (breakfast/lunch/dinner/snack/other) with a picker in `MealEditor`; heuristic auto-suggest + one-time backfill for existing meals; filter chips (All/Favourites/+categories) and a sort control (Recent/Name/Calories/Most-logged, the last via a diary `kind='meal'` count helper). Adds `meals.category TEXT`.
+- **Phase 2 (SHIPPED, `f19590b`).** `meals.category` column (breakfast/lunch/dinner/snack/other; `ALTER TABLE meals ADD COLUMN category TEXT` applied; added to `worker/sync.ts` meals columns). `MealEditor` has a segmented `MealCategoryPicker` that follows a heuristic auto-suggestion (`suggestMealCategory` in `mealCategory.ts`) until the user taps. `MealsLibrary` gained a filter-chip row (All/Favourites/+categories), a sort `Select` (Recent/Name/Calories/Most-logged), and category badges. "Most logged" + the section-fallback for auto-suggest come from `mealLogStats()`/`useMealLogStats()` in the diary repo (counts `kind='meal'` entries + their top section per meal). One-time backfill: `CategoriseSheet` suggests a category for every uncategorised meal (name+ingredients, falling back to top-logged section) for bulk confirm.
 
 Last work shipped (2026-05-22, newest first):
 - **Pet event reactions + sleep window.** The dog now sleeps only 11pm-4am (was 10pm-6am). New `petReaction` store (`src/features/pet/petReaction.ts`) fires transient animation beats: an eating beat on every today-dated log (pulsed from `createDiaryEntry` + `copyDayEntries` - the single choke point all log paths share, so the long-dead `justAte` path is finally driven), a love beat on rename, and milestone beats (happy on hitting goal, surprised on crossing into overeaten) sequenced ~2.8s after the eating beat via fullness-transition detection in `useDogState`. Reactions are the top pose transient, below only the dev override.
