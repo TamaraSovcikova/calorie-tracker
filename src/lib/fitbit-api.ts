@@ -22,7 +22,7 @@ import {
   getFitbitTokens,
   putFitbitTokens,
 } from '@/db/repos/fitbitTokens';
-import type { LocalDate } from '@/lib/dates';
+import { shiftDate, type LocalDate } from '@/lib/dates';
 
 const AUTH_BASE = 'https://accounts.google.com/o/oauth2/v2/auth';
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
@@ -337,17 +337,30 @@ async function ensureValidAccessToken(): Promise<string> {
 
 export interface FitbitDailySummary {
   date: LocalDate;
-  /** Raw total from Google Health = resting (BMR) + all activity. The
-   *  diary converts this to activity-only via features/fitbit/
-   *  activityCalories before storing. */
+  /** Raw total from Google Health = resting (BMR) + all-day passive
+   *  activity. The diary converts this to activity-only via
+   *  features/fitbit/activityCalories before storing. NOTE: Fitbit does NOT
+   *  fold manually-logged workouts into this stream (confirmed via the
+   *  Settings diagnostic: total-calories carried the passive burn while
+   *  active-energy-burned and friends were empty). Logged workouts come
+   *  through `workouts` below instead. */
   totalCaloriesBurned: number;
-  /** Device-reported active energy (already excludes resting burn and folds
-   *  in logged workouts). 0 when the connected source does not provide it.
-   *  Fitbit's total-calories is largely a passive estimate, so a logged
-   *  workout shows up here rather than in the total - this is what makes
-   *  workout calories appear in the diary. */
+  /** Device-reported active energy. Empty for Fitbit-via-Google-Health in
+   *  practice; kept because other sources may populate it. */
   activeEnergyBurned: number;
+  /** Manually-logged / tracked workout sessions for the day, each with its
+   *  own calorie burn. These live in the `exercise` data type (a session
+   *  record, listed not rolled-up) and are NOT in totalCaloriesBurned, so
+   *  the diary shows them as separate rows. */
+  workouts: WorkoutSession[];
   steps?: number;
+}
+
+export interface WorkoutSession {
+  /** A human-friendly activity label, e.g. "Spinning", "Strength training". */
+  name: string;
+  /** Calories burned during the session. */
+  kcal: number;
 }
 
 interface CivilDateTime {
@@ -460,6 +473,107 @@ async function fetchDailyRollup(
   return { value, raw: parsed, status: res.status };
 }
 
+// ---------- Exercise sessions (logged workouts) ----------
+
+/** Recursively find the first numeric leaf whose key contains any hint
+ *  substring (case-insensitive). Used to pull a session's calorie value
+ *  without hard-coding the exact (undocumented) field path. */
+function findNumberByKeyHint(obj: unknown, hints: string[], depth = 0): number | null {
+  if (depth > 6 || obj === null || typeof obj !== 'object') return null;
+  for (const [key, val] of Object.entries(obj as Record<string, unknown>)) {
+    const k = key.toLowerCase();
+    if (hints.some((h) => k.includes(h))) {
+      const n = coerceNumber(val);
+      if (n !== null) return n;
+    }
+    if (val && typeof val === 'object') {
+      const nested = findNumberByKeyHint(val, hints, depth + 1);
+      if (nested !== null) return nested;
+    }
+  }
+  return null;
+}
+
+/** Find a workout's activity label. Activity type may be an enum string
+ *  (e.g. "STRENGTH_TRAINING") or a free-text name; humanise either. */
+function findWorkoutName(obj: unknown, depth = 0): string | null {
+  if (depth > 6 || obj === null || typeof obj !== 'object') return null;
+  for (const [key, val] of Object.entries(obj as Record<string, unknown>)) {
+    const k = key.toLowerCase();
+    if (
+      (k.includes('activitytype') || k.includes('activity') || k === 'type' || k.includes('name')) &&
+      typeof val === 'string' &&
+      val.trim() &&
+      !/^\d/.test(val)
+    ) {
+      return humaniseActivity(val);
+    }
+    if (val && typeof val === 'object') {
+      const nested = findWorkoutName(val, depth + 1);
+      if (nested) return nested;
+    }
+  }
+  return null;
+}
+
+function humaniseActivity(raw: string): string {
+  const cleaned = raw.replace(/[_-]+/g, ' ').trim().toLowerCase();
+  if (!cleaned) return 'Workout';
+  return cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+}
+
+interface ExerciseListResult {
+  workouts: WorkoutSession[];
+  raw: unknown;
+  status: number;
+}
+
+/**
+ * List logged exercise sessions for one local date. The `exercise` data type
+ * is a session record (not a rollup), so it uses the list endpoint with a
+ * civil-time filter rather than dailyRollUp:
+ *   GET /v4/users/me/dataTypes/exercise/dataPoints?filter=...
+ * Parsing is deliberately tolerant (the per-session field names are not
+ * fully documented); the Settings diagnostic dumps the raw response so the
+ * shape can be confirmed against a real workout.
+ */
+async function fetchExerciseSessions(
+  token: string,
+  date: LocalDate,
+): Promise<ExerciseListResult> {
+  const next = shiftDate(date, 1);
+  const filter = `exercise.interval.civil_start_time >= "${date}" AND exercise.interval.civil_start_time < "${next}"`;
+  const url = `${API_BASE}/users/me/dataTypes/exercise/dataPoints?pageSize=25&filter=${encodeURIComponent(filter)}`;
+  const res = await fetch(url, {
+    headers: { authorization: `Bearer ${token}` },
+  });
+  if (res.status === 401) throw new Error('GOOGLE_AUTH');
+  const text = await res.text();
+  let parsed: unknown;
+  try {
+    parsed = text ? JSON.parse(text) : {};
+  } catch {
+    parsed = { _unparsed: text };
+  }
+  if (!res.ok) {
+    throw new Error(
+      `Google Health exercise HTTP ${res.status}: ${text.slice(0, 300)}`,
+    );
+  }
+  const points =
+    (parsed as { dataPoints?: unknown[] }).dataPoints ?? [];
+  const workouts: WorkoutSession[] = [];
+  for (const p of points) {
+    const kcal = findNumberByKeyHint(p, ['cal']);
+    if (kcal === null || kcal <= 0) continue; // skip sessions with no burn
+    workouts.push({
+      name: findWorkoutName(p) ?? 'Workout',
+      kcal: Math.round(kcal),
+    });
+  }
+  return { workouts, raw: parsed, status: res.status };
+}
+
 export async function getDailySummary(
   date: LocalDate,
 ): Promise<FitbitDailySummary> {
@@ -475,10 +589,17 @@ export async function getDailySummary(
       date,
     ).catch(() => zero);
     const steps = await fetchDailyRollup(token, 'steps', date).catch(() => zero);
+    // Logged workouts live in the exercise data type, not total-calories.
+    const exercise = await fetchExerciseSessions(token, date).catch(() => ({
+      workouts: [] as WorkoutSession[],
+      raw: null,
+      status: 0,
+    }));
     return {
       date,
       totalCaloriesBurned: Math.round(calories.value),
       activeEnergyBurned: Math.round(active.value),
+      workouts: exercise.workouts,
       steps: steps.value > 0 ? Math.round(steps.value) : undefined,
     };
   };
@@ -524,6 +645,18 @@ export async function debugGoogleHealth(
 ): Promise<FitbitDebugResult> {
   const token = await ensureValidAccessToken();
   const probe = async (dataType: string): Promise<string> => {
+    // `exercise` is a session record - list it; everything else rolls up.
+    if (dataType === 'exercise') {
+      try {
+        const r = await fetchExerciseSessions(token, date);
+        const summary = r.workouts
+          .map((w) => `${w.name} ${w.kcal}kcal`)
+          .join(', ');
+        return `HTTP ${r.status} · ${r.workouts.length} session(s)${summary ? ` · ${summary}` : ''} · ${JSON.stringify(r.raw).slice(0, 300)}`;
+      } catch (e) {
+        return e instanceof Error ? e.message : 'error';
+      }
+    }
     try {
       const r = await fetchDailyRollup(token, dataType, date);
       return `HTTP ${r.status} · value=${r.value} · ${JSON.stringify(r.raw).slice(0, 300)}`;

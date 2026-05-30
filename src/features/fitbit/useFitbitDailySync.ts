@@ -77,6 +77,46 @@ async function syncFitbitForDate(
     updated_at: now,
   };
   await db.exercise_entries.put(row);
+
+  // Logged workouts are separate sessions, not part of total-calories, so
+  // each becomes its own clearly-named row (e.g. "Spinning"). Stable ids
+  // keyed by index let repeat syncs merge; if a workout is later removed on
+  // Fitbit, the now-extra higher-index rows are soft-deleted so the tombstone
+  // syncs across devices.
+  const prefix = `fitbit-ex:${userId}:${date}:`;
+  const priorWorkoutRows = await db.exercise_entries
+    .where('id')
+    .startsWith(prefix)
+    .toArray();
+  await Promise.all(
+    summary.workouts.map(async (w, i) => {
+      const wid = `${prefix}${i}`;
+      const prior = priorWorkoutRows.find((r) => r.id === wid);
+      const wrow: ExerciseEntry = {
+        id: wid,
+        user_id: userId,
+        date,
+        source: 'fitbit',
+        name: w.name,
+        duration_min: undefined,
+        kcal_burned: w.kcal,
+        needs_profile: undefined,
+        created_at: prior?.created_at ?? now,
+        updated_at: now,
+        deleted_at: undefined,
+      };
+      await db.exercise_entries.put(wrow);
+    }),
+  );
+  // Soft-delete leftover rows from a previous sync that had more workouts.
+  await Promise.all(
+    priorWorkoutRows
+      .filter((r) => {
+        const idx = Number(r.id.slice(prefix.length));
+        return Number.isFinite(idx) && idx >= summary.workouts.length && !r.deleted_at;
+      })
+      .map((r) => db.exercise_entries.update(r.id, { deleted_at: now, updated_at: now })),
+  );
 }
 
 export function useFitbitDailySync(date: LocalDate): void {
