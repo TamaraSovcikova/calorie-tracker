@@ -4,7 +4,17 @@
 
 A personal calorie + nutrition tracking PWA built for Tamara and shared with her sister + 2-3 close friends (5 users total). Local-first via Dexie / IndexedDB, multi-device sync through a single Cloudflare Worker + D1, per-user isolation via private sync codes. Live at <https://calorie-tracker.tamara-sovcik.workers.dev>. Shared and in active use; production.
 
-Built-in features: food logging (search / barcode / photo / quick / saved meals), multi-portion meal templates, virtual pet dog (wellbeing + fullness, 17 cartoon poses), Fitbit-via-Google-Health activity import, weekly calorie budget with un-tracked-day handling, AI food facts on logging, AI meal planner, AI recipe-screenshot scan, AI photo logging from meal pictures, micronutrient tracking (fibre / sugar / sodium).
+Built-in features: food logging (search / barcode / photo / quick / saved meals), multi-portion meal templates, virtual pet dog (wellbeing + fullness, ~20 cartoon poses), Fitbit-via-Google-Health activity import, weekly calorie budget with un-tracked-day handling, AI food facts on logging, AI meal planner, AI recipe-screenshot scan, AI photo logging from meal pictures, micronutrient tracking (fibre / sugar / sodium).
+
+## Project docs (narrative depth)
+
+This file is the operational orientation. The full narrative lives in the OneDrive docs folder (`~/workspace/Projects/calorie_tracker/docs/`):
+- `PURPOSE.md` - what it is, who for, why it exists.
+- `ARCHITECTURE.md` - system design, key decisions, the pet model, sync/isolation.
+- `AI_FOOD_RESOLUTION.md` - the "AI never produces trusted numbers" rule + the matcher (deep dive).
+- `EVOLUTION.md` - the dated story (genesis 2026-05-09 to now).
+- `MISTAKES.md` - project-specific lessons.
+- `INTERVIEW.md` - first-person talking points.
 
 ## Stack
 
@@ -109,11 +119,11 @@ What's stubbed / known limitations:
 - **AI photo logging + recipe scanning** verified end-to-end via curl with food photos. Success path with arbitrary real-world recipe screenshots untested against many examples.
 - **Manual-entry foods don't capture micronutrients** (only OFF / USDA do). Means user-typed foods log as 0g fibre / sugar / sodium.
 - **`fitbit_tokens` OAuth tokens at rest are plaintext** in D1. Acceptable for private Cloudflare account; flagged in audit.
-- **No e2e tests.** Worker logic verified live + 107 unit tests for pure helpers (mealMath, weeklyBudget, foodMath, macros, tdee, units, petLogic, wellbeing, activityCalories).
-- **Pet wellbeing's "missed day" still penalises logging discipline.** The weekly budget neutralises missed days; wellbeing does not (intentional - logging is the consistency meter).
+- **No e2e tests.** Worker logic verified live + ~140 unit tests for pure helpers (mealMath, weeklyBudget, foodMath, macros, tdee, units, petLogic, wellbeing, activityCalories, mealCategory).
+- **Pet wellbeing's "missed day" still penalises logging discipline.** The budget neutralises missed days; wellbeing does not (intentional - logging is the consistency meter).
 - Some leftover UX-audit items deferred: water tracking, micronutrient targets (not just totals).
 
-Last updated: 2026-05-27 by claude-code. Last shipping commit: `f19590b` ("meal categories with filter chips, sort, and auto-categorise"), Version ID `84cc3366`. Earlier same day: meals favourites + richer search (`161113c`, `9e189184`). 2026-05-22: pet reactions + sleep window (`a12a396`); meal photos + chart clarity; dog poses + dev tooling.
+Last updated: 2026-05-30 by claude-code. Recent shipping (newest first): Fitbit workout calories (also fetch `active-energy-burned`, take max with total-minus-BMR); monthly budget mode + opt-in carry-over with optional cap (`8150c52`); filter-scrollbar hidden + meal photos in diary (`892d1e6`); meals reorg phases 1+2 (`161113c`/`f19590b`). Narrative in `docs/EVOLUTION.md`.
 
 ## Project-specific decisions
 
@@ -198,26 +208,17 @@ Run: `npm run test`. No coverage threshold. No e2e (Playwright deliberately not 
 
 Pattern: most tested code is pure (`mealMath`, `weeklyBudget`, etc.). Hooks and Dexie / Cloudflare-AI interactions are not unit-tested - verified by use and by curl-testing endpoints live.
 
-## What's currently being worked on
+## Current state
 
-**Meals reorganisation (SHIPPED, both phases).** Goal: the Meals library felt crowded at ~15 meals. Favourites + category model, categories auto-suggested with confirm.
-- **Phase 1 (SHIPPED, `161113c`).** Decluttered: two CTA banners -> one "New meal" menu sheet (blank / scan recipe / plan with AI); removed the duplicate Library header "New" button. Meal favourites: `meals.favorite` (nullable; `ALTER TABLE meals ADD COLUMN favorite INTEGER` applied; added to `worker/sync.ts` meals columns; `favorite` was already in the client `normaliseInbound` boolean list). Favourites pin to the top in `MealsLibrary` + `MealPicker` (both now use `useMealsWithTotals`, sorted via `compareMealsForList`). Search upgraded to tokenised AND across name + notes + ingredient names (`matchesMealQuery`, fed by a per-meal `haystack` from `useMealsWithTotals`).
-- **Phase 2 (SHIPPED, `f19590b`).** `meals.category` column (breakfast/lunch/dinner/snack/other; `ALTER TABLE meals ADD COLUMN category TEXT` applied; added to `worker/sync.ts` meals columns). `MealEditor` has a segmented `MealCategoryPicker` that follows a heuristic auto-suggestion (`suggestMealCategory` in `mealCategory.ts`) until the user taps. `MealsLibrary` gained a filter-chip row (All/Favourites/+categories), a sort `Select` (Recent/Name/Calories/Most-logged), and category badges. "Most logged" + the section-fallback for auto-suggest come from `mealLogStats()`/`useMealLogStats()` in the diary repo (counts `kind='meal'` entries + their top section per meal). One-time backfill: `CategoriseSheet` suggests a category for every uncategorised meal (name+ingredients, falling back to top-logged section) for bulk confirm.
+Production; live and in daily multi-user use. Nothing actively in progress as of 2026-05-27 (latest: meals reorganisation, both phases, shipped). The dated story of every shipped feature is in `docs/EVOLUTION.md`; do not re-narrate it here.
 
-Last work shipped (2026-05-22, newest first):
-- **Pet event reactions + sleep window.** The dog now sleeps only 11pm-4am (was 10pm-6am). New `petReaction` store (`src/features/pet/petReaction.ts`) fires transient animation beats: an eating beat on every today-dated log (pulsed from `createDiaryEntry` + `copyDayEntries` - the single choke point all log paths share, so the long-dead `justAte` path is finally driven), a love beat on rename, and milestone beats (happy on hitting goal, surprised on crossing into overeaten) sequenced ~2.8s after the eating beat via fullness-transition detection in `useDogState`. Reactions are the top pose transient, below only the dev override.
-- **New dog poses + dev pose tooling.** Added `skeleton` (3+ days no logging, hard override), `too_stuffed` (+12-25% over goal) and `overeaten` (+25%+); old `stuffed` repurposed for the gentle +5-12% band (full is now +0-5%). Art runs through `scripts/process-pet-art.py` (raw PNG -> 640px webp). Dev-only pose override (`window.__dog` console + on-screen `DevPosePanel`) for testing every state on localhost; stripped from prod via `import.meta.env.DEV` (verified by a dist grep).
-- **Meal photos.** Users can attach a photo to a saved meal in the MealEditor (reuses `downscaleImage` at 640px -> JPEG data URL stored in the new nullable `meals.image_url` D1 column; synced like any other meal column). Thumbnail shows in MealsLibrary rows. D1 migration `ALTER TABLE meals ADD COLUMN image_url TEXT` applied to remote. NOTE: same "AI macros are never trusted" reasoning does NOT apply here - this is a decorative user photo, not a data source.
-- **"Last N days" chart clarity.** Added a colour legend (green = on target ±10%, orange = over/under, grey = no entries), a dashed daily-target reference line, and a status word in the bar tooltip. Weekday labels moved to their own row so the target line aligns to a clean 96px plot area.
-
-Possible follow-ups: meal photo also in `LogMealSheet` / `MealPicker` (currently editor + library only); the happy/surprised milestone beats fire on any fullness transition into full/overeaten, so a goal that drops mid-day (weekly-budget recompute) could trigger one without a log - acceptable but noted.
-
-Open follow-ups noted in `AUDIT_3.md`:
-
-- Manual-entry foods don't capture micronutrients (form has no fibre / sugar / sodium fields).
+Open follow-ups (actionable):
+- Manual-entry foods don't capture micronutrients (form has no fibre / sugar / sodium fields) - log as 0g.
 - Food-facts toggle is device-local (localStorage) vs other prefs which sync - intentional but inconsistent.
-- Photo logging's success path is verified end-to-end with curl + a food photo. Real-world phone-camera testing with varied meals would harden it.
+- Photo logging / recipe scan verified via curl + a food photo; varied real-world phone testing would harden them.
+- Meal photo could also show in `LogMealSheet` / `MealPicker` (currently editor + library only).
+- README is partly stale (still documents the retired single `SYNC_TOKEN` bearer model). See `docs/ARCHITECTURE.md` open questions.
 
 ## Open questions for Tamara
 
-(none currently open; previous open items have been answered and acted on)
+- Reconcile the stale README with the per-user-sync-code reality, or leave it as a historical snapshot?

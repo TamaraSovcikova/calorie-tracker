@@ -44,17 +44,37 @@ export function elapsedDayFraction(date: LocalDate): number {
 }
 
 /**
- * Activity calories for a date, or null when BMR can't be estimated
- * (incomplete profile). We deliberately do NOT fall back to the raw
- * total — showing total burn (~1,600+) as "activity from 5k steps" is
- * plainly wrong. The UI shows steps + a "set up profile" hint instead.
+ * Activity calories for a date. Two independent signals, whichever is
+ * available, taking the larger so a logged workout always surfaces:
+ *
+ *  - `activeEnergyBurned`: the device's own active-calorie figure. Already
+ *    excludes resting burn and folds in logged workouts, and needs no BMR
+ *    estimate. Preferred when present (> 0).
+ *  - `totalBurned - restingSoFar`: total daily burn minus estimated resting
+ *    burn (prorated for today). Needs a complete profile for the BMR.
+ *
+ * Taking the max (never the sum) avoids double-counting while ensuring a
+ * workout that lands in only one stream still shows. Returns null only when
+ * neither signal is available (no active-energy data AND no BMR estimate),
+ * in which case the UI shows steps + a "set up profile" hint.
+ *
+ * Background: Fitbit's `total-calories` through Google Health is largely a
+ * passive (steps/HR) estimate, so manually-logged workouts often appear in
+ * `active-energy-burned` but barely move the total. Reading only the total
+ * was why workout calories were missing.
  */
 export function activeCaloriesForDate(
   totalBurned: number,
+  activeEnergyBurned: number,
   dailyBmr: number | null,
   date: LocalDate,
 ): number | null {
-  if (dailyBmr === null) return null;
-  const restingSoFar = dailyBmr * elapsedDayFraction(date);
-  return Math.round(Math.max(0, totalBurned - restingSoFar));
+  const candidates: number[] = [];
+  if (activeEnergyBurned > 0) candidates.push(activeEnergyBurned);
+  if (dailyBmr !== null) {
+    const restingSoFar = dailyBmr * elapsedDayFraction(date);
+    candidates.push(Math.max(0, totalBurned - restingSoFar));
+  }
+  if (candidates.length === 0) return null;
+  return Math.round(Math.max(...candidates));
 }

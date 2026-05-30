@@ -81,20 +81,38 @@ describe('activeCaloriesForDate', () => {
     vi.useRealTimers();
   });
 
-  it('returns null when BMR is unknown', () => {
-    expect(activeCaloriesForDate(2200, null, '2026-05-10')).toBeNull();
+  it('returns null when there is no active stream and no BMR', () => {
+    expect(activeCaloriesForDate(2200, 0, null, '2026-05-10')).toBeNull();
   });
 
-  it('subtracts a full day of BMR for a past day', () => {
-    expect(activeCaloriesForDate(2200, 1500, '2026-05-10')).toBe(700);
+  it('subtracts a full day of BMR for a past day (no active stream)', () => {
+    expect(activeCaloriesForDate(2200, 0, 1500, '2026-05-10')).toBe(700);
   });
 
   it('never goes negative', () => {
-    expect(activeCaloriesForDate(1000, 1500, '2026-05-10')).toBe(0);
+    expect(activeCaloriesForDate(1000, 0, 1500, '2026-05-10')).toBe(0);
   });
 
   it('prorates resting burn for today', () => {
     // today fraction < 1, so less BMR is subtracted than a full day
-    expect(activeCaloriesForDate(2200, 1500, '2026-05-16')).toBeGreaterThan(700);
+    expect(activeCaloriesForDate(2200, 0, 1500, '2026-05-16')).toBeGreaterThan(
+      700,
+    );
+  });
+
+  it('uses the device active-energy figure with no profile needed', () => {
+    // A logged workout that lands in active-energy-burned but barely moves
+    // the total: 600 active surfaces even though total-minus-BMR would be 0.
+    expect(activeCaloriesForDate(1500, 600, null, '2026-05-10')).toBe(600);
+  });
+
+  it('takes the larger of the two signals (workout in the active stream)', () => {
+    // total-minus-BMR = 700, but the device reports 1100 active -> 1100.
+    expect(activeCaloriesForDate(2200, 1100, 1500, '2026-05-10')).toBe(1100);
+  });
+
+  it('takes the larger of the two signals (workout in the total)', () => {
+    // total-minus-BMR = 1100, device active under-reports at 400 -> 1100.
+    expect(activeCaloriesForDate(2600, 400, 1500, '2026-05-10')).toBe(1100);
   });
 });

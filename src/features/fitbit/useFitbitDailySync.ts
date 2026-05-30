@@ -47,10 +47,12 @@ async function syncFitbitForDate(
   const dailyBmr = profileDailyBmr(profile);
   const activity = activeCaloriesForDate(
     summary.totalCaloriesBurned,
+    summary.activeEnergyBurned,
     dailyBmr,
     date,
   );
-  // null = profile incomplete, so we can't estimate activity calories.
+  // null = no active-energy stream AND no BMR estimate, so we can't derive
+  // activity calories. (With active-energy data we no longer need a profile.)
   const needsProfile = activity === null;
 
   const userId = currentUserId();

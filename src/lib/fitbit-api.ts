@@ -341,6 +341,12 @@ export interface FitbitDailySummary {
    *  diary converts this to activity-only via features/fitbit/
    *  activityCalories before storing. */
   totalCaloriesBurned: number;
+  /** Device-reported active energy (already excludes resting burn and folds
+   *  in logged workouts). 0 when the connected source does not provide it.
+   *  Fitbit's total-calories is largely a passive estimate, so a logged
+   *  workout shows up here rather than in the total - this is what makes
+   *  workout calories appear in the diary. */
+  activeEnergyBurned: number;
   steps?: number;
 }
 
@@ -459,16 +465,20 @@ export async function getDailySummary(
 ): Promise<FitbitDailySummary> {
   let token = await ensureValidAccessToken();
 
+  const zero = { value: 0, raw: null, status: 0 };
   const run = async (): Promise<FitbitDailySummary> => {
     const calories = await fetchDailyRollup(token, 'total-calories', date);
-    const steps = await fetchDailyRollup(token, 'steps', date).catch(() => ({
-      value: 0,
-      raw: null,
-      status: 0,
-    }));
+    // active-energy-burned isn't provided by every source; tolerate absence.
+    const active = await fetchDailyRollup(
+      token,
+      'active-energy-burned',
+      date,
+    ).catch(() => zero);
+    const steps = await fetchDailyRollup(token, 'steps', date).catch(() => zero);
     return {
       date,
       totalCaloriesBurned: Math.round(calories.value),
+      activeEnergyBurned: Math.round(active.value),
       steps: steps.value > 0 ? Math.round(steps.value) : undefined,
     };
   };
@@ -493,9 +503,21 @@ export async function getDailySummary(
 export interface FitbitDebugResult {
   date: LocalDate;
   account: string | null;
-  totalCalories: string;
-  steps: string;
+  /** One line per probed data type, so a workout day shows which stream
+   *  actually carries the burn. */
+  probes: { type: string; result: string }[];
 }
+
+/** Data types worth probing when activity calories look wrong. The first two
+ *  drive the diary; the rest help identify where a logged workout landed. */
+const DEBUG_DATA_TYPES = [
+  'total-calories',
+  'active-energy-burned',
+  'active-zone-minutes',
+  'active-minutes',
+  'exercise',
+  'steps',
+];
 
 export async function debugGoogleHealth(
   date: LocalDate,
@@ -504,17 +526,16 @@ export async function debugGoogleHealth(
   const probe = async (dataType: string): Promise<string> => {
     try {
       const r = await fetchDailyRollup(token, dataType, date);
-      return `HTTP ${r.status} · value=${r.value} · ${JSON.stringify(r.raw).slice(0, 500)}`;
+      return `HTTP ${r.status} · value=${r.value} · ${JSON.stringify(r.raw).slice(0, 300)}`;
     } catch (e) {
       return e instanceof Error ? e.message : 'error';
     }
   };
-  return {
-    date,
-    account: getConnectedAccountEmail(),
-    totalCalories: await probe('total-calories'),
-    steps: await probe('steps'),
-  };
+  const probes: { type: string; result: string }[] = [];
+  for (const t of DEBUG_DATA_TYPES) {
+    probes.push({ type: t, result: await probe(t) });
+  }
+  return { date, account: getConnectedAccountEmail(), probes };
 }
 
 export async function disconnectFitbit(): Promise<void> {

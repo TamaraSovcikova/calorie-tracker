@@ -91,8 +91,9 @@ export function FitbitSection() {
       setDebugResult({
         date: todayLocal(),
         account: getConnectedAccountEmail(),
-        totalCalories: err instanceof Error ? err.message : 'error',
-        steps: '—',
+        probes: [
+          { type: 'error', result: err instanceof Error ? err.message : 'error' },
+        ],
       });
     } finally {
       setDebugBusy(false);
@@ -223,14 +224,16 @@ export function FitbitSection() {
                   <span className="text-muted-foreground">account: </span>
                   {debugResult.account ?? '(unknown)'}
                 </div>
-                <div className="break-all">
-                  <span className="text-muted-foreground">total-calories: </span>
-                  {debugResult.totalCalories}
-                </div>
-                <div className="break-all">
-                  <span className="text-muted-foreground">steps: </span>
-                  {debugResult.steps}
-                </div>
+                {debugResult.probes.map((p) => (
+                  <div key={p.type} className="break-all">
+                    <span className="text-muted-foreground">{p.type}: </span>
+                    {p.result}
+                  </div>
+                ))}
+                <p className="pt-1 text-muted-foreground/70">
+                  Run this on a day you logged a workout: the stream whose
+                  value jumps is the one carrying it.
+                </p>
               </div>
             )}
             <Button
