@@ -503,17 +503,18 @@ function isPathOrId(s: string): boolean {
   return false;
 }
 
-/** Find a workout's activity label. Activity type may be an enum string
- *  (e.g. "STRENGTH_TRAINING") or a free-text name; humanise either.
- *  Skips resource path strings (the "name" field of a data-point is the
- *  REST resource path, NOT the activity name). */
+/** Find a workout's activity label. The confirmed Google Health exercise
+ *  data point shape is:
+ *    { exercise: { exerciseType: "WALKING", metricsSummary: { caloriesKcal: 97, ... } } }
+ *  We look for `exerciseType` first (exact match), then fall back to other
+ *  candidate keys. Resource path strings are skipped. */
 function findWorkoutName(obj: unknown, depth = 0): string | null {
   if (depth > 6 || obj === null || typeof obj !== 'object') return null;
   for (const [key, val] of Object.entries(obj as Record<string, unknown>)) {
     const k = key.toLowerCase();
-    // Only look at keys that suggest an activity label.
     if (
-      (k === 'activitytype' || k === 'type' || k === 'activityname' || k === 'title') &&
+      (k === 'exercisetype' || k === 'activitytype' || k === 'type' ||
+       k === 'activityname' || k === 'title') &&
       typeof val === 'string' &&
       val.trim() &&
       !/^\d/.test(val) &&

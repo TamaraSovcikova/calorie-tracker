@@ -45,11 +45,13 @@ async function syncFitbitForDate(
 ): Promise<void> {
   const summary = await getDailySummary(date);
   const dailyBmr = profileDailyBmr(profile);
+  const sessionKcalTotal = summary.workouts.reduce((s, w) => s + w.kcal, 0);
   const activity = activeCaloriesForDate(
     summary.totalCaloriesBurned,
     summary.activeEnergyBurned,
     dailyBmr,
     date,
+    sessionKcalTotal,
   );
   // null = no active-energy stream AND no BMR estimate, so we can't derive
   // activity calories. (With active-energy data we no longer need a profile.)

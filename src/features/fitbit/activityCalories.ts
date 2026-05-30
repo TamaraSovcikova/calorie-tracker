@@ -44,37 +44,40 @@ export function elapsedDayFraction(date: LocalDate): number {
 }
 
 /**
- * Activity calories for a date. Two independent signals, whichever is
- * available, taking the larger so a logged workout always surfaces:
+ * Passive background-activity calories for the diary's "Health activity" row.
+ * This is intentionally separate from the per-session exercise rows so the
+ * two are never summed. The signals and their priority:
  *
- *  - `activeEnergyBurned`: the device's own active-calorie figure. Already
- *    excludes resting burn and folds in logged workouts, and needs no BMR
- *    estimate. Preferred when present (> 0).
- *  - `totalBurned - restingSoFar`: total daily burn minus estimated resting
- *    burn (prorated for today). Needs a complete profile for the BMR.
+ *  - `activeEnergyBurned` (> 0): Fitbit's own active-calorie figure. On
+ *    workout days this IS populated and already represents all active energy
+ *    for the day (confirmed via diagnostic: 773 kcal on a 5-session day).
+ *    Using it as-is means the named exercise sessions shown alongside it are
+ *    already included in this number - so we subtract the session sum to
+ *    avoid the user seeing the same calories twice.
+ *  - `totalBurned - restingSoFar` (BMR fallback): when active-energy-burned
+ *    is 0 (non-workout days or devices that don't provide it). Requires a
+ *    complete profile for the BMR estimate. Session calories are subtracted
+ *    here too for the same reason.
  *
- * Taking the max (never the sum) avoids double-counting while ensuring a
- * workout that lands in only one stream still shows. Returns null only when
- * neither signal is available (no active-energy data AND no BMR estimate),
- * in which case the UI shows steps + a "set up profile" hint.
- *
- * Background: Fitbit's `total-calories` through Google Health is largely a
- * passive (steps/HR) estimate, so manually-logged workouts often appear in
- * `active-energy-burned` but barely move the total. Reading only the total
- * was why workout calories were missing.
+ * Returns null only when neither signal is available.
  */
 export function activeCaloriesForDate(
   totalBurned: number,
   activeEnergyBurned: number,
   dailyBmr: number | null,
   date: LocalDate,
+  /** Sum of all exercise-session kcal already shown as named rows. */
+  sessionKcalTotal = 0,
 ): number | null {
-  const candidates: number[] = [];
-  if (activeEnergyBurned > 0) candidates.push(activeEnergyBurned);
-  if (dailyBmr !== null) {
+  let base: number | null = null;
+  if (activeEnergyBurned > 0) {
+    base = activeEnergyBurned;
+  } else if (dailyBmr !== null) {
     const restingSoFar = dailyBmr * elapsedDayFraction(date);
-    candidates.push(Math.max(0, totalBurned - restingSoFar));
+    base = Math.max(0, totalBurned - restingSoFar);
   }
-  if (candidates.length === 0) return null;
-  return Math.round(Math.max(...candidates));
+  if (base === null) return null;
+  // Subtract session calories already shown as named rows - the background
+  // row should represent only the remaining non-session activity.
+  return Math.round(Math.max(0, base - sessionKcalTotal));
 }

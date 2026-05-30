@@ -106,13 +106,23 @@ describe('activeCaloriesForDate', () => {
     expect(activeCaloriesForDate(1500, 600, null, '2026-05-10')).toBe(600);
   });
 
-  it('takes the larger of the two signals (workout in the active stream)', () => {
-    // total-minus-BMR = 700, but the device reports 1100 active -> 1100.
-    expect(activeCaloriesForDate(2200, 1100, 1500, '2026-05-10')).toBe(1100);
+  it('prefers active-energy-burned over total-minus-BMR when both present', () => {
+    // active-energy-burned = 773, total-minus-BMR = 1170. Since active-energy
+    // is present, use it as the base (it is the authoritative active figure).
+    expect(activeCaloriesForDate(2670, 773, 1500, '2026-05-28')).toBe(773);
   });
 
-  it('takes the larger of the two signals (workout in the total)', () => {
-    // total-minus-BMR = 1100, device active under-reports at 400 -> 1100.
-    expect(activeCaloriesForDate(2600, 400, 1500, '2026-05-10')).toBe(1100);
+  it('subtracts session calories to avoid double-counting named exercise rows', () => {
+    // active-energy-burned = 773, sessions = 691 -> background = 82.
+    expect(activeCaloriesForDate(2670, 773, 1500, '2026-05-28', 691)).toBe(82);
+  });
+
+  it('clamps background row to 0 when sessions exceed active-energy total', () => {
+    expect(activeCaloriesForDate(2000, 400, 1500, '2026-05-10', 500)).toBe(0);
+  });
+
+  it('falls back to total-minus-BMR when active-energy is 0 (no workout)', () => {
+    // Non-workout day: active-energy-burned = 0, total-minus-BMR = 700.
+    expect(activeCaloriesForDate(2200, 0, 1500, '2026-05-10')).toBe(700);
   });
 });
