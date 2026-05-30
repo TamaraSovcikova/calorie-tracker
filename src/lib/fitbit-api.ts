@@ -494,17 +494,30 @@ function findNumberByKeyHint(obj: unknown, hints: string[], depth = 0): number |
   return null;
 }
 
+/** True when a string looks like a resource path or opaque ID rather than
+ *  a human-readable label. Skips "Users/…", "dataTypes/…", long hex IDs, etc. */
+function isPathOrId(s: string): boolean {
+  if (s.includes('/')) return true; // resource path like "Users/123/datatypes/..."
+  if (/^[0-9a-f-]{20,}$/i.test(s)) return true; // UUID / long hex ID
+  if (s.length > 80) return true; // suspiciously long string
+  return false;
+}
+
 /** Find a workout's activity label. Activity type may be an enum string
- *  (e.g. "STRENGTH_TRAINING") or a free-text name; humanise either. */
+ *  (e.g. "STRENGTH_TRAINING") or a free-text name; humanise either.
+ *  Skips resource path strings (the "name" field of a data-point is the
+ *  REST resource path, NOT the activity name). */
 function findWorkoutName(obj: unknown, depth = 0): string | null {
   if (depth > 6 || obj === null || typeof obj !== 'object') return null;
   for (const [key, val] of Object.entries(obj as Record<string, unknown>)) {
     const k = key.toLowerCase();
+    // Only look at keys that suggest an activity label.
     if (
-      (k.includes('activitytype') || k.includes('activity') || k === 'type' || k.includes('name')) &&
+      (k === 'activitytype' || k === 'type' || k === 'activityname' || k === 'title') &&
       typeof val === 'string' &&
       val.trim() &&
-      !/^\d/.test(val)
+      !/^\d/.test(val) &&
+      !isPathOrId(val)
     ) {
       return humaniseActivity(val);
     }
@@ -652,7 +665,12 @@ export async function debugGoogleHealth(
         const summary = r.workouts
           .map((w) => `${w.name} ${w.kcal}kcal`)
           .join(', ');
-        return `HTTP ${r.status} · ${r.workouts.length} session(s)${summary ? ` · ${summary}` : ''} · ${JSON.stringify(r.raw).slice(0, 300)}`;
+        // Dump the full first data point so the field shape is visible.
+        const firstPoint = (r.raw as { dataPoints?: unknown[] })?.dataPoints?.[0];
+        const rawSnippet = firstPoint
+          ? JSON.stringify(firstPoint).slice(0, 600)
+          : JSON.stringify(r.raw).slice(0, 300);
+        return `HTTP ${r.status} · ${r.workouts.length} session(s)${summary ? ` · ${summary}` : ''} · first point: ${rawSnippet}`;
       } catch (e) {
         return e instanceof Error ? e.message : 'error';
       }
