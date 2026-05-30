@@ -110,4 +110,14 @@
     min-height: 44px;
     min-width: 44px;
   }
+
+  /* Hide the native scrollbar on horizontal chip/scroll rows. Touch and
+   * wheel scrolling still work; we just drop the squished native bar. */
+  .no-scrollbar {
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* old Edge */
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none; /* WebKit / Chromium */
+  }
 }

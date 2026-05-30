@@ -1,5 +1,5 @@
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Check } from 'lucide-react';
+import { Check, ChefHat } from 'lucide-react';
 import { db } from '@/db/dexie';
 import type { DiaryEntry, Food, Meal } from '@/db/types';
 import { formatGrams, formatKcal, MACRO_LABELS, type MacroKey } from '@/lib/macros';
@@ -53,6 +53,9 @@ export function DiaryRow({
       : entry.kind === 'quick'
         ? 'Quick add'
         : 'Food');
+  // Meals and OFF-cached foods can carry a photo; show it as a thumbnail.
+  const imageUrl = target?.image_url;
+  const showThumb = !selectMode && entry.kind !== 'quick';
   const macroVal =
     primaryMacro === 'protein'
       ? entry.protein
@@ -94,6 +97,19 @@ export function DiaryRow({
           {selected && <Check className="h-3.5 w-3.5" strokeWidth={3} />}
         </span>
       )}
+      {showThumb &&
+        (imageUrl ? (
+          <img
+            src={imageUrl}
+            alt=""
+            loading="lazy"
+            className="h-9 w-9 shrink-0 rounded-lg bg-muted object-cover"
+          />
+        ) : entry.kind === 'meal' ? (
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted">
+            <ChefHat className="h-4 w-4 text-muted-foreground" />
+          </div>
+        ) : null)}
       <div className="min-w-0 flex-1">
         <div className="truncate text-sm font-medium">{name}</div>
         <div className="mt-0.5 truncate text-xs text-muted-foreground">

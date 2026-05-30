@@ -98,7 +98,7 @@ export function MealsLibrary() {
             />
           </div>
 
-          <div className="-mx-4 flex gap-1.5 overflow-x-auto px-4 pb-0.5">
+          <div className="no-scrollbar -mx-4 flex gap-1.5 overflow-x-auto px-4">
             {filterChips.map((chip) => (
               <button
                 key={chip.value}
