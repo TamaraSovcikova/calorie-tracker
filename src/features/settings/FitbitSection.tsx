@@ -80,16 +80,17 @@ export function FitbitSection() {
     await disconnectFitbit();
   };
 
+  const [debugDate, setDebugDate] = useState(() => todayLocal());
   const [debugResult, setDebugResult] = useState<FitbitDebugResult | null>(null);
   const [debugBusy, setDebugBusy] = useState(false);
   const handleDebug = async () => {
     setDebugBusy(true);
     setDebugResult(null);
     try {
-      setDebugResult(await debugGoogleHealth(todayLocal()));
+      setDebugResult(await debugGoogleHealth(debugDate));
     } catch (err) {
       setDebugResult({
-        date: todayLocal(),
+        date: debugDate,
         account: getConnectedAccountEmail(),
         probes: [
           { type: 'error', result: err instanceof Error ? err.message : 'error' },
@@ -200,6 +201,18 @@ export function FitbitSection() {
                   {expiresAt && formatDistanceToNow(expiresAt, { addSuffix: true })}
                 </span>
               )}
+            </div>
+            <div className="flex items-center gap-2">
+              <label className="shrink-0 text-xs text-muted-foreground">
+                Date to test
+              </label>
+              <input
+                type="date"
+                value={debugDate}
+                max={todayLocal()}
+                onChange={(e) => setDebugDate(e.target.value || todayLocal())}
+                className="flex-1 rounded-lg border border-input bg-background px-2 py-1 text-xs outline-none focus:ring-2 focus:ring-ring"
+              />
             </div>
             <Button
               type="button"
