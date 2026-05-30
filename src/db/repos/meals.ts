@@ -17,8 +17,8 @@ export interface CreateMealInput {
   servings?: number;
   /** Downscaled JPEG data URL for the meal photo (optional). */
   image_url?: string;
-  /** Coarse meal-type for filtering (optional). */
-  category?: import('../types').MealCategory;
+  /** Category tokens for filtering (a meal can belong to several). */
+  categories?: string[];
   items: MealItemInput[];
 }
 
@@ -38,7 +38,7 @@ export async function createMeal(input: CreateMealInput): Promise<Meal> {
     notes: input.notes,
     servings: normaliseServings(input.servings),
     image_url: input.image_url,
-    category: input.category,
+    categories: input.categories,
     created_at: now,
     updated_at: now,
   };
@@ -105,7 +105,7 @@ export async function duplicateMeal(id: string): Promise<Meal | undefined> {
     notes: original.notes,
     servings: original.servings,
     image_url: original.image_url,
-    category: original.category,
+    categories: original.categories ?? (original.category ? [original.category] : undefined),
     items: items.map((it) => ({ food_id: it.food_id, qty: it.qty, unit: it.unit })),
   });
 }

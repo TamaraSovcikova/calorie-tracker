@@ -20,13 +20,20 @@ import { RecipeScanSheet } from '@/features/recipe-scan/RecipeScanSheet';
 import { CategoriseSheet } from './CategoriseSheet';
 import { useMealsWithTotals } from './useMealsWithTotals';
 import { formatServings, matchesMealQuery } from './mealMath';
-import { CATEGORY_LABEL, MEAL_CATEGORIES } from './mealCategory';
+import {
+  categoryLabel,
+  mealCategories,
+  MEAL_CATEGORIES,
+  parseCustomCategories,
+} from './mealCategory';
 import { toggleMealFavorite } from '@/db/repos/meals';
 import { useMealLogStats } from '@/db/repos/diary';
+import { useProfile } from '@/db/repos/profile';
 import { formatKcal } from '@/lib/macros';
-import type { Meal, MealCategory } from '@/db/types';
+import type { Meal } from '@/db/types';
 
-type MealFilter = 'all' | 'favorites' | MealCategory;
+/** 'all' | 'favorites' | a category token. */
+type MealFilter = string;
 type MealSort = 'recent' | 'name' | 'calories' | 'logged';
 
 /** Meals sub-tab of the Library: saved meal templates, tap to log. */
@@ -34,6 +41,7 @@ export function MealsLibrary() {
   const navigate = useNavigate();
   const meals = useMealsWithTotals();
   const logStats = useMealLogStats();
+  const profile = useProfile();
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<MealFilter>('all');
   const [sort, setSort] = useState<MealSort>('recent');
@@ -43,7 +51,7 @@ export function MealsLibrary() {
   const [categoriseOpen, setCategoriseOpen] = useState(false);
 
   const uncategorised = useMemo(
-    () => (meals ?? []).filter((m) => !m.meal.category),
+    () => (meals ?? []).filter((m) => mealCategories(m.meal).length === 0),
     [meals],
   );
 
@@ -51,7 +59,8 @@ export function MealsLibrary() {
     if (!meals) return [];
     let list = meals.filter((m) => matchesMealQuery(m.haystack, query));
     if (filter === 'favorites') list = list.filter((m) => m.meal.favorite);
-    else if (filter !== 'all') list = list.filter((m) => m.meal.category === filter);
+    else if (filter !== 'all')
+      list = list.filter((m) => mealCategories(m.meal).includes(filter));
     // Favourites stay pinned on top, then the chosen sort key.
     return [...list].sort((a, b) => {
       const fa = a.meal.favorite ? 1 : 0;
@@ -73,10 +82,23 @@ export function MealsLibrary() {
     });
   }, [meals, query, filter, sort, logStats]);
 
+  // Chips: built-ins, then any custom categories (from profile, plus any
+  // still referenced by a meal even if removed from the profile list).
+  const customTokens = useMemo(() => {
+    const tokens = new Set(parseCustomCategories(profile?.custom_meal_categories));
+    for (const m of meals ?? []) {
+      for (const t of mealCategories(m.meal)) {
+        if (!(MEAL_CATEGORIES as readonly string[]).includes(t)) tokens.add(t);
+      }
+    }
+    return [...tokens];
+  }, [profile?.custom_meal_categories, meals]);
+
   const filterChips: { value: MealFilter; label: string }[] = [
     { value: 'all', label: 'All' },
     { value: 'favorites', label: '★ Favourites' },
-    ...MEAL_CATEGORIES.map((c) => ({ value: c, label: CATEGORY_LABEL[c] })),
+    ...MEAL_CATEGORIES.map((c) => ({ value: c, label: categoryLabel(c) })),
+    ...customTokens.map((t) => ({ value: t, label: categoryLabel(t) })),
   ];
 
   return (
@@ -200,13 +222,16 @@ export function MealsLibrary() {
                   </div>
                 )}
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex flex-wrap items-center gap-1.5">
                     <span className="truncate text-sm font-medium">{meal.name}</span>
-                    {meal.category && (
-                      <span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
-                        {CATEGORY_LABEL[meal.category]}
+                    {mealCategories(meal).map((token) => (
+                      <span
+                        key={token}
+                        className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground"
+                      >
+                        {categoryLabel(token)}
                       </span>
-                    )}
+                    ))}
                   </div>
                   <div className="mt-0.5 truncate text-xs text-muted-foreground tabular-nums">
                     {itemCount} {itemCount === 1 ? 'item' : 'items'}

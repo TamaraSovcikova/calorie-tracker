@@ -265,7 +265,11 @@ class SyncEngine {
         );
 
         if (pull.meals?.length) {
-          await this.upsertWithLww(db.meals, pull.meals as Meal[], 'id');
+          await this.upsertWithLww(
+            db.meals,
+            (pull.meals as Meal[]).map(this.deserialiseMeal),
+            'id',
+          );
         }
         if (pull.diary_entries?.length) {
           await this.upsertWithLww(
@@ -346,6 +350,20 @@ class SyncEngine {
       }
     }
     return f as Food;
+  };
+
+  /** meals.categories is a JSON array column - parse the D1 TEXT back to an
+   *  array (mirrors deserialiseFood for custom_units). */
+  private deserialiseMeal = (m: Meal & { categories?: unknown }): Meal => {
+    if (typeof m.categories === 'string') {
+      try {
+        const parsed = JSON.parse(m.categories);
+        return { ...m, categories: Array.isArray(parsed) ? parsed : undefined };
+      } catch {
+        return { ...m, categories: undefined };
+      }
+    }
+    return m as Meal;
   };
 
   private async upsertWithLww<T extends { updated_at: string }>(

@@ -1,6 +1,6 @@
-import type { MealCategory } from '@/db/types';
+import type { Meal, MealCategory } from '@/db/types';
 
-/** All categories, in display order (filter chips + pickers). */
+/** Built-in categories, in display order (filter chips + pickers). */
 export const MEAL_CATEGORIES: readonly MealCategory[] = [
   'breakfast',
   'lunch',
@@ -16,6 +16,43 @@ export const CATEGORY_LABEL: Record<MealCategory, string> = {
   snack: 'Snack',
   other: 'Other',
 };
+
+const BUILT_IN = new Set<string>(MEAL_CATEGORIES);
+
+/** Normalise free text to a category token: lowercase, single-spaced. */
+export function toCategoryToken(raw: string): string {
+  return raw.trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+/** Display label for any token: built-in label, else title-cased custom. */
+export function categoryLabel(token: string): string {
+  if ((BUILT_IN as Set<string>).has(token)) {
+    return CATEGORY_LABEL[token as MealCategory];
+  }
+  return token.replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+/**
+ * A meal's categories as tokens, tolerant of the legacy single `category`
+ * field: new `categories[]` wins; otherwise fall back to `[category]`.
+ */
+export function mealCategories(meal: Pick<Meal, 'categories' | 'category'>): string[] {
+  if (meal.categories && meal.categories.length) return meal.categories;
+  return meal.category ? [meal.category] : [];
+}
+
+/** Parse the profile's JSON array of custom category tokens. */
+export function parseCustomCategories(raw: string | undefined): string[] {
+  if (!raw) return [];
+  try {
+    const arr = JSON.parse(raw) as unknown;
+    return Array.isArray(arr)
+      ? arr.filter((x): x is string => typeof x === 'string' && !!x.trim())
+      : [];
+  } catch {
+    return [];
+  }
+}
 
 /**
  * Keyword signals per category, matched against the meal name + ingredient

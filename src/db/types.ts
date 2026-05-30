@@ -98,6 +98,11 @@ export interface Profile {
    */
   untracked_dates?: string;
 
+  /** User-created meal categories, as a JSON array of lowercase tokens.
+   *  Stored as a string so it round-trips through sync without a JSON
+   *  transform (parsed at use via parseCustomCategories). */
+  custom_meal_categories?: string;
+
   plan: 'free' | 'pro';
   fitbit_connected: boolean;
   onboarded: boolean;
@@ -148,9 +153,15 @@ export interface Meal {
   user_id: ID;
   name: string;
   notes?: string;
-  /** Coarse meal-type for filter chips. Optional/nullable: pre-feature and
-   *  un-categorised rows read undefined. */
+  /** Legacy single category. Superseded by `categories` (a meal can belong
+   *  to several). Kept for back-compat reads of rows written before the
+   *  multi-category change; use `mealCategories(meal)` to read either. */
   category?: MealCategory;
+  /** Categories this meal belongs to, as lowercase tokens. Built-in tokens
+   *  are the MealCategory values; custom ones are user-defined (see
+   *  profile.custom_meal_categories). Optional/nullable: legacy rows read
+   *  undefined and fall back to `category`. */
+  categories?: string[];
   /**
    * How many portions the batch makes. Ingredients are entered as the
    * whole batch (e.g. all the groceries cooked at once); per-portion
