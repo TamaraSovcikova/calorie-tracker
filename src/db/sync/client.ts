@@ -368,6 +368,7 @@ class SyncEngine {
     for (const k of [
       'eat_back_burned',
       'weekly_budget_enabled',
+      'budget_carryover_enabled',
       'weekly_budget_floor',
       'fitbit_connected',
       'onboarded',

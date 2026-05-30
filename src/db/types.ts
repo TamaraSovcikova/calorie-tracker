@@ -66,6 +66,26 @@ export interface Profile {
    * the feature existed read as off / Monday.
    */
   weekly_budget_enabled?: boolean;
+  /**
+   * Budget period: 'week' (default) recalculates over a 7-day week; 'month'
+   * recalculates over the calendar month, so a single bad day dilutes far
+   * more and an end-of-period overage still has days left to absorb it.
+   * Undefined reads as 'week' (pre-feature behaviour).
+   */
+  budget_period?: 'week' | 'month';
+  /**
+   * Carry-over: when on, a period that ends in net surplus/deficit rolls
+   * that balance into the next period as an opening adjustment - so an
+   * overage on the last day is not forgotten. Off = each period starts
+   * fresh (the old behaviour). Optional, default off.
+   */
+  budget_carryover_enabled?: boolean;
+  /**
+   * Optional cap (kcal) on the carried-over balance, applied to both
+   * directions. Undefined or <= 0 means no cap. Keeps one disastrous week
+   * from dominating the next period.
+   */
+  budget_carryover_cap?: number;
   /** Day the budget week starts on: 0 = Sunday … 6 = Saturday. */
   week_start_day?: number;
   /** Soft floor — never drop a day's target below ~70% of the daily goal. */

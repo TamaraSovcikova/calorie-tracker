@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { effectiveDailyKcal, weekDates, weekStartFor } from './weeklyBudget';
+import {
+  carryInClamped,
+  effectiveDailyKcal,
+  monthDates,
+  periodDatesFor,
+  previousPeriodDatesFor,
+  weekDates,
+  weekStartFor,
+} from './weeklyBudget';
 
 // 2026-05-19 is a Tuesday.
 describe('weekStartFor', () => {
@@ -109,5 +117,71 @@ describe('effectiveDailyKcal', () => {
     expect(effective[0]).toBe(2000); // overridden to on-target
     expect(effective[1]).toBe(2000); // Tue — logged, kept
     expect(missedCount).toBe(1);
+  });
+});
+
+describe('monthDates', () => {
+  it('returns every day of a 31-day month', () => {
+    const days = monthDates('2026-05-19');
+    expect(days.length).toBe(31);
+    expect(days[0]).toBe('2026-05-01');
+    expect(days[30]).toBe('2026-05-31');
+    expect(days).toContain('2026-05-19');
+  });
+
+  it('handles a short month (February, non-leap)', () => {
+    const days = monthDates('2026-02-10');
+    expect(days.length).toBe(28);
+    expect(days[27]).toBe('2026-02-28');
+  });
+});
+
+describe('periodDatesFor', () => {
+  it('delegates to weekDates for the week period', () => {
+    expect(periodDatesFor('2026-05-19', 'week', 1)).toEqual(
+      weekDates('2026-05-19', 1),
+    );
+  });
+
+  it('delegates to monthDates for the month period', () => {
+    expect(periodDatesFor('2026-05-19', 'month', 1)).toEqual(
+      monthDates('2026-05-19'),
+    );
+  });
+});
+
+describe('previousPeriodDatesFor', () => {
+  it('returns the prior week', () => {
+    const prev = previousPeriodDatesFor('2026-05-19', 'week', 1);
+    expect(prev[0]).toBe('2026-05-11');
+    expect(prev[6]).toBe('2026-05-17');
+  });
+
+  it('returns the prior calendar month', () => {
+    const prev = previousPeriodDatesFor('2026-05-19', 'month', 1);
+    expect(prev[0]).toBe('2026-04-01');
+    expect(prev.length).toBe(30); // April
+    expect(prev[29]).toBe('2026-04-30');
+  });
+});
+
+describe('carryInClamped', () => {
+  it('carries a banked surplus forward as positive', () => {
+    // ate 13000 against a 14000 budget -> banked 1000
+    expect(carryInClamped(14000, 13000, undefined)).toBe(1000);
+  });
+
+  it('carries an overage forward as negative (the penalty)', () => {
+    // ate 15000 against a 14000 budget -> 1000 over
+    expect(carryInClamped(14000, 15000, undefined)).toBe(-1000);
+  });
+
+  it('clamps to +/- the cap when one is set', () => {
+    expect(carryInClamped(14000, 9000, 2000)).toBe(2000); // +5000 capped
+    expect(carryInClamped(14000, 20000, 2000)).toBe(-2000); // -6000 capped
+  });
+
+  it('treats a zero or negative cap as no cap', () => {
+    expect(carryInClamped(14000, 9000, 0)).toBe(5000);
   });
 });

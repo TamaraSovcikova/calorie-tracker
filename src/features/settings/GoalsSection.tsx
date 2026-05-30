@@ -148,8 +148,8 @@ export function GoalsSection({ profile }: GoalsSectionProps) {
       />
 
       <Switch
-        label="Weekly calorie budget"
-        description="Recalculate each day's target from the week's remaining budget (your daily goal × 7). Going over one day trims the rest of the week; going under banks calories forward — so overages aren't forgotten."
+        label="Calorie budget"
+        description="Recalculate each day's target from the period's remaining budget (your daily goal × days in the period). Going over one day trims the rest; going under banks calories forward — so overages aren't forgotten."
         checked={!!profile.weekly_budget_enabled}
         onChange={(v) => void updateProfile({ weekly_budget_enabled: v })}
       />
@@ -158,26 +158,77 @@ export function GoalsSection({ profile }: GoalsSectionProps) {
         <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-3">
           <label className="block space-y-1">
             <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Week starts on
+              Budget period
             </span>
             <Select
-              value={String(profile.week_start_day ?? 1)}
+              value={profile.budget_period ?? 'week'}
               onChange={(e) =>
                 void updateProfile({
-                  week_start_day: parseInt(e.target.value, 10),
+                  budget_period: e.target.value as 'week' | 'month',
                 })
               }
             >
-              {WEEK_DAY_LABELS.map((label, i) => (
-                <option key={label} value={i}>
-                  {label}
-                </option>
-              ))}
+              <option value="week">Weekly (daily goal × 7)</option>
+              <option value="month">Monthly (average per day over the calendar month)</option>
             </Select>
           </label>
+
+          {(profile.budget_period ?? 'week') === 'week' && (
+            <label className="block space-y-1">
+              <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Week starts on
+              </span>
+              <Select
+                value={String(profile.week_start_day ?? 1)}
+                onChange={(e) =>
+                  void updateProfile({
+                    week_start_day: parseInt(e.target.value, 10),
+                  })
+                }
+              >
+                {WEEK_DAY_LABELS.map((label, i) => (
+                  <option key={label} value={i}>
+                    {label}
+                  </option>
+                ))}
+              </Select>
+            </label>
+          )}
+
+          <Switch
+            label="Carry over to the next period"
+            description="Roll an unfinished period's surplus or overage into the next one. So an overage on the last day isn't forgotten — it starts the next period in deficit (and banked calories start it ahead)."
+            checked={!!profile.budget_carryover_enabled}
+            onChange={(v) => void updateProfile({ budget_carryover_enabled: v })}
+          />
+
+          {profile.budget_carryover_enabled && (
+            <LabeledInput
+              label="Carry-over cap (optional)"
+              type="number"
+              inputMode="numeric"
+              step="any"
+              min="0"
+              placeholder="No cap"
+              value={
+                profile.budget_carryover_cap && profile.budget_carryover_cap > 0
+                  ? String(profile.budget_carryover_cap)
+                  : ''
+              }
+              onChange={(e) => {
+                const n = parseFloat(e.target.value);
+                void updateProfile({
+                  budget_carryover_cap:
+                    Number.isFinite(n) && n > 0 ? n : undefined,
+                });
+              }}
+              trailing="kcal"
+            />
+          )}
+
           <Switch
             label="Soft floor"
-            description="Never drop a day's target below 70% of your daily goal. If the week can't fully recover, it simply shows as over budget instead."
+            description="Never drop a day's target below 70% of your daily goal. If the period can't fully recover, it simply shows as over budget instead."
             checked={!!profile.weekly_budget_floor}
             onChange={(v) => void updateProfile({ weekly_budget_floor: v })}
           />
