@@ -21,10 +21,10 @@ import { CategoriseSheet } from './CategoriseSheet';
 import { useMealsWithTotals } from './useMealsWithTotals';
 import { formatServings, matchesMealQuery } from './mealMath';
 import {
+  buildMealFilterChips,
   categoryLabel,
   mealCategories,
-  MEAL_CATEGORIES,
-  parseCustomCategories,
+  mealMatchesFilter,
 } from './mealCategory';
 import { toggleMealFavorite } from '@/db/repos/meals';
 import { useMealLogStats } from '@/db/repos/diary';
@@ -57,10 +57,9 @@ export function MealsLibrary() {
 
   const visible = useMemo(() => {
     if (!meals) return [];
-    let list = meals.filter((m) => matchesMealQuery(m.haystack, query));
-    if (filter === 'favorites') list = list.filter((m) => m.meal.favorite);
-    else if (filter !== 'all')
-      list = list.filter((m) => mealCategories(m.meal).includes(filter));
+    const list = meals.filter(
+      (m) => matchesMealQuery(m.haystack, query) && mealMatchesFilter(m.meal, filter),
+    );
     // Favourites stay pinned on top, then the chosen sort key.
     return [...list].sort((a, b) => {
       const fa = a.meal.favorite ? 1 : 0;
@@ -84,22 +83,14 @@ export function MealsLibrary() {
 
   // Chips: built-ins, then any custom categories (from profile, plus any
   // still referenced by a meal even if removed from the profile list).
-  const customTokens = useMemo(() => {
-    const tokens = new Set(parseCustomCategories(profile?.custom_meal_categories));
-    for (const m of meals ?? []) {
-      for (const t of mealCategories(m.meal)) {
-        if (!(MEAL_CATEGORIES as readonly string[]).includes(t)) tokens.add(t);
-      }
-    }
-    return [...tokens];
-  }, [profile?.custom_meal_categories, meals]);
-
-  const filterChips: { value: MealFilter; label: string }[] = [
-    { value: 'all', label: 'All' },
-    { value: 'favorites', label: '★ Favourites' },
-    ...MEAL_CATEGORIES.map((c) => ({ value: c, label: categoryLabel(c) })),
-    ...customTokens.map((t) => ({ value: t, label: categoryLabel(t) })),
-  ];
+  const filterChips = useMemo(
+    () =>
+      buildMealFilterChips(
+        (meals ?? []).map((m) => m.meal),
+        profile?.custom_meal_categories,
+      ),
+    [meals, profile?.custom_meal_categories],
+  );
 
   return (
     <>

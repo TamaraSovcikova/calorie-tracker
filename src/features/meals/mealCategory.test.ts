@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildMealFilterChips,
   categoryLabel,
+  customCategoryTokens,
   mealCategories,
+  mealMatchesFilter,
   parseCustomCategories,
   suggestMealCategory,
   toCategoryToken,
@@ -97,5 +100,55 @@ describe('parseCustomCategories', () => {
     expect(parseCustomCategories(undefined)).toEqual([]);
     expect(parseCustomCategories('not json')).toEqual([]);
     expect(parseCustomCategories('{"a":1}')).toEqual([]);
+  });
+});
+
+describe('customCategoryTokens', () => {
+  it('unions the profile list with tokens still referenced by a meal', () => {
+    const tokens = customCategoryTokens(
+      [{ categories: ['lunch', 'supper'] }, { category: 'breakfast' }],
+      '["pre workout"]',
+    );
+    // "supper" is referenced by a meal but not in the profile list; both kept.
+    expect(tokens).toContain('pre workout');
+    expect(tokens).toContain('supper');
+    // Built-ins are never custom tokens.
+    expect(tokens).not.toContain('lunch');
+    expect(tokens).not.toContain('breakfast');
+  });
+  it('de-dupes', () => {
+    const tokens = customCategoryTokens(
+      [{ categories: ['supper'] }],
+      '["supper"]',
+    );
+    expect(tokens.filter((t) => t === 'supper')).toHaveLength(1);
+  });
+});
+
+describe('buildMealFilterChips', () => {
+  it('starts with All + Favourites, then built-ins, then custom', () => {
+    const chips = buildMealFilterChips(
+      [{ categories: ['pre workout'] }],
+      undefined,
+    );
+    expect(chips[0]).toEqual({ value: 'all', label: 'All' });
+    expect(chips[1].value).toBe('favorites');
+    expect(chips.map((c) => c.value)).toContain('breakfast');
+    expect(chips.find((c) => c.value === 'pre workout')?.label).toBe('Pre Workout');
+  });
+});
+
+describe('mealMatchesFilter', () => {
+  it('all matches everything', () => {
+    expect(mealMatchesFilter({}, 'all')).toBe(true);
+  });
+  it('favorites matches only starred meals', () => {
+    expect(mealMatchesFilter({ favorite: true }, 'favorites')).toBe(true);
+    expect(mealMatchesFilter({ favorite: false }, 'favorites')).toBe(false);
+  });
+  it('a category filter matches meals in that category (multi-aware)', () => {
+    expect(mealMatchesFilter({ categories: ['lunch', 'dinner'] }, 'dinner')).toBe(true);
+    expect(mealMatchesFilter({ categories: ['lunch'] }, 'dinner')).toBe(false);
+    expect(mealMatchesFilter({ category: 'breakfast' }, 'breakfast')).toBe(true);
   });
 });

@@ -54,6 +54,58 @@ export function parseCustomCategories(raw: string | undefined): string[] {
   }
 }
 
+type Categorisable = Pick<Meal, 'categories' | 'category'>;
+
+/**
+ * Custom category tokens to show as filter chips: the profile's saved list
+ * plus any non-built-in token still referenced by a meal (so a category
+ * removed from the profile but still on a meal stays filterable).
+ */
+export function customCategoryTokens(
+  meals: Categorisable[],
+  customRaw: string | undefined,
+): string[] {
+  const tokens = new Set(parseCustomCategories(customRaw));
+  for (const m of meals) {
+    for (const t of mealCategories(m)) {
+      if (!(BUILT_IN as Set<string>).has(t)) tokens.add(t);
+    }
+  }
+  return [...tokens];
+}
+
+export interface MealFilterChip {
+  /** 'all' | 'favorites' | a category token. */
+  value: string;
+  label: string;
+}
+
+/** The full filter-chip row: All, Favourites, built-ins, then custom. */
+export function buildMealFilterChips(
+  meals: Categorisable[],
+  customRaw: string | undefined,
+): MealFilterChip[] {
+  return [
+    { value: 'all', label: 'All' },
+    { value: 'favorites', label: '★ Favourites' },
+    ...MEAL_CATEGORIES.map((c) => ({ value: c, label: categoryLabel(c) })),
+    ...customCategoryTokens(meals, customRaw).map((t) => ({
+      value: t,
+      label: categoryLabel(t),
+    })),
+  ];
+}
+
+/** Whether a meal passes the active filter chip. */
+export function mealMatchesFilter(
+  meal: Pick<Meal, 'categories' | 'category' | 'favorite'>,
+  filter: string,
+): boolean {
+  if (filter === 'all') return true;
+  if (filter === 'favorites') return !!meal.favorite;
+  return mealCategories(meal).includes(filter);
+}
+
 /**
  * Keyword signals per category, matched against the meal name + ingredient
  * names. Deliberately leaves ambiguous words (smoothie, yoghurt) out of the
