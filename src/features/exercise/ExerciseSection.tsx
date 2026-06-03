@@ -18,12 +18,24 @@ export function ExerciseSection({ date }: ExerciseSectionProps) {
   const [adding, setAdding] = useState(false);
 
   const total = entries ? totalBurned(entries) : 0;
-  // Day's total steps live on the Fitbit summary row; show as a header stat.
-  const daySteps = entries?.find((e) => e.steps != null)?.steps;
-  // Drop the Fitbit summary row from the list when it has no calories - it
+  // The Fitbit daily summary row has id "fitbit:{user}:{date}"; per-session
+  // rows are "fitbit-ex:...". Detect the summary row structurally so the fix
+  // applies to legacy rows too (written before the `steps` column existed).
+  const isFitbitSummary = (e: ExerciseEntry) =>
+    e.source === 'fitbit' && e.id.startsWith('fitbit:');
+  // Day's total steps: prefer the new steps column; fall back to parsing the
+  // legacy summary row name ("Health activity · 9,564 steps") until re-sync.
+  const summaryRow = entries?.find(isFitbitSummary);
+  const daySteps =
+    summaryRow?.steps ??
+    (() => {
+      const m = summaryRow?.name.match(/([\d,]+)\s*steps/i);
+      return m ? Number(m[1].replace(/,/g, '')) : undefined;
+    })();
+  // Drop the summary row from the list when it carries no calories - it
   // exists only to hold the step count (shown in the header instead).
   const visibleEntries = (entries ?? []).filter(
-    (e) => !(e.source === 'fitbit' && e.steps != null && e.kcal_burned === 0),
+    (e) => !(isFitbitSummary(e) && e.kcal_burned === 0),
   );
   const stepsLabel =
     daySteps && daySteps > 0 ? `${daySteps.toLocaleString()} steps` : '';
