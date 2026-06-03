@@ -525,6 +525,24 @@ function numAt(obj: unknown, path: string): number | undefined {
   return n === null ? undefined : n;
 }
 
+/** Recursively find the first string leaf whose key contains a hint
+ *  substring (case-insensitive). Fallback for shape variations across
+ *  exercise types where the exact dotted path may differ. */
+function findStringByKeyHint(obj: unknown, hints: string[], depth = 0): string | undefined {
+  if (depth > 6 || obj === null || typeof obj !== 'object') return undefined;
+  for (const [key, val] of Object.entries(obj as Record<string, unknown>)) {
+    const k = key.toLowerCase();
+    if (hints.some((h) => k.includes(h)) && typeof val === 'string' && val.trim()) {
+      return val;
+    }
+    if (val && typeof val === 'object') {
+      const nested = findStringByKeyHint(val, hints, depth + 1);
+      if (nested) return nested;
+    }
+  }
+  return undefined;
+}
+
 interface ExerciseListResult {
   workouts: WorkoutSession[];
   raw: unknown;
@@ -576,14 +594,24 @@ async function fetchExerciseSessions(
       findNumberByKeyHint(p, ['cal']);
     if (kcal === null || kcal === undefined || kcal <= 0) continue;
 
-    const exerciseType = strAt(p, 'exercise.exerciseType');
-    const startIso = strAt(p, 'exercise.interval.startTime');
-    const endIso = strAt(p, 'exercise.interval.endTime');
+    // Targeted reads with key-hint fallbacks: a strength session nests its
+    // metrics differently from a walk, so scan if the exact path misses.
+    const exerciseType =
+      strAt(p, 'exercise.exerciseType') ?? findStringByKeyHint(p, ['exercisetype', 'activitytype']);
+    const startIso =
+      strAt(p, 'exercise.interval.startTime') ?? findStringByKeyHint(p, ['starttime']);
+    const endIso =
+      strAt(p, 'exercise.interval.endTime') ?? findStringByKeyHint(p, ['endtime']);
     const offsetSec = parseUtcOffsetSeconds(
-      strAt(p, 'exercise.interval.startUtcOffset'),
+      strAt(p, 'exercise.interval.startUtcOffset') ??
+        findStringByKeyHint(p, ['startutcoffset', 'utcoffset', 'offset']),
     );
-    const steps = numAt(p, 'exercise.metricsSummary.steps');
-    const distanceMm = numAt(p, 'exercise.metricsSummary.distanceMillimeters');
+    const steps =
+      numAt(p, 'exercise.metricsSummary.steps') ?? findNumberByKeyHint(p, ['step']) ?? undefined;
+    const distanceMm =
+      numAt(p, 'exercise.metricsSummary.distanceMillimeters') ??
+      findNumberByKeyHint(p, ['distancemillim', 'distance']) ??
+      undefined;
 
     workouts.push({
       name: humaniseExerciseType(exerciseType),

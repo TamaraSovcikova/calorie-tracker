@@ -138,11 +138,26 @@ export function useFitbitDailySync(date: LocalDate): void {
   useEffect(() => {
     if (!connected) return;
     const key = cacheKey(date, profileDailyBmr(profile));
-    const last = lastFetched.get(key);
-    if (last && Date.now() - last < CACHE_MS) return;
 
     let cancelled = false;
     (async () => {
+      // One-time heal: if the date has Fitbit workout rows written before the
+      // detail/steps fields existed (a session row missing detail), re-sync
+      // regardless of the time cache so the richer fields populate.
+      let stale = false;
+      try {
+        const exRows = await db.exercise_entries
+          .where('id')
+          .startsWith(`fitbit-ex:${currentUserId()}:${date}:`)
+          .toArray();
+        stale = exRows.some((r) => !r.deleted_at && r.detail == null);
+      } catch {
+        stale = false;
+      }
+
+      const last = lastFetched.get(key);
+      if (!stale && last && Date.now() - last < CACHE_MS) return;
+
       try {
         await syncFitbitForDate(date, profile);
         if (!cancelled) lastFetched.set(key, Date.now());
