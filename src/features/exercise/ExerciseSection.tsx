@@ -18,6 +18,15 @@ export function ExerciseSection({ date }: ExerciseSectionProps) {
   const [adding, setAdding] = useState(false);
 
   const total = entries ? totalBurned(entries) : 0;
+  // Day's total steps live on the Fitbit summary row; show as a header stat.
+  const daySteps = entries?.find((e) => e.steps != null)?.steps;
+  // Drop the Fitbit summary row from the list when it has no calories - it
+  // exists only to hold the step count (shown in the header instead).
+  const visibleEntries = (entries ?? []).filter(
+    (e) => !(e.source === 'fitbit' && e.steps != null && e.kcal_burned === 0),
+  );
+  const stepsLabel =
+    daySteps && daySteps > 0 ? `${daySteps.toLocaleString()} steps` : '';
 
   return (
     <section className="rounded-2xl border border-border bg-card shadow-sm">
@@ -28,7 +37,12 @@ export function ExerciseSection({ date }: ExerciseSectionProps) {
             Exercise
           </h2>
           <p className="mt-0.5 text-xs text-muted-foreground tabular-nums">
-            {total > 0 ? `${formatKcal(total)} kcal burned` : 'No workouts logged'}
+            {[
+              total > 0 ? `${formatKcal(total)} kcal burned` : '',
+              stepsLabel,
+            ]
+              .filter(Boolean)
+              .join(' · ') || 'No workouts logged'}
           </p>
         </div>
         <button
@@ -42,9 +56,9 @@ export function ExerciseSection({ date }: ExerciseSectionProps) {
         </button>
       </header>
 
-      {entries && entries.length > 0 && (
+      {visibleEntries.length > 0 && (
         <ul className="divide-y divide-border px-2 pb-2">
-          {entries.map((e) => (
+          {visibleEntries.map((e) => (
             <li key={e.id}>
               <button
                 type="button"
@@ -60,10 +74,16 @@ export function ExerciseSection({ date }: ExerciseSectionProps) {
                       </span>
                     )}
                   </div>
-                  {e.duration_min !== undefined && (
-                    <div className="mt-0.5 text-xs text-muted-foreground tabular-nums">
-                      {e.duration_min} min
+                  {e.detail ? (
+                    <div className="mt-0.5 truncate text-xs text-muted-foreground tabular-nums">
+                      {e.detail}
                     </div>
+                  ) : (
+                    e.duration_min !== undefined && (
+                      <div className="mt-0.5 text-xs text-muted-foreground tabular-nums">
+                        {e.duration_min} min
+                      </div>
+                    )
                   )}
                   {e.needs_profile && (
                     <div className="mt-0.5 text-xs text-amber-600 dark:text-amber-400">

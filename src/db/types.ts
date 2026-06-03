@@ -229,6 +229,15 @@ export interface ExerciseEntry {
   name: string;
   duration_min?: number;
   kcal_burned: number;
+  /** A human subtitle for the row, e.g. "8:12-8:29pm · 1,425 steps" for a
+   *  Fitbit workout session. Optional/nullable. */
+  detail?: string;
+  /** Day's total step count. Set only on the Fitbit daily summary row, used
+   *  for the Exercise section header stat (not rendered as its own row). */
+  steps?: number;
+  /** True once the user has renamed this row. Sync preserves a locked name
+   *  rather than overwriting it with the source's generic label. */
+  name_locked?: boolean;
   /** True for a Fitbit row whose calorie estimate is unavailable because
    *  the profile lacks the stats needed to estimate resting burn. The UI
    *  shows a "set up profile" hint instead of a (wrong) kcal figure. */

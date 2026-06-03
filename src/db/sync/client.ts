@@ -392,6 +392,7 @@ class SyncEngine {
       'onboarded',
       'needs_profile',
       'favorite',
+      'name_locked',
     ]) {
       if (typeof r[k] === 'number') r[k] = r[k] === 1;
     }

@@ -61,30 +61,37 @@ async function syncFitbitForDate(
   const id = `fitbit:${userId}:${date}`;
   const now = new Date().toISOString();
   const existing = await db.exercise_entries.get(id);
-  const stepsLabel = summary.steps
-    ? ` · ${summary.steps.toLocaleString()} steps`
-    : '';
+  // The daily summary row carries the day's total steps (shown in the
+  // Exercise header, not as its own row) and any background-activity kcal
+  // not attributed to a logged session. Its name is preserved if the user
+  // renamed it.
   const row: ExerciseEntry = {
     id,
     user_id: userId,
     date,
     source: 'fitbit',
-    name: needsProfile
-      ? `Health${stepsLabel}`
-      : `Health activity${stepsLabel}`,
+    name: existing?.name_locked
+      ? existing.name
+      : needsProfile
+        ? 'Daily activity'
+        : 'Background activity',
     duration_min: undefined,
     kcal_burned: activity ?? 0,
+    steps: summary.steps,
+    name_locked: existing?.name_locked,
     needs_profile: needsProfile || undefined,
     created_at: existing?.created_at ?? now,
     updated_at: now,
+    deleted_at: undefined,
   };
   await db.exercise_entries.put(row);
 
   // Logged workouts are separate sessions, not part of total-calories, so
-  // each becomes its own clearly-named row (e.g. "Spinning"). Stable ids
-  // keyed by index let repeat syncs merge; if a workout is later removed on
-  // Fitbit, the now-extra higher-index rows are soft-deleted so the tombstone
-  // syncs across devices.
+  // each becomes its own clearly-named row (e.g. "Spinning") with a detail
+  // line (time range + steps). Stable ids keyed by index let repeat syncs
+  // merge; if a workout is later removed on Fitbit, the now-extra
+  // higher-index rows are soft-deleted so the tombstone syncs across
+  // devices. A user-renamed row keeps its name across re-syncs.
   const prefix = `fitbit-ex:${userId}:${date}:`;
   const priorWorkoutRows = await db.exercise_entries
     .where('id')
@@ -99,9 +106,11 @@ async function syncFitbitForDate(
         user_id: userId,
         date,
         source: 'fitbit',
-        name: w.name,
-        duration_min: undefined,
+        name: prior?.name_locked ? prior.name : w.name,
+        duration_min: w.durationMin || undefined,
+        detail: w.detail || undefined,
         kcal_burned: w.kcal,
+        name_locked: prior?.name_locked,
         needs_profile: undefined,
         created_at: prior?.created_at ?? now,
         updated_at: now,

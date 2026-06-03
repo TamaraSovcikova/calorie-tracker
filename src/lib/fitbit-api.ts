@@ -23,6 +23,12 @@ import {
   putFitbitTokens,
 } from '@/db/repos/fitbitTokens';
 import { shiftDate, type LocalDate } from '@/lib/dates';
+import {
+  buildSessionDetail,
+  durationMinutes,
+  humaniseExerciseType,
+  parseUtcOffsetSeconds,
+} from '@/features/fitbit/exerciseFormat';
 
 const AUTH_BASE = 'https://accounts.google.com/o/oauth2/v2/auth';
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
@@ -361,6 +367,10 @@ export interface WorkoutSession {
   name: string;
   /** Calories burned during the session. */
   kcal: number;
+  /** Whole minutes the session lasted (0 if unknown). */
+  durationMin: number;
+  /** A subtitle: local time range + steps + distance (parts that exist). */
+  detail: string;
 }
 
 interface CivilDateTime {
@@ -494,46 +504,25 @@ function findNumberByKeyHint(obj: unknown, hints: string[], depth = 0): number |
   return null;
 }
 
-/** True when a string looks like a resource path or opaque ID rather than
- *  a human-readable label. Skips "Users/…", "dataTypes/…", long hex IDs, etc. */
-function isPathOrId(s: string): boolean {
-  if (s.includes('/')) return true; // resource path like "Users/123/datatypes/..."
-  if (/^[0-9a-f-]{20,}$/i.test(s)) return true; // UUID / long hex ID
-  if (s.length > 80) return true; // suspiciously long string
-  return false;
-}
-
-/** Find a workout's activity label. The confirmed Google Health exercise
- *  data point shape is:
- *    { exercise: { exerciseType: "WALKING", metricsSummary: { caloriesKcal: 97, ... } } }
- *  We look for `exerciseType` first (exact match), then fall back to other
- *  candidate keys. Resource path strings are skipped. */
-function findWorkoutName(obj: unknown, depth = 0): string | null {
-  if (depth > 6 || obj === null || typeof obj !== 'object') return null;
-  for (const [key, val] of Object.entries(obj as Record<string, unknown>)) {
-    const k = key.toLowerCase();
-    if (
-      (k === 'exercisetype' || k === 'activitytype' || k === 'type' ||
-       k === 'activityname' || k === 'title') &&
-      typeof val === 'string' &&
-      val.trim() &&
-      !/^\d/.test(val) &&
-      !isPathOrId(val)
-    ) {
-      return humaniseActivity(val);
-    }
-    if (val && typeof val === 'object') {
-      const nested = findWorkoutName(val, depth + 1);
-      if (nested) return nested;
-    }
+/** Read a string at a dotted path, e.g. exercise.exerciseType. */
+function strAt(obj: unknown, path: string): string | undefined {
+  let cur: unknown = obj;
+  for (const key of path.split('.')) {
+    if (cur === null || typeof cur !== 'object') return undefined;
+    cur = (cur as Record<string, unknown>)[key];
   }
-  return null;
+  return typeof cur === 'string' ? cur : undefined;
 }
 
-function humaniseActivity(raw: string): string {
-  const cleaned = raw.replace(/[_-]+/g, ' ').trim().toLowerCase();
-  if (!cleaned) return 'Workout';
-  return cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+/** Read a number (or numeric string) at a dotted path. */
+function numAt(obj: unknown, path: string): number | undefined {
+  let cur: unknown = obj;
+  for (const key of path.split('.')) {
+    if (cur === null || typeof cur !== 'object') return undefined;
+    cur = (cur as Record<string, unknown>)[key];
+  }
+  const n = coerceNumber(cur);
+  return n === null ? undefined : n;
 }
 
 interface ExerciseListResult {
@@ -578,11 +567,35 @@ async function fetchExerciseSessions(
     (parsed as { dataPoints?: unknown[] }).dataPoints ?? [];
   const workouts: WorkoutSession[] = [];
   for (const p of points) {
-    const kcal = findNumberByKeyHint(p, ['cal']);
-    if (kcal === null || kcal <= 0) continue; // skip sessions with no burn
+    // Confirmed shape:
+    //   exercise.exerciseType, exercise.interval.{startTime,endTime,startUtcOffset},
+    //   exercise.metricsSummary.{caloriesKcal,steps,distanceMillimeters}
+    // Targeted reads with the tolerant scanner as a fallback for kcal.
+    const kcal =
+      numAt(p, 'exercise.metricsSummary.caloriesKcal') ??
+      findNumberByKeyHint(p, ['cal']);
+    if (kcal === null || kcal === undefined || kcal <= 0) continue;
+
+    const exerciseType = strAt(p, 'exercise.exerciseType');
+    const startIso = strAt(p, 'exercise.interval.startTime');
+    const endIso = strAt(p, 'exercise.interval.endTime');
+    const offsetSec = parseUtcOffsetSeconds(
+      strAt(p, 'exercise.interval.startUtcOffset'),
+    );
+    const steps = numAt(p, 'exercise.metricsSummary.steps');
+    const distanceMm = numAt(p, 'exercise.metricsSummary.distanceMillimeters');
+
     workouts.push({
-      name: findWorkoutName(p) ?? 'Workout',
+      name: humaniseExerciseType(exerciseType),
       kcal: Math.round(kcal),
+      durationMin: startIso && endIso ? durationMinutes(startIso, endIso) : 0,
+      detail: buildSessionDetail({
+        startIso,
+        endIso,
+        offsetSec,
+        steps: steps ?? undefined,
+        distanceMeters: distanceMm !== undefined ? distanceMm / 1000 : undefined,
+      }),
     });
   }
   return { workouts, raw: parsed, status: res.status };

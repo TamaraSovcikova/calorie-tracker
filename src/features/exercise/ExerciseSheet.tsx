@@ -87,10 +87,16 @@ export function ExerciseSheet({ open, date, entry, onClose }: ExerciseSheetProps
       const durationMin =
         durNum !== undefined && Number.isFinite(durNum) ? durNum : undefined;
       if (entry) {
+        // Renaming a Fitbit row locks the name so re-syncs preserve it
+        // instead of reverting to the source's generic label.
+        const renamed = name.trim() !== entry.name;
         await db.exercise_entries.update(entry.id, {
           name: name.trim(),
           duration_min: durationMin,
           kcal_burned: kcalNum,
+          ...(entry.source === 'fitbit' && renamed
+            ? { name_locked: true }
+            : {}),
           updated_at: new Date().toISOString(),
         });
       } else {
