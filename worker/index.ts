@@ -18,6 +18,7 @@ import { handleFoodFact } from './foodFacts';
 import { handleMealPlan } from './mealPlan';
 import { handlePhotoFood } from './photoFood';
 import { handlePhotoRecipe } from './photoRecipe';
+import { handlePhotoLabel } from './photoLabel';
 import { checkRateLimit } from './rateLimit';
 
 export interface Env {
@@ -197,6 +198,21 @@ export default {
           return await handlePhotoRecipe(req, env);
         } catch {
           return jsonResponse({ recipe: null, error: 'Recipe scan failed — try again.' });
+        }
+      }
+
+      // /api/photo-label — AI vision: transcribe a nutrition label.
+      if (url.pathname === '/api/photo-label' && req.method === 'POST') {
+        if (!(await checkRateLimit(env, `label:${userId}`, 12, 60))) {
+          return jsonResponse(
+            { label: null, error: 'Too many scans in a short time — wait a minute.' },
+            { status: 429 },
+          );
+        }
+        try {
+          return await handlePhotoLabel(req, env);
+        } catch {
+          return jsonResponse({ label: null, error: 'Label scan failed — try again.' });
         }
       }
 

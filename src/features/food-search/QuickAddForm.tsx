@@ -8,6 +8,8 @@ export interface QuickAddValues {
   protein: number;
   carbs: number;
   fat: number;
+  /** Optional label, e.g. "Pub lunch". Falls back to "Quick add" in the diary. */
+  name?: string;
 }
 
 interface QuickAddFormProps {
@@ -27,6 +29,7 @@ export function QuickAddForm({
   onSave,
   onDelete,
 }: QuickAddFormProps) {
+  const [name, setName] = useState(initial?.name ?? '');
   const [kcal, setKcal] = useState(initial ? String(initial.kcal) : '');
   const [protein, setProtein] = useState(initial?.protein ? String(initial.protein) : '');
   const [carbs, setCarbs] = useState(initial?.carbs ? String(initial.carbs) : '');
@@ -42,6 +45,7 @@ export function QuickAddForm({
       protein: parseFloat(protein) || 0,
       carbs: parseFloat(carbs) || 0,
       fat: parseFloat(fat) || 0,
+      name: name.trim() || undefined,
     });
   };
 
@@ -52,6 +56,12 @@ export function QuickAddForm({
           Log calories directly when you don't want to itemise a meal — eating
           out, a guess, a recipe. Macros are optional.
         </p>
+        <LabeledInput
+          label="Name (optional)"
+          placeholder="e.g. Pub lunch"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+        />
         <LabeledInput
           label="Calories"
           type="number"

@@ -16,6 +16,11 @@ export interface CreateFoodInput {
   protein_100: number;
   carbs_100: number;
   fat_100: number;
+  /** Micronutrients per 100g (optional). Manual entry can now capture these
+   *  - previously only OFF / USDA foods carried them. */
+  fiber_100?: number;
+  sugar_100?: number;
+  sodium_100?: number;
   serving_g?: number;
   custom_units?: CustomUnit[];
 }

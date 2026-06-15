@@ -51,7 +51,7 @@ export function DiaryRow({
     (entry.kind === 'meal'
       ? 'Meal'
       : entry.kind === 'quick'
-        ? 'Quick add'
+        ? entry.name?.trim() || 'Quick add'
         : 'Food');
   // Meals and OFF-cached foods can carry a photo; show it as a thumbnail.
   const imageUrl = target?.image_url;

@@ -51,6 +51,7 @@ function EditQuickEntryInner({
 }) {
   const handleSave = async (v: QuickAddValues) => {
     await updateDiaryEntry(entry.id, {
+      name: v.name,
       kcal: v.kcal,
       protein: v.protein,
       carbs: v.carbs,
@@ -77,6 +78,7 @@ function EditQuickEntryInner({
           protein: entry.protein,
           carbs: entry.carbs,
           fat: entry.fat,
+          name: entry.name,
         }}
         saveLabel="Save changes"
         onSave={handleSave}

@@ -200,6 +200,9 @@ export interface DiaryEntry {
   section: MealSection;
   /** 'quick' = a bare calorie/macro entry with no underlying food or meal. */
   kind: 'food' | 'meal' | 'quick';
+  /** Optional label for a quick-add entry (e.g. "Pub lunch"). Nullable;
+   *  pre-feature rows and food/meal entries read undefined. */
+  name?: string;
   food_id?: ID;
   meal_id?: ID;
   qty: number;

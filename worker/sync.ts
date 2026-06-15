@@ -124,6 +124,7 @@ const COLUMNS: Record<TableName, string[]> = {
     'date',
     'section',
     'kind',
+    'name',
     'food_id',
     'meal_id',
     'qty',

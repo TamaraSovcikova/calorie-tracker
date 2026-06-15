@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
-import { Apple, Search, Trash2 } from 'lucide-react';
+import { Apple, Plus, Search, Trash2 } from 'lucide-react';
+import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Sheet } from '@/components/ui/Sheet';
 import { toast } from '@/components/ui/toast';
@@ -13,6 +14,7 @@ export function FoodsLibrary() {
   const foods = useMyProducts();
   const [query, setQuery] = useState('');
   const [editing, setEditing] = useState<Food | null>(null);
+  const [creating, setCreating] = useState(false);
 
   const filtered = useMemo(() => {
     if (!foods) return [];
@@ -35,6 +37,11 @@ export function FoodsLibrary() {
 
   return (
     <>
+      <Button block variant="primary" onClick={() => setCreating(true)}>
+        <Plus className="h-4 w-4" />
+        New food
+      </Button>
+
       {foods && foods.length > 0 && (
         <div className="relative">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -59,8 +66,9 @@ export function FoodsLibrary() {
           />
           <h2 className="mt-3 text-base font-medium">No custom foods yet</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            When you add a food manually from the diary search, it's saved
-            here so you can reuse and edit it.
+            Tap <span className="font-medium text-foreground">New food</span> to
+            add one by hand or by scanning a nutrition label. It's saved here to
+            reuse and edit.
           </p>
         </div>
       ) : filtered.length === 0 ? (
@@ -118,6 +126,18 @@ export function FoodsLibrary() {
             onCreated={() => {
               setEditing(null);
               toast({ message: 'Product saved', variant: 'success' });
+            }}
+          />
+        )}
+      </Sheet>
+
+      <Sheet open={creating} onClose={() => setCreating(false)} title="New food">
+        {creating && (
+          <ManualEntryForm
+            onBack={() => setCreating(false)}
+            onCreated={() => {
+              setCreating(false);
+              toast({ message: 'Food saved', variant: 'success' });
             }}
           />
         )}

@@ -105,6 +105,7 @@ export function AddFoodSheet({ open, onClose, date, section }: AddFoodSheetProps
       date,
       section,
       kind: 'quick',
+      name: v.name,
       qty: 1,
       unit: 'kcal',
       kcal: v.kcal,
@@ -116,7 +117,7 @@ export function AddFoodSheet({ open, onClose, date, section }: AddFoodSheetProps
       sodium: 0,
     });
     toast({
-      message: `${formatKcal(v.kcal)} kcal added to ${SECTION_LABEL[section]}`,
+      message: `${v.name ? `${v.name} · ` : ''}${formatKcal(v.kcal)} kcal added to ${SECTION_LABEL[section]}`,
       variant: 'success',
     });
     handleClose();

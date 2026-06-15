@@ -14,6 +14,8 @@ export interface CreateDiaryEntryInput {
   date: LocalDate;
   section: MealSection;
   kind: 'food' | 'meal' | 'quick';
+  /** Optional label, used for named quick-add entries. */
+  name?: string;
   food_id?: string;
   meal_id?: string;
   qty: number;

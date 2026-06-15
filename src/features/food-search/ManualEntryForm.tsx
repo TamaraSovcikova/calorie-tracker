@@ -1,8 +1,9 @@
-import { useState } from 'react';
-import { ArrowLeft, Plus, Trash2 } from 'lucide-react';
+import { useRef, useState } from 'react';
+import { ArrowLeft, Loader2, Plus, ScanText, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input, LabeledInput } from '@/components/ui/Input';
 import { createFood, updateFood } from '@/db/repos/foods';
+import { analyzeLabel } from './photoLabel';
 import type { CustomUnit, Food } from '@/db/types';
 
 interface ManualEntryFormProps {
@@ -22,8 +23,14 @@ interface FormState {
   protein: string;
   carbs: string;
   fat: string;
+  fiber: string;
+  sugar: string;
+  sodium: string;
   serving_g: string;
 }
+
+const numField = (v: number | null | undefined): string =>
+  v != null ? String(v) : '';
 
 export function ManualEntryForm({
   initialName = '',
@@ -42,7 +49,10 @@ export function ManualEntryForm({
           protein: String(food.protein_100),
           carbs: String(food.carbs_100),
           fat: String(food.fat_100),
-          serving_g: food.serving_g != null ? String(food.serving_g) : '',
+          fiber: numField(food.fiber_100),
+          sugar: numField(food.sugar_100),
+          sodium: numField(food.sodium_100),
+          serving_g: numField(food.serving_g),
         }
       : {
           name: initialName,
@@ -51,6 +61,9 @@ export function ManualEntryForm({
           protein: '',
           carbs: '',
           fat: '',
+          fiber: '',
+          sugar: '',
+          sodium: '',
           serving_g: '',
         },
   );
@@ -59,6 +72,38 @@ export function ManualEntryForm({
   const [newGrams, setNewGrams] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [scanning, setScanning] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleLabelFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // allow re-picking the same file
+    if (!file) return;
+    setError(null);
+    setScanning(true);
+    try {
+      const { label, error: scanError } = await analyzeLabel(file);
+      if (!label) {
+        setError(scanError ?? "Couldn't read that label.");
+        return;
+      }
+      // Prefill from the transcribed label; keep an existing typed name.
+      setForm((s) => ({
+        name: s.name || label.name,
+        brand: s.brand || label.brand,
+        kcal: numField(label.kcal_100),
+        protein: numField(label.protein_100),
+        carbs: numField(label.carbs_100),
+        fat: numField(label.fat_100),
+        fiber: numField(label.fiber_100),
+        sugar: numField(label.sugar_100),
+        sodium: numField(label.sodium_100),
+        serving_g: numField(label.serving_g),
+      }));
+    } finally {
+      setScanning(false);
+    }
+  };
 
   const update = (k: keyof FormState, v: string) => setForm((s) => ({ ...s, [k]: v }));
 
@@ -88,6 +133,12 @@ export function ManualEntryForm({
     if (serving_g !== undefined && (!Number.isFinite(serving_g) || serving_g <= 0)) {
       return setError('Serving size must be a positive number');
     }
+    // Micronutrients are optional; a blank field stays undefined.
+    const optNum = (v: string): number | undefined => {
+      if (!v.trim()) return undefined;
+      const n = parseFloat(v);
+      return Number.isFinite(n) && n >= 0 ? n : undefined;
+    };
     setSaving(true);
     try {
       const fields = {
@@ -97,6 +148,9 @@ export function ManualEntryForm({
         protein_100: protein,
         carbs_100: carbs,
         fat_100: fat,
+        fiber_100: optNum(form.fiber),
+        sugar_100: optNum(form.sugar),
+        sodium_100: optNum(form.sodium),
         serving_g,
         custom_units: units,
       };
@@ -138,6 +192,38 @@ export function ManualEntryForm({
       </div>
 
       <div className="space-y-3 p-4">
+        {/* Scan a nutrition label to auto-fill the macros below. */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          className="hidden"
+          onChange={(e) => void handleLabelFile(e)}
+        />
+        <Button
+          type="button"
+          variant="secondary"
+          block
+          disabled={scanning}
+          onClick={() => fileInputRef.current?.click()}
+        >
+          {scanning ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Reading label…
+            </>
+          ) : (
+            <>
+              <ScanText className="h-4 w-4" />
+              Scan a nutrition label
+            </>
+          )}
+        </Button>
+        <p className="-mt-1 text-center text-[11px] text-muted-foreground">
+          Snap the label and we'll fill in the macros - check them, name it, save.
+        </p>
+
         <LabeledInput
           label="Name"
           required
@@ -187,6 +273,36 @@ export function ManualEntryForm({
             value={form.fat}
             onChange={(e) => update('fat', e.target.value)}
             trailing="g"
+          />
+        </div>
+
+        <div className="grid grid-cols-3 gap-3">
+          <LabeledInput
+            label="Fibre / 100g"
+            type="number"
+            inputMode="decimal"
+            step="any"
+            value={form.fiber}
+            onChange={(e) => update('fiber', e.target.value)}
+            trailing="g"
+          />
+          <LabeledInput
+            label="Sugar / 100g"
+            type="number"
+            inputMode="decimal"
+            step="any"
+            value={form.sugar}
+            onChange={(e) => update('sugar', e.target.value)}
+            trailing="g"
+          />
+          <LabeledInput
+            label="Sodium / 100g"
+            type="number"
+            inputMode="decimal"
+            step="any"
+            value={form.sodium}
+            onChange={(e) => update('sodium', e.target.value)}
+            trailing="mg"
           />
         </div>
 
