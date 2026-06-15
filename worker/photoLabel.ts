@@ -40,10 +40,20 @@ export interface CleanLabel {
   serving_g: number | null;
 }
 
-/** Coerce to a non-negative finite number, else null. */
+/**
+ * Coerce to a non-negative number, tolerating strings the model sometimes
+ * returns despite the JSON instruction: "250 kcal", "1,024", "10g", "<0.5".
+ * Pulls the first numeric token; commas stripped, leading "<"/"~" ignored.
+ */
 function num(v: unknown): number | null {
-  const n = Number(v);
-  return Number.isFinite(n) && n >= 0 ? n : null;
+  if (typeof v === 'number') return Number.isFinite(v) && v >= 0 ? v : null;
+  if (typeof v === 'string') {
+    const m = v.replace(/,/g, '').match(/-?\d+(?:\.\d+)?/);
+    if (!m) return null;
+    const n = parseFloat(m[0]);
+    return Number.isFinite(n) && n >= 0 ? n : null;
+  }
+  return null;
 }
 
 function cleanLabel(parsed: unknown): CleanLabel | null {
@@ -75,18 +85,28 @@ function cleanLabel(parsed: unknown): CleanLabel | null {
 }
 
 const PROMPT =
-  'You are reading a food nutrition label. Transcribe the PER 100 g (or per ' +
-  '100 ml) column - NOT the per-serving column. If only per-serving values ' +
-  'are printed, convert them to per-100g using the serving size. Reply with ' +
-  'ONLY JSON, no other text: ' +
+  'You are reading the nutrition information off a food package. It may be ' +
+  'laid out in ANY of these ways, so read carefully and handle all of them:\n' +
+  '1. A nutrition TABLE/box with columns (often "per 100g" and "per ' +
+  'serving"), possibly rotated or skewed.\n' +
+  '2. A single LINE or short phrase, e.g. "Energy 540kJ/128kcal, fat 5g, ' +
+  'carbohydrate 12g, protein 8g per 100g".\n' +
+  '3. Values written INLINE inside a PARAGRAPH of text or next to an ' +
+  'ingredients list.\n' +
+  'Always report the PER 100 g (or per 100 ml) values. If a per-100g column ' +
+  'or phrase exists, use it directly. If ONLY per-serving values are shown, ' +
+  'convert to per-100g using the serving size (per100 = perServing / ' +
+  'servingGrams * 100). Ignore the ingredients list itself; only extract the ' +
+  'numbers. Reply with ONLY JSON, no other text, no markdown:\n' +
   '{"name":"<product name if visible, else \\"\\">","brand":"<brand if ' +
   'visible, else \\"\\">","kcal_100":<number>,"protein_100":<grams>,' +
   '"carbs_100":<grams>,"fat_100":<grams>,"fiber_100":<grams or null>,' +
   '"sugar_100":<grams or null>,"sodium_100":<milligrams or null>,' +
   '"serving_g":<one serving in grams if shown, else null>}. ' +
-  'Energy must be in kcal (if only kJ is shown, divide by 4.184). Sodium in ' +
+  'Energy MUST be kcal (if only kJ is shown, kcal = kJ / 4.184). Sodium in ' +
   'milligrams (if only salt in grams is shown, sodium_mg = salt_g / 2.5 * ' +
-  '1000). If the image is not a nutrition label, reply {"kcal_100":null}.';
+  '1000). Use null for any value you genuinely cannot find. If the image ' +
+  'contains no nutrition information at all, reply {"kcal_100":null}.';
 
 export async function handlePhotoLabel(req: Request, env: Env): Promise<Response> {
   const buf = await req.arrayBuffer();
