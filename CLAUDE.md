@@ -117,13 +117,13 @@ What works: every feature listed under "What this project is" is live and shippe
 
 What's stubbed / known limitations:
 - **AI photo logging + recipe scanning** verified end-to-end via curl with food photos. Success path with arbitrary real-world recipe screenshots untested against many examples.
-- **Manual-entry foods don't capture micronutrients** (only OFF / USDA do). Means user-typed foods log as 0g fibre / sugar / sodium.
+- **Manual-entry foods now capture micronutrients** (optional fibre / sugar / sodium fields in `ManualEntryForm`, added 2026-06-07). A nutrition-label photo scan (`/api/photo-label`) can prefill them. Older hand-entered foods may still read 0g until edited.
 - **`fitbit_tokens` OAuth tokens at rest are plaintext** in D1. Acceptable for private Cloudflare account; flagged in audit.
 - **No e2e tests.** Worker logic verified live + ~140 unit tests for pure helpers (mealMath, weeklyBudget, foodMath, macros, tdee, units, petLogic, wellbeing, activityCalories, mealCategory).
 - **Pet wellbeing's "missed day" still penalises logging discipline.** The budget neutralises missed days; wellbeing does not (intentional - logging is the consistency meter).
 - Some leftover UX-audit items deferred: water tracking, micronutrient targets (not just totals).
 
-Last updated: 2026-05-30 by claude-code. Recent shipping (newest first): Fitbit workout calories (also fetch `active-energy-burned`, take max with total-minus-BMR); monthly budget mode + opt-in carry-over with optional cap (`8150c52`); filter-scrollbar hidden + meal photos in diary (`892d1e6`); meals reorg phases 1+2 (`161113c`/`f19590b`). Narrative in `docs/EVOLUTION.md`.
+Last updated: 2026-06-07 by claude-code. Head `0ef5f7f`, Version `5c40a674`. Full narrative in `docs/EVOLUTION.md`; per-feature current state under "## Current state" below.
 
 ## Project-specific decisions
 
@@ -210,14 +210,23 @@ Pattern: most tested code is pure (`mealMath`, `weeklyBudget`, etc.). Hooks and 
 
 ## Current state
 
-Production; live and in daily multi-user use. Nothing actively in progress as of 2026-05-27 (latest: meals reorganisation, both phases, shipped). The dated story of every shipped feature is in `docs/EVOLUTION.md`; do not re-narrate it here.
+Production; live and in daily multi-user use. Head `0ef5f7f`, deployed Version `5c40a674`. Nothing actively in progress as of 2026-06-07. The dated story of every shipped feature is in `docs/EVOLUTION.md`; do not re-narrate it here.
+
+Shipped this session (2026-05-30 -> 06-07): monthly budget mode + opt-in carry-over; diary meal/food thumbnails + filter-chip scrollbar fix; Fitbit exercise overhaul (per-session detail lines, friendly names from `exercise.exerciseType`, rename-sticks via `name_locked`, steps as a header stat, no double-count); multi-category meals + custom categories; meal-picker category filters; manual food creation (Foods library "New food"); nutrition-label scanner (`/api/photo-label`); named quick-adds.
 
 Open follow-ups (actionable):
-- Manual-entry foods don't capture micronutrients (form has no fibre / sugar / sodium fields) - log as 0g.
 - Food-facts toggle is device-local (localStorage) vs other prefs which sync - intentional but inconsistent.
-- Photo logging / recipe scan verified via curl + a food photo; varied real-world phone testing would harden them.
+- Real-world phone testing of the label scanner across varied label layouts (tables / inline / paragraph) would harden it.
 - Meal photo could also show in `LogMealSheet` / `MealPicker` (currently editor + library only).
+- Fitbit OAuth uses ~7-day testing-mode tokens (weekly reconnect). Moving the Google OAuth app to "In production" would issue long-lived refresh tokens.
 - README is partly stale (still documents the retired single `SYNC_TOKEN` bearer model). See `docs/ARCHITECTURE.md` open questions.
+
+## Operational notes for a fresh session
+
+- All commands run in WSL: `wsl -d Ubuntu -- bash -ic 'cd ~/projects_/calorie-tracker && <cmd>'`. Verify with `npm run typecheck && npm run lint && npm run test && npm run build` (165 tests as of 06-07).
+- Ship loop: D1 `ALTER` first (one column at a time, on remote) -> commit -> `git push origin main` -> `npx wrangler deploy`. GitHub remote is `TamaraSovcikova/calorie-tracker`.
+- `wrangler` OAuth expires periodically: a transient `7403` is fixed by `npx wrangler whoami`; a full "not authorized" / hidden-account error needs `npx wrangler login` (interactive). Account id `b850f64ada89773f5f065a2aa638251c`.
+- Commit messages: no AI co-author, no em-dashes. Heredoc via `git commit -F -` (the `$(cat <<EOF)` form breaks under `bash -ic`).
 
 ## Open questions for Tamara
 
