@@ -17,6 +17,7 @@
 
 import type { Food } from '@/db/types';
 import { currentUserId } from '@/db/userId';
+import { suggestPortions, parseServingDescription } from './portionSuggestions';
 
 const OFF_BASE = 'https://world.openfoodfacts.org';
 const APP_NAME = import.meta.env.VITE_OFF_APP_NAME || 'calorie-tracker';
@@ -134,6 +135,24 @@ function num(v: number | string | undefined): number | undefined {
 }
 
 /**
+ * Build custom_units for an OFF food:
+ * 1. Try to parse a human label from the serving_size string (e.g. "1 slice (38g)" → slice).
+ * 2. Fall back to rule-based suggestions from the food name.
+ */
+function resolveOffCustomUnits(
+  name: string,
+  brand: string | undefined,
+  servingG: number | undefined,
+  servingSizeStr: string | undefined,
+) {
+  if (servingG && servingSizeStr) {
+    const unit = parseServingDescription(servingSizeStr, servingG);
+    if (unit) return [unit];
+  }
+  return suggestPortions(name, brand);
+}
+
+/**
  * Map an OFF product JSON to our local Food shape. Returns null if the
  * product doesn't have enough info to be useful (no name or no kcal).
  */
@@ -143,6 +162,8 @@ export function offProductToFood(p: OffProduct): Food | null {
   if (!name) return null;
   const kcal = kcalFromNutriments(p.nutriments);
   if (kcal === null) return null;
+  const brand = p.brands?.split(',')[0]?.trim() || undefined;
+  const servingG = num(p.serving_quantity);
   const now = new Date().toISOString();
   return {
     id: `off:${p.code}`,
@@ -150,7 +171,7 @@ export function offProductToFood(p: OffProduct): Food | null {
     source: 'off',
     off_barcode: p.code,
     name,
-    brand: p.brands?.split(',')[0]?.trim() || undefined,
+    brand,
     kcal_100: kcal,
     protein_100: p.nutriments?.['proteins_100g'] ?? 0,
     carbs_100: p.nutriments?.['carbohydrates_100g'] ?? 0,
@@ -158,8 +179,8 @@ export function offProductToFood(p: OffProduct): Food | null {
     fiber_100: p.nutriments?.['fiber_100g'],
     sugar_100: p.nutriments?.['sugars_100g'],
     sodium_100: sodiumMg100(p.nutriments),
-    serving_g: num(p.serving_quantity),
-    custom_units: [],
+    serving_g: servingG,
+    custom_units: resolveOffCustomUnits(name, brand, servingG, p.serving_size),
     image_url: p.image_front_small_url?.trim() || undefined,
     created_at: now,
     updated_at: now,

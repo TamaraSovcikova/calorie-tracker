@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { format } from 'date-fns';
 import {
+  AlertCircle,
   CalendarCheck,
   CalendarOff,
   ChevronLeft,
@@ -57,7 +58,7 @@ export function DiaryPage() {
 
   // If Fitbit is connected, pulls daily calories burned and upserts an
   // exercise_entry row in the background. No-op when not connected.
-  useFitbitDailySync(currentDate);
+  const { syncFailed: fitbitSyncFailed } = useFitbitDailySync(currentDate);
 
   const [addingTo, setAddingTo] = useState<MealSection | null>(null);
   const [editing, setEditing] = useState<DiaryEntry | null>(null);
@@ -271,6 +272,19 @@ export function DiaryPage() {
               on-target, not by what's logged here.
             </span>
           </div>
+        )}
+        {onToday && fitbitSyncFailed && !selectMode && (
+          <button
+            type="button"
+            onClick={() => navigate('/settings')}
+            className="flex w-full items-start gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-left text-xs text-amber-700 dark:text-amber-300"
+          >
+            <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            <span>
+              Health sync couldn't connect — tap to go to Settings and
+              reconnect.
+            </span>
+          </button>
         )}
         {!selectMode && <DogHero />}
         {!selectMode && onToday && <WeeklyDigestCard />}

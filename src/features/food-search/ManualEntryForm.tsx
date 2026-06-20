@@ -1,9 +1,11 @@
-import { useRef, useState } from 'react';
+import { useRef, useMemo, useState } from 'react';
 import { ArrowLeft, Loader2, Plus, ScanText, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input, LabeledInput } from '@/components/ui/Input';
 import { createFood, updateFood } from '@/db/repos/foods';
 import { analyzeLabel } from './photoLabel';
+import { suggestPortions } from '@/lib/portionSuggestions';
+import { formatGrams } from '@/lib/macros';
 import type { CustomUnit, Food } from '@/db/types';
 
 interface ManualEntryFormProps {
@@ -74,6 +76,16 @@ export function ManualEntryForm({
   const [saving, setSaving] = useState(false);
   const [scanning, setScanning] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Suggestions update live as the user types the name (filtered to exclude
+  // units they've already added).
+  const suggestions = useMemo(
+    () =>
+      suggestPortions(form.name, form.brand).filter(
+        (s) => !units.some((u) => u.label.toLowerCase() === s.label.toLowerCase()),
+      ),
+    [form.name, form.brand, units],
+  );
 
   const handleLabelFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -342,6 +354,26 @@ export function ManualEntryForm({
                 </li>
               ))}
             </ul>
+          )}
+          {suggestions.length > 0 && (
+            <div className="space-y-1.5">
+              <span className="text-[11px] text-muted-foreground">
+                Suggested for this food — tap to add:
+              </span>
+              <div className="flex flex-wrap gap-1.5">
+                {suggestions.map((s) => (
+                  <button
+                    key={s.label}
+                    type="button"
+                    onClick={() => setUnits((prev) => [...prev, s])}
+                    className="flex items-center gap-1 rounded-full border border-primary/40 bg-primary/5 px-2.5 py-1 text-xs font-medium text-primary hover:bg-primary/10 active:scale-95 transition-transform"
+                  >
+                    <Plus className="h-3 w-3" />
+                    {s.label} ({formatGrams(s.grams)} g)
+                  </button>
+                ))}
+              </div>
+            </div>
           )}
           <div className="grid grid-cols-[1fr_1fr_auto] gap-2">
             <Input

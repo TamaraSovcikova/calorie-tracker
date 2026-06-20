@@ -63,6 +63,16 @@ export function LogMealStep({
         </p>
       </div>
 
+      {resolved.meal.image_url && (
+        <div className="overflow-hidden">
+          <img
+            src={resolved.meal.image_url}
+            alt=""
+            className="h-36 w-full object-cover"
+          />
+        </div>
+      )}
+
       <div className="space-y-4 p-4">
         <div className="flex flex-wrap gap-2">
           {QUICK_MULTS.map((q) => (

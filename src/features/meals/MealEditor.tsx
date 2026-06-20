@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft,
+  Camera,
   Copy,
   ImagePlus,
   Loader2,
@@ -89,6 +90,7 @@ export function MealEditor({ mode }: MealEditorProps) {
   const [items, setItems] = useState<DraftItem[]>([]);
   const [imageUrl, setImageUrl] = useState<string | undefined>(undefined);
   const [imageBusy, setImageBusy] = useState(false);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [editingKey, setEditingKey] = useState<string | null>(null);
@@ -350,6 +352,14 @@ export function MealEditor({ mode }: MealEditorProps) {
             Photo (optional)
           </span>
           <input
+            ref={cameraInputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            className="hidden"
+            onChange={handlePickPhoto}
+          />
+          <input
             ref={fileInputRef}
             type="file"
             accept="image/*"
@@ -362,9 +372,17 @@ export function MealEditor({ mode }: MealEditorProps) {
               <div className="absolute right-2 top-2 flex gap-1.5">
                 <button
                   type="button"
+                  onClick={() => cameraInputRef.current?.click()}
+                  className="rounded-full bg-background/90 p-2 text-foreground shadow-sm hover:bg-background"
+                  aria-label="Take a new photo"
+                >
+                  <Camera className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
                   onClick={() => fileInputRef.current?.click()}
                   className="rounded-full bg-background/90 p-2 text-foreground shadow-sm hover:bg-background"
-                  aria-label="Replace photo"
+                  aria-label="Replace photo from gallery"
                 >
                   <ImagePlus className="h-4 w-4" />
                 </button>
@@ -379,21 +397,32 @@ export function MealEditor({ mode }: MealEditorProps) {
               </div>
             </div>
           ) : (
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={imageBusy}
-              className="flex h-24 w-full flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-border text-sm text-muted-foreground hover:bg-muted/40 disabled:opacity-60"
-            >
-              {imageBusy ? (
-                <Loader2 className="h-5 w-5 animate-spin" />
-              ) : (
-                <>
-                  <ImagePlus className="h-5 w-5" />
-                  Add a photo
-                </>
-              )}
-            </button>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => cameraInputRef.current?.click()}
+                disabled={imageBusy}
+                className="flex h-20 flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed border-border text-xs text-muted-foreground hover:bg-muted/40 disabled:opacity-60"
+              >
+                {imageBusy ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <>
+                    <Camera className="h-4 w-4" />
+                    Take photo
+                  </>
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={imageBusy}
+                className="flex h-20 flex-col items-center justify-center gap-1.5 rounded-xl border border-dashed border-border text-xs text-muted-foreground hover:bg-muted/40 disabled:opacity-60"
+              >
+                <ImagePlus className="h-4 w-4" />
+                From gallery
+              </button>
+            </div>
           )}
         </div>
 
@@ -612,9 +641,14 @@ function IngredientRow({
         <div className="truncate text-sm font-medium">{food?.name ?? '…'}</div>
         <div className="mt-0.5 truncate text-xs text-muted-foreground tabular-nums">
           {formatGrams(draft.qty)} {draft.unit}
-          {macros && ` · ${formatKcal(macros.kcal)} kcal`}
-          <span className="text-muted-foreground/60"> · tap to edit</span>
+          {macros && (
+            <>
+              {' · '}{formatKcal(macros.kcal)} kcal
+              {' · '}{Math.round(macros.protein)}P / {Math.round(macros.carbs)}C / {Math.round(macros.fat)}F
+            </>
+          )}
         </div>
+        <div className="text-[11px] text-muted-foreground/60">tap to edit</div>
       </button>
       <button
         type="button"

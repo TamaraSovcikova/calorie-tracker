@@ -16,6 +16,7 @@
 import { v4 as uuid } from 'uuid';
 import { currentUserId } from '@/db/userId';
 import type { CustomUnit, Food, UsdaDataType } from '@/db/types';
+import { suggestPortions, parseServingDescription } from './portionSuggestions';
 
 const BASE = 'https://api.nal.usda.gov/fdc/v1';
 const API_KEY_LS = 'calorie-tracker:usda-key';
@@ -250,7 +251,22 @@ export function usdaHitToFood(hit: UsdaHit): Food | null {
       ? hit.servingSize
       : undefined;
 
-  const customUnits = portionsToCustomUnits(hit.foodPortions);
+  let customUnits = portionsToCustomUnits(hit.foodPortions);
+
+  // Branded foods rarely have foodPortions but do carry householdServingFullText
+  // (e.g. "1 slice") + servingSize (grams). Convert that into a custom unit.
+  if (customUnits.length === 0 && isBranded && hit.householdServingFullText && servingG) {
+    const unit = parseServingDescription(hit.householdServingFullText, servingG);
+    if (unit) customUnits = [unit];
+  }
+
+  // Last resort: rule-based suggestions from the food name, so common items
+  // (eggs, chicken breast, bread slices…) always get sensible units even when
+  // the database doesn't provide portion data.
+  if (customUnits.length === 0) {
+    const brand = isBranded ? hit.brandName ?? hit.brandOwner : undefined;
+    customUnits = suggestPortions(name, brand);
+  }
 
   const now = new Date().toISOString();
   return {

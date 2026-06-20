@@ -12,6 +12,7 @@ import {
   type ResolvedMacros,
 } from './foodMath';
 import { updateFood } from '@/db/repos/foods';
+import { suggestPortions } from '@/lib/portionSuggestions';
 import type { CustomUnit, Food } from '@/db/types';
 
 interface QuantityStepProps {
@@ -54,9 +55,26 @@ export function QuantityStep({
   const macros = useMemo(() => computeMacros(liveFood, state), [liveFood, state]);
   const valid = state.qty > 0 && Number.isFinite(state.qty) && macros.grams > 0;
 
+  // Rule-based suggestions shown when the food has no custom units yet.
+  const suggestions = useMemo(
+    () =>
+      customUnits.length === 0
+        ? suggestPortions(food.name, food.brand)
+        : [],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [food.id, food.name, food.brand, customUnits.length],
+  );
+
   const persistUnits = async (next: CustomUnit[]) => {
     setCustomUnits(next);
     await updateFood(food.id, { custom_units: next });
+  };
+
+  // Add a suggested unit and immediately switch to it.
+  const addSuggestion = async (unit: CustomUnit) => {
+    const next = [...customUnits, unit];
+    await persistUnits(next);
+    setState({ mode: `unit:${unit.label}` as QuantityMode, qty: 1 });
   };
 
   const handleAddCustomUnit = async () => {
@@ -177,6 +195,27 @@ export function QuantityStep({
                 </li>
               ))}
             </ul>
+          </div>
+        )}
+
+        {suggestions.length > 0 && (
+          <div className="space-y-1.5">
+            <span className="text-xs text-muted-foreground">
+              Typical portions — tap to add:
+            </span>
+            <div className="flex flex-wrap gap-1.5">
+              {suggestions.map((u) => (
+                <button
+                  key={u.label}
+                  type="button"
+                  onClick={() => void addSuggestion(u)}
+                  className="flex items-center gap-1 rounded-full border border-primary/40 bg-primary/5 px-2.5 py-1 text-xs font-medium text-primary hover:bg-primary/10 active:scale-95 transition-transform"
+                >
+                  <Plus className="h-3 w-3" />
+                  {u.label} ({formatGrams(u.grams)} g)
+                </button>
+              ))}
+            </div>
           </div>
         )}
 

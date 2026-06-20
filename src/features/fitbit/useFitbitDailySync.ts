@@ -13,7 +13,7 @@
  *   - Writes a row even at 0 kcal so the diary reflects rest days.
  */
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { db } from '@/db/dexie';
 import { currentUserId } from '@/db/userId';
 import { useFitbitTokens } from '@/db/repos/fitbitTokens';
@@ -130,10 +130,11 @@ async function syncFitbitForDate(
   );
 }
 
-export function useFitbitDailySync(date: LocalDate): void {
+export function useFitbitDailySync(date: LocalDate): { syncFailed: boolean } {
   const tokens = useFitbitTokens();
   const profile = useProfile();
   const connected = !!tokens;
+  const [syncFailed, setSyncFailed] = useState(false);
 
   useEffect(() => {
     if (!connected) return;
@@ -160,10 +161,14 @@ export function useFitbitDailySync(date: LocalDate): void {
 
       try {
         await syncFitbitForDate(date, profile);
-        if (!cancelled) lastFetched.set(key, Date.now());
+        if (!cancelled) {
+          setSyncFailed(false);
+          lastFetched.set(key, Date.now());
+        }
       } catch (err) {
         // Diary works fine without Fitbit — console-warn only.
         console.warn('Fitbit sync failed for', date, err);
+        if (!cancelled) setSyncFailed(true);
       }
     })();
 
@@ -173,4 +178,6 @@ export function useFitbitDailySync(date: LocalDate): void {
     // profile is intentionally in deps so a later profile edit (which
     // changes the BMR estimate) re-runs the activity calculation.
   }, [date, connected, profile]);
+
+  return { syncFailed };
 }
