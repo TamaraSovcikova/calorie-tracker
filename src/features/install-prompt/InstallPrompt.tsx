@@ -87,7 +87,7 @@ export function InstallPrompt() {
         <div className="min-w-0 flex-1 text-sm">
           {deferred ? (
             <>
-              <div className="font-medium">Install Calorie Tracker</div>
+              <div className="font-medium">Install Verve</div>
               <div className="text-xs text-muted-foreground">
                 Faster opens, works offline.
               </div>
