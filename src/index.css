@@ -4,38 +4,38 @@
 
 @layer base {
   /*
-   * Design tokens — warm, cozy, minimalist. Palette:
-   *   Porcelain  #FDFFF7  canvas        Charcoal   #50514F  ink
-   *   Verdigris  #2F9C95  primary/brand Rosy Taupe #B98B82  warm caution
-   * The pet's cartoon art carries the saturated colour; the UI stays soft.
+   * Design tokens — Stone & Amber palette.
+   *   Stone bg  #F4F3EF  canvas        Amber      #BF9248  brand/accent
+   *   Dark ink  #1A1916  foreground    Gold dark  #D4AA50  dark-mode accent
    */
   :root {
     color-scheme: light;
 
-    --background: 70 50% 98%;
-    --foreground: 90 4% 28%;
+    /* Semantic tokens (used by Tailwind utilities like bg-background, text-primary etc.) */
+    --background: 48 19% 95%;       /* #F4F3EF stone */
+    --foreground: 45 9% 9%;         /* #1A1916 */
 
     --card: 0 0% 100%;
-    --card-foreground: 90 4% 28%;
+    --card-foreground: 45 9% 9%;
 
-    --primary: 176 54% 40%;
+    --primary: 37 48% 52%;          /* #BF9248 amber */
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 72 20% 95%;
-    --secondary-foreground: 90 5% 28%;
+    --secondary: 45 15% 94%;
+    --secondary-foreground: 45 9% 9%;
 
-    --muted: 72 18% 95%;
-    --muted-foreground: 84 5% 46%;
+    --muted: 45 12% 93%;
+    --muted-foreground: 45 6% 47%;
 
-    --accent: 176 36% 93%;
-    --accent-foreground: 176 50% 24%;
+    --accent: 37 30% 90%;
+    --accent-foreground: 37 48% 32%;
 
     --destructive: 10 36% 58%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 72 16% 90%;
-    --input: 72 14% 87%;
-    --ring: 176 54% 40%;
+    --border: 42 17% 88%;           /* #E6E3DC */
+    --input: 42 17% 87%;
+    --ring: 37 48% 52%;
 
     --kcal: 24 78% 56%;
     --protein: 214 60% 57%;
@@ -43,35 +43,69 @@
     --fat: 262 44% 62%;
 
     --radius: 0.875rem;
+
+    /* Stone & Amber design tokens (used directly in new components) */
+    --color-bg:           #F4F3EF;
+    --color-text:         #1A1916;
+    --color-text-muted:   #989690;
+    --color-text-faint:   #B4B2AC;
+    --color-accent:       #BF9248;
+    --color-accent-deep:  #8C6A30;
+    --color-border:       #E6E3DC;
+    --color-thumb-bg:     #ECEAE4;
+    --color-tab-track:    #E6E3DC;
+    --color-tab-active:   #F8F7F3;
+    --color-hero:         #F0E4CF;
+    --color-hero-text:    #3D250A;
+    --color-chip-bg:      #E6E3DC;
+    --color-log-ghost:    rgba(191, 146, 72, 0.13);
+    --color-search-bg:    #EDEBE6;
   }
 
   .dark {
     color-scheme: dark;
 
-    --background: 90 5% 12%;
-    --foreground: 70 14% 90%;
+    --background: 40 7% 8%;         /* #161513 dark stone */
+    --foreground: 40 15% 93%;       /* #F0EDE6 */
 
-    --card: 90 5% 16%;
-    --card-foreground: 70 14% 90%;
+    --card: 40 6% 12%;
+    --card-foreground: 40 15% 93%;
 
-    --primary: 176 48% 47%;
-    --primary-foreground: 90 6% 12%;
+    --primary: 41 60% 57%;          /* #D4AA50 gold */
+    --primary-foreground: 40 7% 8%;
 
-    --secondary: 90 5% 22%;
-    --secondary-foreground: 70 14% 90%;
+    --secondary: 40 6% 17%;
+    --secondary-foreground: 40 15% 93%;
 
-    --muted: 90 5% 21%;
-    --muted-foreground: 80 7% 60%;
+    --muted: 40 6% 15%;
+    --muted-foreground: 40 7% 50%;
 
-    --accent: 176 30% 24%;
-    --accent-foreground: 176 40% 80%;
+    --accent: 40 20% 18%;
+    --accent-foreground: 41 60% 70%;
 
     --destructive: 10 42% 56%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 90 5% 24%;
-    --input: 90 5% 27%;
-    --ring: 176 48% 47%;
+    --border: 45 15% 16%;           /* #2E2B22 */
+    --input: 45 15% 18%;
+    --ring: 41 60% 57%;
+
+    /* Stone & Amber dark tokens */
+    --color-bg:           #161513;
+    --color-text:         #F0EDE6;
+    --color-text-muted:   #7A7468;
+    --color-text-faint:   #524E44;
+    --color-accent:       #D4AA50;
+    --color-accent-deep:  #B8902E;
+    --color-border:       #2E2B22;
+    --color-thumb-bg:     #201E19;
+    --color-tab-track:    #252218;
+    --color-tab-active:   #302C20;
+    --color-hero:         #2A231A;
+    --color-hero-text:    #F0E4CF;
+    --color-chip-bg:      #252218;
+    --color-log-ghost:    rgba(212, 170, 80, 0.13);
+    --color-search-bg:    #1E1C17;
   }
 
   * {
@@ -86,7 +120,7 @@
 
   body {
     @apply bg-background text-foreground antialiased;
-    font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-family: 'Hanken Grotesk', system-ui, -apple-system, sans-serif;
     overscroll-behavior-y: none;
     -webkit-tap-highlight-color: transparent;
     /* Safe area insets for iOS home-indicator devices */

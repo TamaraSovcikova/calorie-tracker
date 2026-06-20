@@ -62,38 +62,38 @@ export function Layout() {
         <Outlet />
       </main>
       <nav
+        style={{ borderTopColor: 'var(--color-border)', background: 'var(--color-bg)' }}
         className={cn(
           'fixed bottom-0 left-0 right-0 z-50',
-          'border-t border-border bg-background/95 backdrop-blur',
+          'border-t backdrop-blur-sm',
           'pb-[env(safe-area-inset-bottom)]',
         )}
       >
-        <ul className="mx-auto flex max-w-md items-stretch justify-around">
-          {NAV_ITEMS.map(({ to, label, icon: Icon }) => (
-            <li key={to} className="flex-1">
-              <NavLink
-                to={to}
-                className={({ isActive }) =>
-                  cn(
-                    'flex flex-col items-center justify-center gap-1 py-2 text-[11px] tap-target',
-                    isActive
-                      ? 'text-primary'
-                      : 'text-muted-foreground hover:text-foreground',
-                  )
-                }
-              >
+        <ul className="mx-auto flex h-16 max-w-md items-center justify-around px-[30px]">
+          {NAV_ITEMS.map(({ to, icon: Icon }) => (
+            <li key={to}>
+              <NavLink to={to}>
                 {({ isActive }) => (
-                  <>
-                    <span
-                      className={cn(
-                        'flex h-7 w-14 items-center justify-center rounded-full transition-colors',
-                        isActive && 'bg-accent',
-                      )}
-                    >
-                      <Icon className="h-5 w-5" strokeWidth={2.25} />
-                    </span>
-                    <span className={cn(isActive && 'font-medium')}>{label}</span>
-                  </>
+                  <div className="relative flex items-center justify-center p-2">
+                    <Icon
+                      className="h-[21px] w-[21px]"
+                      strokeWidth={isActive ? 2 : 1.6}
+                      style={{ color: isActive ? 'var(--color-accent-deep)' : 'var(--color-text-faint)' }}
+                    />
+                    {isActive && (
+                      <span
+                        className="absolute rounded-full"
+                        style={{
+                          width: 4,
+                          height: 4,
+                          background: 'var(--color-accent-deep)',
+                          bottom: -2,
+                          left: '50%',
+                          transform: 'translateX(-50%)',
+                        }}
+                      />
+                    )}
+                  </div>
                 )}
               </NavLink>
             </li>

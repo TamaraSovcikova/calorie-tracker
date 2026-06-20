@@ -44,6 +44,10 @@ const POSE_SRC: Record<DogPose, string> = {
   surprised: surprisedUrl,
 };
 
+export function getDogSrc(pose: DogPose): string {
+  return POSE_SRC[pose];
+}
+
 /** Poses with extra pep get the livelier bob instead of calm breathing. */
 const BOB_POSES = new Set<DogPose>(['happy', 'greeting', 'eating', 'playful']);
 

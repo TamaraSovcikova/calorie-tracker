@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "calorie-tracker-dev",
+      "runtimeExecutable": "wsl",
+      "runtimeArgs": ["-d", "Ubuntu", "--", "bash", "-ic", "cd ~/projects_/calorie-tracker && npm run dev -- --host 0.0.0.0"],
+      "port": 5173
+    }
+  ]
+}

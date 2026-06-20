@@ -12,17 +12,17 @@ import {
   Loader2,
   MoreVertical,
 } from 'lucide-react';
-import { PageHeader } from '@/components/PageHeader';
 import { Button } from '@/components/ui/Button';
-import { CoachTip } from '@/components/ui/CoachTip';
-import { DogHero } from '@/features/pet/DogHero';
-import { MacroSummary } from '@/features/diary/MacroSummary';
+import { ArcGauge } from '@/components/ArcGauge';
 import { DiarySectionView } from '@/features/diary/DiarySection';
 import { CopyDaySheet } from '@/features/diary/CopyDaySheet';
 import { AddFoodSheet } from '@/features/food-search/AddFoodSheet';
 import { EditEntrySheet } from '@/features/food-search/EditEntrySheet';
 import { ExerciseSection } from '@/features/exercise/ExerciseSection';
 import { useFitbitDailySync } from '@/features/fitbit/useFitbitDailySync';
+import { useDogState } from '@/features/pet/useDogState';
+import { getDogSrc } from '@/features/pet/Dog';
+import { useDailyGreeting } from '@/features/pet/useDailyGreeting';
 import {
   formatDayHeader,
   fromLocalDate,
@@ -55,10 +55,10 @@ export function DiaryPage() {
   const entries = useDiaryDay(currentDate);
   const exercise = useExerciseDay(currentDate);
   const weekly = useWeeklyBudget(currentDate, profile);
-
-  // If Fitbit is connected, pulls daily calories burned and upserts an
-  // exercise_entry row in the background. No-op when not connected.
   const { syncFailed: fitbitSyncFailed } = useFitbitDailySync(currentDate);
+
+  const greeting = useDailyGreeting();
+  const dog = useDogState({ greeting });
 
   const [addingTo, setAddingTo] = useState<MealSection | null>(null);
   const [editing, setEditing] = useState<DiaryEntry | null>(null);
@@ -68,7 +68,6 @@ export function DiaryPage() {
   const [menuOpen, setMenuOpen] = useState(false);
   const dateInputRef = useRef<HTMLInputElement>(null);
 
-  // Leaving the day cancels an in-progress selection.
   useEffect(() => {
     setSelectMode(false);
     setSelectedIds(new Set());
@@ -104,23 +103,14 @@ export function DiaryPage() {
   const openDatePicker = () => {
     const input = dateInputRef.current;
     if (!input) return;
-    // showPicker() is the reliable way to open the native picker from a
-    // gesture; fall back to focus+click on older engines.
     if (typeof input.showPicker === 'function') {
-      try {
-        input.showPicker();
-        return;
-      } catch {
-        /* fall through */
-      }
+      try { input.showPicker(); return; } catch { /* fall through */ }
     }
     input.focus();
     input.click();
   };
 
   const onToday = isToday(currentDate);
-
-  // "Untracked" days count as on-target for the weekly budget.
   const untrackedDays = parseUntrackedDates(profile?.untracked_dates);
   const isUntracked = untrackedDays.has(currentDate);
   const toggleUntracked = () => {
@@ -142,35 +132,79 @@ export function DiaryPage() {
     ? entries.filter((e) => e.kind === 'food' && e.food_id).length
     : 0;
 
+  const baseTarget = weekly ? weekly.adjustedTarget : (profile?.kcal_target ?? 2000);
+  const effective = profile?.eat_back_burned ? baseTarget + burned : baseTarget;
+  const remaining = Math.max(0, Math.round(effective - totals.kcal));
+
+  const dogSrc = dog.ready ? getDogSrc(dog.pose) : undefined;
+
+  const macroRows = [
+    { key: 'protein', label: 'PROTEIN', value: Math.round(totals.protein), target: profile?.protein_g ?? 0 },
+    { key: 'carbs',   label: 'CARBS',   value: Math.round(totals.carbs),   target: profile?.carbs_g ?? 0 },
+    { key: 'fat',     label: 'FAT',     value: Math.round(totals.fat),     target: profile?.fat_g ?? 0 },
+  ];
+
   return (
     <>
-      <PageHeader
-        title={formatDayHeader(currentDate)}
-        subtitle={format(fromLocalDate(currentDate), 'EEEE, d MMMM yyyy')}
-        onTitleClick={openDatePicker}
-        trailing={
-          <div className="flex items-center gap-1">
-            {!onToday && (
-              <button
-                type="button"
-                onClick={() => goToDate(todayLocal())}
-                className="tap-target rounded-full border border-border px-3 py-1 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
-              >
-                Today
-              </button>
-            )}
-            <button
-              type="button"
-              onClick={() => goToDate(shiftDate(currentDate, -1))}
-              className="tap-target rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground"
-              aria-label="Previous day"
+      {/* Hidden date input for native date picker */}
+      <input
+        ref={dateInputRef}
+        type="date"
+        value={currentDate}
+        onChange={(e) => { if (e.target.value) goToDate(e.target.value as LocalDate); }}
+        tabIndex={-1}
+        aria-hidden="true"
+        className="pointer-events-none absolute left-4 top-12 h-0 w-0 opacity-0"
+      />
+
+      {/* ── Header ─────────────────────────────────────────────────── */}
+      <div className="mx-auto max-w-md px-6 pt-7">
+        <div className="flex items-center justify-between">
+          <button
+            type="button"
+            onClick={() => goToDate(shiftDate(currentDate, -1))}
+            className="tap-target rounded-md p-2"
+            style={{ color: 'var(--color-text-faint)' }}
+            aria-label="Previous day"
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </button>
+
+          <button
+            type="button"
+            onClick={openDatePicker}
+            className="flex flex-col items-center"
+          >
+            <div
+              style={{
+                fontSize: 11,
+                fontWeight: 600,
+                letterSpacing: '0.18em',
+                color: 'var(--color-text-faint)',
+                textTransform: 'uppercase',
+              }}
             >
-              <ChevronLeft className="h-5 w-5" />
-            </button>
+              {format(fromLocalDate(currentDate), 'EEEE d MMMM')}
+            </div>
+            <div
+              style={{
+                fontSize: 26,
+                fontWeight: 600,
+                letterSpacing: '-0.02em',
+                marginTop: 4,
+                color: 'var(--color-text)',
+              }}
+            >
+              {onToday ? 'Today' : formatDayHeader(currentDate)}
+            </div>
+          </button>
+
+          <div className="flex items-center gap-0.5">
             <button
               type="button"
               onClick={() => goToDate(shiftDate(currentDate, 1))}
-              className="tap-target rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground"
+              className="tap-target rounded-md p-2"
+              style={{ color: 'var(--color-text-faint)' }}
               aria-label="Next day"
             >
               <ChevronRight className="h-5 w-5" />
@@ -181,7 +215,8 @@ export function DiaryPage() {
                 onClick={() => setMenuOpen((v) => !v)}
                 aria-label="More actions"
                 aria-expanded={menuOpen}
-                className="tap-target rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground"
+                className="tap-target rounded-md p-2"
+                style={{ color: 'var(--color-text-faint)' }}
               >
                 <MoreVertical className="h-5 w-5" />
               </button>
@@ -195,12 +230,18 @@ export function DiaryPage() {
                     onClick={() => setMenuOpen(false)}
                   />
                   <div className="absolute right-0 top-full z-[56] mt-1 w-56 overflow-hidden rounded-xl border border-border bg-card p-1 shadow-lg">
+                    {!onToday && (
+                      <button
+                        type="button"
+                        onClick={() => { goToDate(todayLocal()); setMenuOpen(false); }}
+                        className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-sm hover:bg-muted"
+                      >
+                        Go to today
+                      </button>
+                    )}
                     <button
                       type="button"
-                      onClick={() => {
-                        setCopyOpen(true);
-                        setMenuOpen(false);
-                      }}
+                      onClick={() => { setCopyOpen(true); setMenuOpen(false); }}
                       className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-sm hover:bg-muted"
                     >
                       <CopyPlus className="h-4 w-4 shrink-0 text-muted-foreground" />
@@ -209,10 +250,7 @@ export function DiaryPage() {
                     {foodEntryCount > 0 && (
                       <button
                         type="button"
-                        onClick={() => {
-                          setSelectMode(true);
-                          setMenuOpen(false);
-                        }}
+                        onClick={() => { setSelectMode(true); setMenuOpen(false); }}
                         className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-sm hover:bg-muted"
                       >
                         <ListChecks className="h-4 w-4 shrink-0 text-muted-foreground" />
@@ -230,9 +268,7 @@ export function DiaryPage() {
                         ) : (
                           <CalendarOff className="h-4 w-4 shrink-0 text-muted-foreground" />
                         )}
-                        {isUntracked
-                          ? 'Mark day as tracked'
-                          : 'Mark day as untracked'}
+                        {isUntracked ? 'Mark day as tracked' : 'Mark day as untracked'}
                       </button>
                     )}
                   </div>
@@ -240,23 +276,108 @@ export function DiaryPage() {
               )}
             </div>
           </div>
-        }
-      />
-      <input
-        ref={dateInputRef}
-        type="date"
-        value={currentDate}
-        onChange={(e) => {
-          if (e.target.value) goToDate(e.target.value);
-        }}
-        tabIndex={-1}
-        aria-hidden="true"
-        className="pointer-events-none absolute left-4 top-12 h-0 w-0 opacity-0"
-      />
+        </div>
+      </div>
 
+      {/* ── Arc + macros ─────────────────────────────────────────── */}
+      <div className="mx-auto flex max-w-md flex-col items-center px-6" style={{ gap: 14 }}>
+        {profile && (
+          <div style={{ marginTop: 8 }}>
+            <ArcGauge
+              value={totals.kcal}
+              max={effective}
+              remaining={remaining}
+              dogSrc={dogSrc}
+            />
+          </div>
+        )}
+
+        {dog.ready && (
+          <div
+            style={{
+              fontSize: 12.5,
+              fontWeight: 600,
+              color: 'var(--color-text-muted)',
+              marginTop: -4,
+            }}
+          >
+            {dog.petName} · {dog.statusLine}
+          </div>
+        )}
+
+        {profile && (
+          <div style={{ display: 'flex', gap: 26, marginTop: 4 }}>
+            {macroRows.map(({ key, label, value, target }) => (
+              <div
+                key={key}
+                style={{
+                  width: 78,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  gap: 7,
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: 15,
+                    fontWeight: 700,
+                    fontVariantNumeric: 'tabular-nums',
+                    color: 'var(--color-text)',
+                  }}
+                >
+                  {value}
+                  <span
+                    style={{
+                      fontSize: 10.5,
+                      fontWeight: 500,
+                      color: 'var(--color-text-faint)',
+                    }}
+                  >
+                    /{target}g
+                  </span>
+                </div>
+                <div
+                  style={{
+                    width: '100%',
+                    height: 2,
+                    borderRadius: 2,
+                    background: 'var(--color-border)',
+                    overflow: 'hidden',
+                  }}
+                >
+                  <div
+                    style={{
+                      height: '100%',
+                      borderRadius: 2,
+                      background: 'var(--color-text)',
+                      width: `${target > 0 ? Math.min(100, (value / target) * 100) : 0}%`,
+                      transition: 'width 0.6s ease',
+                    }}
+                  />
+                </div>
+                <div
+                  style={{
+                    fontSize: 10.5,
+                    fontWeight: 600,
+                    letterSpacing: '0.04em',
+                    color: 'var(--color-text-faint)',
+                    textTransform: 'uppercase',
+                  }}
+                >
+                  {label}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* ── Body content ─────────────────────────────────────────── */}
       <div
         className={`mx-auto max-w-md animate-fade-in space-y-3 px-4 py-4 ${selectMode ? 'pb-24' : ''}`}
       >
+        {/* Banners */}
         {selectMode && (
           <div className="rounded-xl border border-primary/30 bg-primary/5 px-3 py-2 text-xs text-muted-foreground">
             Tap the foods you want, then{' '}
@@ -268,8 +389,7 @@ export function DiaryPage() {
           <div className="flex items-start gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
             <CalendarOff className="mt-0.5 h-3.5 w-3.5 shrink-0" />
             <span>
-              This day is marked untracked — your weekly budget counts it as
-              on-target, not by what's logged here.
+              This day is marked untracked — your weekly budget counts it as on-target, not by what's logged here.
             </span>
           </div>
         )}
@@ -281,29 +401,14 @@ export function DiaryPage() {
           >
             <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
             <span>
-              Health sync couldn't connect — tap to go to Settings and
-              reconnect.
+              Health sync couldn't connect — tap to go to Settings and reconnect.
             </span>
           </button>
         )}
-        {!selectMode && <DogHero />}
-        {!selectMode && onToday && <WeeklyDigestCard />}
-        {!selectMode && (
-          <CoachTip id="diary-basics">
-            Tap the date above to jump to any day. Use a section's{' '}
-            <span className="font-medium text-foreground">Add</span> button to
-            search, scan a barcode, or quick-add calories.
-          </CoachTip>
-        )}
-        {profile && (
-          <MacroSummary
-            profile={profile}
-            totals={totals}
-            burnedKcal={burned}
-            weekly={weekly}
-          />
-        )}
 
+        {!selectMode && onToday && <WeeklyDigestCard />}
+
+        {/* Meal sections */}
         {loading ? (
           <div className="flex items-center justify-center gap-2 py-12 text-sm text-muted-foreground">
             <Loader2 className="h-4 w-4 animate-spin" />
@@ -330,6 +435,7 @@ export function DiaryPage() {
         )}
       </div>
 
+      {/* Select mode action bar */}
       {selectMode && (
         <div className="fixed inset-x-0 bottom-0 z-[60] border-t border-border bg-card p-3 pb-[max(env(safe-area-inset-bottom),12px)]">
           <div className="mx-auto flex max-w-md items-center gap-2">
