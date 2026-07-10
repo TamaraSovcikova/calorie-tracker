@@ -6,8 +6,26 @@ How to use:
 - Start of session: read only the top entry, announce the chat number.
 - End of session: prepend a new entry, bump `Session count`.
 
-Session count: 1
+Session count: 2
 Last updated: 2026-07-10
+
+---
+
+## Chat #2 - 2026-07-10 (barcode photo import, app-icon fix, pet awareness; deployed)
+
+- Did:
+  - Barcode: photo/gallery import added to `BarcodeScanner.tsx` (decodes a still image via the same ZXing reader/hints, then the existing `lookupBarcode` pipeline). Lives in the shared component, so the Add-food Scan tab and `IngredientPickerSheet` both get it.
+  - App icon: fixed the white-corner / floating-badge bug (icon looked like a square forced into a circle). Cause: `favicon.svg` art was a rounded badge scaled 1.5x past the canvas, and the generator padded on a light field. Now `public/favicon.svg` is full-bleed dark (rx=0, arc scale 1.1 inside the safe zone) and `pwa-assets.config.ts` is a custom preset filling padding with `#211D17` (apple padding 0, maskable 0.1). Regenerated all PNGs; verified the rendered Apple/maskable/any icons.
+  - Pets: new `src/features/pet/petInteraction.ts` (`petMood`, `reactionFor`, `idleBeatFor`). `mood` (happy/content/needy/distressed) derived in `useDogState` and threaded into `DogPlayground` + `DraggableDogArc`. Fling -> `playful` (happy/content) or `sad`/cry (needy/distressed); 3 quick throws = bully -> `sad`; gentle tap -> `love`/`happy`; hard wall/floor crash -> `surprised` (throttled, suppressed on drop-in); idle beats now mood-weighted, not uniform random. Also fixed `DogHero` ignoring the chosen species.
+  - Widget (quick-add shortcuts): NO code change. Shortcuts confirmed live in the deployed manifest; they weren't showing on the Pixel 9a because the installed WebAPK is stale (installed before shortcuts existed). Fix is device-side: uninstall + reinstall the PWA.
+- State: DEPLOYED to https://calorie-tracker.tamara-sovcik.workers.dev (Version a4edbf68). COMMITTED + PUSHED on `main`: 81a2fd1 (barcode), b94f42f (icon), 6086bfa (pets), plus this log. `pnpm run build` clean, worker typecheck clean, 184/184 tests pass.
+- Next:
+  - Device QA on the Pixel: reinstall the PWA (gets the new full-bleed icon AND the long-press Quick add / Scan shortcuts); test barcode photo-import (Add food -> Scan -> Import a barcode photo).
+  - Feel-test pet reactions on `/pet` and tune thresholds (bully = 3 throws, fling speed >= 7, impact > 13 (playground) / 11 (arc), reaction hold durations). Untested live - no reliable preview from the Windows-cwd session, dev server is in WSL.
+- Open:
+  - Pet reaction thresholds/tuning unverified in-browser; adjust after device test.
+  - (carry from Chat #1) Rotate the Gemini API key pasted in chat; delete "API key 2" once pets confirmed.
+- Skills/conventions: from a Windows-cwd session you can drive the WSL toolchain via `wsl.exe -d Ubuntu bash -s <<'EOF' ... EOF` (stdin heredoc avoids Git Bash MSYS arg-mangling that eats `$HOME`); prefix `export PATH="$HOME/.nvm/versions/node/v22.22.2/bin:$PATH"`.
 
 ---
 
