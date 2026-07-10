@@ -5,7 +5,7 @@ import {
   DecodeHintType,
   type Result,
 } from '@zxing/library';
-import { Camera, RotateCcw } from 'lucide-react';
+import { Camera, Loader2, RotateCcw, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 
@@ -43,6 +43,9 @@ export function BarcodeScanner({ onCode }: BarcodeScannerProps) {
   );
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [manualCode, setManualCode] = useState('');
+  const [importing, setImporting] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -107,6 +110,33 @@ export function BarcodeScanner({ onCode }: BarcodeScannerProps) {
     };
   }, [onCode]);
 
+  // Decode a barcode from a still image the user picked (a photo already in
+  // their library, or a fresh snap via the OS picker). Reuses the same reader
+  // hints as the live scanner and funnels into the same onCode pipeline.
+  const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // allow re-picking the same file
+    if (!file) return;
+    setImportError(null);
+    setImporting(true);
+    const url = URL.createObjectURL(file);
+    try {
+      const reader = new BrowserMultiFormatReader(HINTS);
+      const result = await reader.decodeFromImageUrl(url);
+      const code = result.getText();
+      if (code) {
+        onCode(code);
+        return;
+      }
+      setImportError("No barcode found in that photo. Try another, or type the digits below.");
+    } catch {
+      setImportError("No barcode found in that photo. Try another, or type the digits below.");
+    } finally {
+      URL.revokeObjectURL(url);
+      setImporting(false);
+    }
+  };
+
   const handleManualSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const code = manualCode.trim();
@@ -148,6 +178,42 @@ export function BarcodeScanner({ onCode }: BarcodeScannerProps) {
               </span>
             )}
           </div>
+        )}
+      </div>
+      <div className="border-t border-border p-4">
+        {/* Import a barcode from an existing photo. No `capture` attribute, so
+            the OS picker offers both the camera and the photo library. */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={(e) => void handleImportFile(e)}
+        />
+        <Button
+          type="button"
+          variant="secondary"
+          block
+          disabled={importing}
+          onClick={() => fileInputRef.current?.click()}
+        >
+          {importing ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Reading barcode…
+            </>
+          ) : (
+            <>
+              <Upload className="h-4 w-4" />
+              Import a barcode photo
+            </>
+          )}
+        </Button>
+        <p className="mt-1 text-center text-[11px] text-muted-foreground">
+          Already have a photo of the barcode? Pick it from your library.
+        </p>
+        {importError && (
+          <p className="mt-2 text-center text-xs text-destructive">{importError}</p>
         )}
       </div>
       <form onSubmit={handleManualSubmit} className="space-y-2 p-4">
