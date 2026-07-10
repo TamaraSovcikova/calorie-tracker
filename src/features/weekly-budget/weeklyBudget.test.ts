@@ -72,8 +72,8 @@ describe('effectiveDailyKcal', () => {
       2000,
       none,
     );
-    expect(effective[0]).toBe(2000); // Mon — missed, neutralised
-    expect(effective[1]).toBe(1800); // Tue — logged, kept
+    expect(effective[0]).toBe(2000); // Mon - missed, neutralised
+    expect(effective[1]).toBe(1800); // Tue - logged, kept
     expect(missedCount).toBe(1);
   });
 
@@ -100,7 +100,7 @@ describe('effectiveDailyKcal', () => {
       2000,
       none,
     );
-    expect(effective[0]).toBe(400); // logged — a real low day, not erased
+    expect(effective[0]).toBe(400); // logged - a real low day, not erased
     expect(effective[1]).toBe(2000); // un-logged past day
     expect(missedCount).toBe(1);
   });
@@ -115,7 +115,7 @@ describe('effectiveDailyKcal', () => {
       new Set(['2026-05-18']), // Mon marked untracked despite being logged
     );
     expect(effective[0]).toBe(2000); // overridden to on-target
-    expect(effective[1]).toBe(2000); // Tue — logged, kept
+    expect(effective[1]).toBe(2000); // Tue - logged, kept
     expect(missedCount).toBe(1);
   });
 });

@@ -5,7 +5,7 @@ import { useDogState } from './useDogState';
 import { useDailyGreeting } from './useDailyGreeting';
 
 /**
- * The dog hero band at the top of the Today screen — a compact playground
+ * The dog hero band at the top of the Today screen - a compact playground
  * (still draggable) with the current status line. The expand button opens
  * the full-screen Pet playground.
  */

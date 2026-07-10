@@ -1,5 +1,5 @@
 /**
- * The "food facts when logging" preference. Device-local (localStorage) —
+ * The "food facts when logging" preference. Device-local (localStorage) -
  * a lightweight UI nicety, not synced personal data. Defaults to on.
  */
 

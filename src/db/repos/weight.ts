@@ -5,7 +5,7 @@ import type { LocalDate } from '@/lib/dates';
 import type { WeightEntry } from '../types';
 
 /**
- * One weigh-in per date — upserts on (user_id, date).
+ * One weigh-in per date - upserts on (user_id, date).
  *
  * The row id is DETERMINISTIC (`w:{user}:{date}`), not a random uuid, so
  * the same date logged on two devices produces the same id. Without this

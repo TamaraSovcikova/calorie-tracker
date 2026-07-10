@@ -2,15 +2,16 @@ import { useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/cn';
 import { Dog } from './Dog';
 import type { DogPose } from './petLogic';
+import type { PetSpecies } from './petSpecies';
 
 /**
  * A Shimeji-flavoured playground for the Pet screen. Biscuit can be
  * grabbed and flung; he falls under gravity, bounces off the floor and
- * walls, tumbles when thrown, and — for active poses — hops around on his
+ * walls, tumbles when thrown, and - for active poses - hops around on his
  * own. Restful poses (full, stuffed, asleep, sad) just settle on the floor.
  *
  * Physics live entirely in refs and a requestAnimationFrame loop that
- * writes `transform` straight to the DOM — no per-frame React renders.
+ * writes `transform` straight to the DOM - no per-frame React renders.
  */
 
 const DOG = 120; // dog box, px
@@ -20,7 +21,7 @@ const WALL_BOUNCE = 0.5;
 const GROUND_FRICTION = 0.84;
 const AIR_FRICTION = 0.992;
 const THROW_CAP = 34;
-const WALK_SPEED = 1.45; // px/frame at 60fps — a calm stroll
+const WALK_SPEED = 1.45; // px/frame at 60fps - a calm stroll
 
 const RESTFUL = new Set<DogPose>([
   'full',
@@ -49,14 +50,15 @@ const clamp = (v: number, lo: number, hi: number) =>
 
 interface DogPlaygroundProps {
   pose: DogPose;
+  species?: PetSpecies;
   className?: string;
 }
 
-export function DogPlayground({ pose, className }: DogPlaygroundProps) {
+export function DogPlayground({ pose, species = 'dog', className }: DogPlaygroundProps) {
   const stageRef = useRef<HTMLDivElement>(null);
   const dogRef = useRef<HTMLDivElement>(null);
 
-  // Physics + interaction state — refs, so frames don't trigger renders.
+  // Physics + interaction state - refs, so frames don't trigger renders.
   const pos = useRef({ x: 80, y: 0 });
   const vel = useRef({ vx: 0, vy: 0 });
   const stage = useRef({ w: 320, h: 280 });
@@ -140,7 +142,7 @@ export function DogPlayground({ pose, className }: DogPlaygroundProps) {
         if (p.y >= floorY) {
           p.y = floorY;
           v.vy = v.vy > 1.6 ? -v.vy * FLOOR_BOUNCE : 0;
-          // Friction only when not walking — a walk holds a steady pace.
+          // Friction only when not walking - a walk holds a steady pace.
           if (behavior.current !== 'walking') v.vx *= GROUND_FRICTION ** dt;
           onFloor.current = Math.abs(v.vy) < 0.6;
         } else {
@@ -154,7 +156,7 @@ export function DogPlayground({ pose, className }: DogPlaygroundProps) {
         } else {
           rot.current += v.vx * 0.7 * dt;
         }
-        // Facing follows motion (a fling, a hop) — walking sets it above.
+        // Facing follows motion (a fling, a hop) - walking sets it above.
         if (!walking && Math.abs(v.vx) > 0.45) {
           facing.current = v.vx > 0 ? 1 : -1;
         }
@@ -165,7 +167,7 @@ export function DogPlayground({ pose, className }: DogPlaygroundProps) {
     };
     raf = requestAnimationFrame(frame);
 
-    // Self-roaming: a calm behaviour mix — mostly pausing and strolling,
+    // Self-roaming: a calm behaviour mix - mostly pausing and strolling,
     // with the odd turn and a rare hop.
     let roamTimer: ReturnType<typeof setTimeout>;
     const roam = () => {
@@ -179,7 +181,7 @@ export function DogPlayground({ pose, className }: DogPlaygroundProps) {
           if (free) {
             const roll = Math.random();
             if (roll < 0.4) {
-              // pause — just stand and breathe
+              // pause - just stand and breathe
             } else if (roll < 0.78) {
               // stroll to a new spot a decent distance away
               const dir = Math.random() < 0.5 ? -1 : 1;
@@ -205,7 +207,7 @@ export function DogPlayground({ pose, className }: DogPlaygroundProps) {
     };
     roam();
 
-    // Occasional idle beat — a brief expression or action (stretch, curious,
+    // Occasional idle beat - a brief expression or action (stretch, curious,
     // playful…) drawn at random, then back to the base pose.
     let beatTimer: ReturnType<typeof setTimeout>;
     let beatClear: ReturnType<typeof setTimeout>;
@@ -293,7 +295,7 @@ export function DogPlayground({ pose, className }: DogPlaygroundProps) {
         style={{ width: DOG, height: DOG, willChange: 'transform' }}
         className="absolute left-0 top-0 touch-none cursor-grab active:cursor-grabbing"
       >
-        <Dog pose={beat ?? pose} className="h-full w-full" />
+        <Dog pose={beat ?? pose} species={species} className="h-full w-full" />
       </div>
     </div>
   );

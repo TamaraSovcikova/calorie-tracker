@@ -1,7 +1,7 @@
 import { cn } from '@/lib/cn';
 
 interface MacroRingProps {
-  /** 0..1.5 — values >1 wrap visually as a tonal bar */
+  /** 0..1.5 - values >1 wrap visually as a tonal bar */
   value: number;
   /** centre headline e.g. "1,234" */
   label: string;

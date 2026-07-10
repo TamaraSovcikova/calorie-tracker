@@ -20,7 +20,7 @@ interface QuickAddFormProps {
 }
 
 /**
- * Bare calorie entry — log a number without building a food. Macros are
+ * Bare calorie entry - log a number without building a food. Macros are
  * optional. Reused for both adding (no `initial`) and editing.
  */
 export function QuickAddForm({
@@ -53,7 +53,7 @@ export function QuickAddForm({
     <div className="flex flex-col">
       <div className="space-y-4 p-4">
         <p className="text-sm text-muted-foreground">
-          Log calories directly when you don't want to itemise a meal — eating
+          Log calories directly when you don't want to itemise a meal - eating
           out, a guess, a recipe. Macros are optional.
         </p>
         <LabeledInput

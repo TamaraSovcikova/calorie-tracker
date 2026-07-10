@@ -1,8 +1,8 @@
 /**
- * Daily wellbeing roll-forward — runs once at startup. Every un-evaluated
+ * Daily wellbeing roll-forward - runs once at startup. Every un-evaluated
  * completed day (after `wellbeing_evaluated_date`, before today) is folded
  * into the pet's wellbeing score via the pure `rollWellbeing`. Today is
- * never evaluated — it's still in progress.
+ * never evaluated - it's still in progress.
  */
 
 import { db } from '@/db/dexie';

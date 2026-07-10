@@ -1,11 +1,11 @@
 /**
  * App seeding, run once on startup (from main.tsx):
  *
- *  - ensureProfile()       — always; creates the default profile row.
- *  - ensureCuratedFoods()  — always (dev + prod); upserts the bundled
+ *  - ensureProfile()       - always; creates the default profile row.
+ *  - ensureCuratedFoods()  - always (dev + prod); upserts the bundled
  *                            common-foods library, version-gated so it
  *                            only writes when curatedFoods.ts changes.
- *  - dev-only convenience  — flags the profile onboarded so developers
+ *  - dev-only convenience  - flags the profile onboarded so developers
  *                            land straight in the diary.
  */
 
@@ -23,7 +23,7 @@ const DEV_MARKER_KEY = 'calorie-tracker:dev-seeded:v2';
 /**
  * Upsert the curated common-foods library. Stable ids ('curated:{slug}')
  * mean re-running is a clean overwrite, never a duplicate. Version-gated
- * so it only does work — and only nudges the sync engine — when the
+ * so it only does work - and only nudges the sync engine - when the
  * bundled list actually changed.
  */
 export async function ensureCuratedFoods(): Promise<void> {
@@ -56,7 +56,7 @@ export async function ensureSeed(): Promise<void> {
   await ensureProfile();
   await ensurePet();
   await ensureCuratedFoods();
-  // Background cleanup of stale OFF/USDA search cache — don't block startup.
+  // Background cleanup of stale OFF/USDA search cache - don't block startup.
   void pruneStaleSearchCache().catch(() => undefined);
 
   // Dev convenience: skip onboarding so `pnpm dev` lands in the diary.

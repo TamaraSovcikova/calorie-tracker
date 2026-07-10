@@ -47,7 +47,7 @@ function OnboardingWizard({ profile }: { profile: Profile }) {
   const [step, setStep] = useState<StepId>('welcome');
 
   // Local draft mirrors the profile but only writes back when the user moves
-  // forward — avoids clobbering on every keystroke.
+  // forward - avoids clobbering on every keystroke.
   const [draft, setDraft] = useState(() => ({
     kcal_target: String(profile.kcal_target),
     primary_macro: profile.primary_macro,
@@ -303,7 +303,7 @@ function GoalsStep({
       <header>
         <h1 className="text-2xl font-semibold">Daily calorie target</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Your goal pick set this — tweak it here, or enter your own number.
+          Your goal pick set this - tweak it here, or enter your own number.
         </p>
       </header>
       <div className="mt-6 space-y-4">
@@ -371,7 +371,7 @@ function ProfileStep({
       <header>
         <h1 className="text-2xl font-semibold">A bit about you</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Optional — fills in to suggest a TDEE-based calorie target.
+          Optional - fills in to suggest a TDEE-based calorie target.
         </p>
       </header>
       <div className="mt-5 space-y-3">
@@ -389,7 +389,7 @@ function ProfileStep({
               value={draft.sex}
               onChange={(e) => update('sex', e.target.value as Sex | '')}
             >
-              <option value="">—</option>
+              <option value="">-</option>
               <option value="female">Female</option>
               <option value="male">Male</option>
             </Select>
@@ -445,7 +445,7 @@ function ProfileStep({
               update('activity', e.target.value as ActivityLevel | '')
             }
           >
-            <option value="">—</option>
+            <option value="">-</option>
             {(Object.keys(ACTIVITY_LABELS) as ActivityLevel[]).map((k) => (
               <option key={k} value={k}>
                 {ACTIVITY_LABELS[k]}
@@ -458,7 +458,7 @@ function ProfileStep({
           <div className="rounded-xl border border-primary/30 bg-primary/5 p-4">
             <div className="flex items-center gap-1.5 text-xs uppercase tracking-wide text-primary">
               <Sparkles className="h-3.5 w-3.5" />
-              Maintenance {formatKcal(tdeePreview)} kcal — pick a goal
+              Maintenance {formatKcal(tdeePreview)} kcal - pick a goal
             </div>
             <div className="mt-2 grid grid-cols-3 gap-2">
               {GOAL_OPTIONS.map((g) => {
@@ -494,7 +494,7 @@ function ProfileStep({
             </div>
             <p className="mt-2 text-xs text-muted-foreground">
               Based on Mifflin-St Jeor × your activity level. Tap a goal to set
-              your target — you can fine-tune it on the next screen.
+              your target - you can fine-tune it on the next screen.
             </p>
           </div>
         )}

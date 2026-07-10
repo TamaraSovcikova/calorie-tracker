@@ -5,7 +5,7 @@
  *   kcal ≈ MET × body-weight-kg × hours
  *
  * MET values are approximations from the standard Compendium of Physical
- * Activities — good enough for a calorie-tracking estimate the user can
+ * Activities - good enough for a calorie-tracking estimate the user can
  * always override.
  */
 

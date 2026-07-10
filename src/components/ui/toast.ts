@@ -42,7 +42,7 @@ export const useToastStore = create<ToastState>((set, get) => ({
   dismiss: (id) => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
 }));
 
-/** Fire a toast from anywhere — no component subscription needed. */
+/** Fire a toast from anywhere - no component subscription needed. */
 export function toast(opts: ShowToastOptions | string): void {
   useToastStore.getState().show(typeof opts === 'string' ? { message: opts } : opts);
 }

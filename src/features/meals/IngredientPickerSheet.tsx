@@ -22,7 +22,7 @@ const BarcodeScanner = lazy(() =>
 interface IngredientPickerSheetProps {
   open: boolean;
   onClose: () => void;
-  /** Called once with the new ingredient input — caller appends to the meal. */
+  /** Called once with the new ingredient input - caller appends to the meal. */
   onPicked: (item: MealItemInput, food: Food) => void;
 }
 

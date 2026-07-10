@@ -16,7 +16,7 @@
 import type { CustomUnit } from '@/db/types';
 
 interface PortionRule {
-  /** One or more phrases — any hit triggers the rule. Phrases are
+  /** One or more phrases - any hit triggers the rule. Phrases are
    *  matched case-insensitively; multi-word phrases use substring matching,
    *  single words require a word boundary. */
   match: string[];
@@ -172,7 +172,7 @@ const RULES: PortionRule[] = [
     units: [{ label: 'roll', grams: 55 }],
   },
   {
-    // Generic bread — catch-all at the end. Multi-word rule so we avoid
+    // Generic bread - catch-all at the end. Multi-word rule so we avoid
     // matching "banana bread" or "breadcrumb" with a single-word boundary.
     match: [
       'white bread', 'brown bread', 'wholemeal bread', 'wholegrain bread',
@@ -473,7 +473,7 @@ function phraseMatches(haystack: string, phrase: string): boolean {
   // Single word: require a word boundary so "egg" doesn't match "eggplant"
   // and "bread" doesn't match "breadcrumb".
   // We allow a single trailing 's' so "banana" matches "bananas" and
-  // "egg" matches "eggs" — but we still reject two+ trailing letters
+  // "egg" matches "eggs" - but we still reject two+ trailing letters
   // ("eggplant" has "pl" after "egg", "breadcrumb" has "cr" after "bread").
   try {
     return new RegExp(`(?<![a-z])${escRe(p)}(?![a-z][a-z])`).test(haystack);

@@ -1,5 +1,5 @@
 /**
- * Pure wellbeing roll-forward — REVAMP_PLAN §2.2. Each elapsed day nudges
+ * Pure wellbeing roll-forward - REVAMP_PLAN §2.2. Each elapsed day nudges
  * the 0-100 score: logging lifts it, hitting the goal lifts it more,
  * skipping a day dips it, going over dings it gently. The impure
  * "gather elapsed days from the diary" wiring lives elsewhere (Phase 6).

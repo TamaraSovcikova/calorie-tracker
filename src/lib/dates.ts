@@ -1,6 +1,6 @@
 /**
  * All app dates are stored as YYYY-MM-DD strings in the user's local timezone.
- * Never store timestamps for diary entries — that breaks day boundaries when
+ * Never store timestamps for diary entries - that breaks day boundaries when
  * the user travels across timezones, and complicates the "what day was that
  * meal logged on?" question.
  */

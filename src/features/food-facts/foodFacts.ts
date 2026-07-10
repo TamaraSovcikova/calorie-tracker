@@ -35,7 +35,7 @@ function markShown(key: string): void {
   try {
     localStorage.setItem(SHOWN_KEY, JSON.stringify(next));
   } catch {
-    /* storage full / unavailable — non-critical */
+    /* storage full / unavailable - non-critical */
   }
 }
 
@@ -47,7 +47,7 @@ export async function maybeShowFoodFact(food: Food): Promise<void> {
   if (Math.random() > SHOW_PROBABILITY) return;
 
   const { token } = getSyncConfig();
-  if (!token) return; // facts are served by the Worker — needs a sync code
+  if (!token) return; // facts are served by the Worker - needs a sync code
 
   try {
     const res = await fetch(`${syncBaseUrl()}/api/food-fact`, {
@@ -65,6 +65,6 @@ export async function maybeShowFoodFact(food: Food): Promise<void> {
       useFoodFactStore.getState().show(food.name, data.fact);
     }
   } catch {
-    /* offline or AI unavailable — no fact, no problem */
+    /* offline or AI unavailable - no fact, no problem */
   }
 }

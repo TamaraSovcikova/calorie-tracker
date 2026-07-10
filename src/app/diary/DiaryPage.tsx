@@ -21,8 +21,8 @@ import { EditEntrySheet } from '@/features/food-search/EditEntrySheet';
 import { ExerciseSection } from '@/features/exercise/ExerciseSection';
 import { useFitbitDailySync } from '@/features/fitbit/useFitbitDailySync';
 import { useDogState } from '@/features/pet/useDogState';
-import { getDogSrc } from '@/features/pet/Dog';
 import { useDailyGreeting } from '@/features/pet/useDailyGreeting';
+import { DraggableDogArc } from '@/features/pet/DraggableDogArc';
 import {
   formatDayHeader,
   fromLocalDate,
@@ -32,11 +32,13 @@ import {
   type LocalDate,
 } from '@/lib/dates';
 import {
+  copyEntryToDate,
   groupBySection,
   sumTotals,
   useDiaryDay,
   ZERO_TOTALS,
 } from '@/db/repos/diary';
+import { toast } from '@/components/ui/toast';
 import { useExerciseDay, totalBurned } from '@/db/repos/exercise';
 import { updateProfile, useProfile } from '@/db/repos/profile';
 import {
@@ -100,6 +102,11 @@ export function DiaryPage() {
     navigate(isToday(next) ? '/diary' : `/diary/${next}`);
   };
 
+  const handleCopyToToday = async (entry: DiaryEntry) => {
+    await copyEntryToDate(entry, todayLocal());
+    toast({ message: 'Copied to today', variant: 'success' });
+  };
+
   const openDatePicker = () => {
     const input = dateInputRef.current;
     if (!input) return;
@@ -135,8 +142,6 @@ export function DiaryPage() {
   const baseTarget = weekly ? weekly.adjustedTarget : (profile?.kcal_target ?? 2000);
   const effective = profile?.eat_back_burned ? baseTarget + burned : baseTarget;
   const remaining = Math.max(0, Math.round(effective - totals.kcal));
-
-  const dogSrc = dog.ready ? getDogSrc(dog.pose) : undefined;
 
   const macroRows = [
     { key: 'protein', label: 'PROTEIN', value: Math.round(totals.protein), target: profile?.protein_g ?? 0 },
@@ -282,27 +287,37 @@ export function DiaryPage() {
       {/* ── Arc + macros ─────────────────────────────────────────── */}
       <div className="mx-auto flex max-w-md flex-col items-center px-6" style={{ gap: 14 }}>
         {profile && (
-          <div style={{ marginTop: 8 }}>
+          <div style={{ marginTop: 8, position: 'relative', width: 236, height: 236 }}>
             <ArcGauge
               value={totals.kcal}
               max={effective}
               remaining={remaining}
-              dogSrc={dogSrc}
             />
+            {dog.ready && <DraggableDogArc pose={dog.pose} species={dog.species} />}
           </div>
         )}
 
         {dog.ready && (
-          <div
+          <button
+            type="button"
+            onClick={() => navigate('/pet')}
             style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 3,
               fontSize: 12.5,
               fontWeight: 600,
               color: 'var(--color-text-muted)',
               marginTop: -4,
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              padding: '4px 8px',
             }}
           >
-            {dog.petName} · {dog.statusLine}
-          </div>
+            {dog.statusLine}
+            <ChevronRight size={13} strokeWidth={2} style={{ opacity: 0.5, flexShrink: 0 }} />
+          </button>
         )}
 
         {profile && (
@@ -389,7 +404,7 @@ export function DiaryPage() {
           <div className="flex items-start gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
             <CalendarOff className="mt-0.5 h-3.5 w-3.5 shrink-0" />
             <span>
-              This day is marked untracked — your weekly budget counts it as on-target, not by what's logged here.
+              This day is marked untracked - your weekly budget counts it as on-target, not by what's logged here.
             </span>
           </div>
         )}
@@ -401,7 +416,7 @@ export function DiaryPage() {
           >
             <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
             <span>
-              Health sync couldn't connect — tap to go to Settings and reconnect.
+              Health sync couldn't connect - tap to go to Settings and reconnect.
             </span>
           </button>
         )}
@@ -427,6 +442,7 @@ export function DiaryPage() {
                 selectMode={selectMode}
                 selectedIds={selectedIds}
                 onToggleSelect={toggleSelect}
+                onCopyToToday={onToday ? undefined : handleCopyToToday}
               />
             ))}
 

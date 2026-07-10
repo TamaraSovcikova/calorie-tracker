@@ -48,7 +48,7 @@ export function BarcodeScanner({ onCode }: BarcodeScannerProps) {
     let cancelled = false;
     // ZXing fires the decode callback once per frame. Without this guard
     // it can fire onCode dozens of times for a single barcode (especially
-    // before `controls` is assigned, so `controls.stop()` no-ops) — which
+    // before `controls` is assigned, so `controls.stop()` no-ops) - which
     // hammered the Open Food Facts rate limit and made lookups fail.
     let fired = false;
     let controls: IScannerControls | null = null;

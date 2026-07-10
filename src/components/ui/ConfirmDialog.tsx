@@ -15,7 +15,7 @@ interface ConfirmDialogProps {
 }
 
 /**
- * Centred modal confirmation — a styled replacement for window.confirm().
+ * Centred modal confirmation - a styled replacement for window.confirm().
  * Use for rare, hard-to-reverse actions; prefer an undo toast for frequent
  * low-stakes ones.
  */

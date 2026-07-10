@@ -2,6 +2,8 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { v4 as uuid } from 'uuid';
 import { db } from '../dexie';
 import { currentUserId } from '../userId';
+import { getContributeShared } from '@/features/settings/foodSourceSettings';
+import { contributeSharedFood } from '@/lib/shared-foods-api';
 import type { CustomUnit, Food } from '../types';
 
 export interface CreateFoodInput {
@@ -36,6 +38,11 @@ export async function createFood(input: CreateFoodInput): Promise<Food> {
     ...input,
   };
   await db.foods.put(food);
+  // Opt-in: share manually-entered products to the community pool so they're
+  // findable later (on any device) without re-typing. Best-effort.
+  if (input.source === 'custom' && getContributeShared()) {
+    void contributeSharedFood(food);
+  }
   return food;
 }
 
@@ -57,7 +64,7 @@ export async function softDeleteFood(id: string): Promise<void> {
   await db.foods.update(id, { deleted_at: new Date().toISOString() });
 }
 
-/** Reverse a soft-delete — clears the tombstone so the food reappears. */
+/** Reverse a soft-delete - clears the tombstone so the food reappears. */
 export async function restoreFood(id: string): Promise<void> {
   await db.foods.update(id, {
     deleted_at: undefined,
@@ -138,7 +145,7 @@ export async function pruneStaleSearchCache(maxAgeDays = 60): Promise<void> {
     .equals(currentUserId())
     .filter(
       (f) =>
-        (f.source === 'off' || f.source === 'usda') &&
+        (f.source === 'off' || f.source === 'usda' || f.source === 'shared') &&
         f.updated_at < cutoff &&
         !referenced.has(f.id),
     )

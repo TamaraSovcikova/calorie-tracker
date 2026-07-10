@@ -3,14 +3,14 @@
  *
  * A hand-maintained set of everyday staples with sensible per-100g macros
  * AND natural portion units ("1 large egg", "1 slice", "1 medium banana").
- * Bundled with the app — instant, offline, no API flakiness — and ranked
+ * Bundled with the app - instant, offline, no API flakiness - and ranked
  * at the top of search so logging the basics is one tap.
  *
  * Open Food Facts (barcodes / packaged) and USDA (broader generic search)
  * stay as secondary online sources for anything not in here.
  *
  * Macros are approximate, sourced from standard UK/US nutrition data, and
- * are per 100 g (or per 100 ml for liquids — close enough at ~1 g/ml).
+ * are per 100 g (or per 100 ml for liquids - close enough at ~1 g/ml).
  *
  * Bump CURATED_VERSION whenever this list changes so installed apps
  * re-seed on next load.

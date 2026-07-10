@@ -2,7 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { Lightbulb, X } from 'lucide-react';
 
 interface CoachTipProps {
-  /** Stable id — once dismissed under this id the tip never shows again. */
+  /** Stable id - once dismissed under this id the tip never shows again. */
   id: string;
   children: ReactNode;
 }

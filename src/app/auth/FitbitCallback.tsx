@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/Button';
 import { completeFitbitAuth } from '@/lib/fitbit-api';
 
 /**
- * Lives at /auth/fitbit/callback — Fitbit redirects here with ?code&state
+ * Lives at /auth/fitbit/callback - Fitbit redirects here with ?code&state
  * after the user authorises. Exchanges the code for tokens (PKCE in the
  * browser, no server secret), stores them in Dexie (which syncs to the
  * worker), then bounces back to Settings.
@@ -20,7 +20,7 @@ export function FitbitCallback() {
 
   // OAuth authorization codes are single-use and the PKCE verifier is
   // consumed on first read. React StrictMode runs effects twice in dev,
-  // which would make the second run fail spuriously — guard with a ref so
+  // which would make the second run fail spuriously - guard with a ref so
   // the exchange happens exactly once per mount.
   const exchangeStarted = useRef(false);
 

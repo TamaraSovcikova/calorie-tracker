@@ -29,7 +29,7 @@ export function ExerciseSheet({ open, date, entry, onClose }: ExerciseSheetProps
   const [name, setName] = useState('');
   const [duration, setDuration] = useState('');
   const [kcal, setKcal] = useState('');
-  /** MET of the picked activity — drives the calorie estimate. */
+  /** MET of the picked activity - drives the calorie estimate. */
   const [met, setMet] = useState<number | null>(null);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [saving, setSaving] = useState(false);

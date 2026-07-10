@@ -1,5 +1,5 @@
 /**
- * Weekly digest — a once-a-week recap of the last completed week, shown on
+ * Weekly digest - a once-a-week recap of the last completed week, shown on
  * the diary and dismissed per week. All derived from the diary; no storage
  * beyond a localStorage "last seen week" marker.
  */

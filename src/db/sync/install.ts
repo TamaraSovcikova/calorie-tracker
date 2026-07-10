@@ -31,7 +31,7 @@ export function installSync(): void {
   installed = true;
 
   for (const t of TABLES) {
-    // Cast — Dexie's hook signatures are mutually exclusive per event name.
+    // Cast - Dexie's hook signatures are mutually exclusive per event name.
     const hookable = t as unknown as {
       hook(event: 'creating', cb: () => void): void;
       hook(event: 'updating', cb: () => void): void;
@@ -57,7 +57,7 @@ export function installSync(): void {
     const cursors = getCursors();
     const cursorTables = Object.keys(cursors).length;
     if (cursorTables === 0) {
-      // First sync ever — pulls everything.
+      // First sync ever - pulls everything.
       void syncEngine.syncNow().catch((e) => console.warn('initial sync', e));
     } else {
       void syncEngine.syncNow().catch(() => undefined);

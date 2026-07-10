@@ -76,7 +76,7 @@ export function MealPlannerPage() {
     };
     const res = await requestMealPlan(request);
     if (res.meals.length === 0) {
-      setError(res.error ?? 'Could not generate a plan — try again.');
+      setError(res.error ?? 'Could not generate a plan - try again.');
       setPhase('form');
       return;
     }
@@ -92,7 +92,7 @@ export function MealPlannerPage() {
     if (res.meals.length === 0) {
       // Keep the meals already on screen; just report the hiccup.
       toast({
-        message: res.error ?? 'Could not get new meals — try again.',
+        message: res.error ?? 'Could not get new meals - try again.',
         variant: 'error',
       });
       setPhase('results');
@@ -143,7 +143,7 @@ export function MealPlannerPage() {
           </div>
           <p className="text-xs text-muted-foreground">
             Each makes {req.portions} portion{req.portions === 1 ? '' : 's'}. Tap a
-            meal to see the recipe, scaled to hit your targets — then save it.
+            meal to see the recipe, scaled to hit your targets - then save it.
           </p>
           {meals.map((meal, i) => (
             <MealCard key={`${meal.name}-${i}`} meal={meal} req={req} />
@@ -163,14 +163,14 @@ export function MealPlannerPage() {
             block
             onClick={() => navigate('/library')}
           >
-            Done — go to library
+            Done - go to library
           </Button>
         </div>
       ) : (
         <div className="space-y-4 p-4">
           <p className="text-sm text-muted-foreground">
             Set your targets and get meal-prep recipes that actually fit them.
-            Add ingredients to build around — or leave them blank for free
+            Add ingredients to build around - or leave them blank for free
             inspiration.
           </p>
 
@@ -270,7 +270,7 @@ export function MealPlannerPage() {
             Find meals
           </Button>
           <p className="text-center text-[11px] text-muted-foreground">
-            Macros are looked up from real food data — free, on Cloudflare AI.
+            Macros are looked up from real food data - free, on Cloudflare AI.
           </p>
         </div>
       )}
@@ -313,12 +313,12 @@ function MealCard({
       toast({
         message:
           skipped.length > 0
-            ? `"${meal.name}" saved — ${skipped.length} ingredient${skipped.length === 1 ? '' : 's'} had no nutrition data; add ${skipped.length === 1 ? 'it' : 'them'} in the meal editor`
+            ? `"${meal.name}" saved - ${skipped.length} ingredient${skipped.length === 1 ? '' : 's'} had no nutrition data; add ${skipped.length === 1 ? 'it' : 'them'} in the meal editor`
             : `"${meal.name}" saved to your library`,
         variant: 'success',
       });
     } catch {
-      toast({ message: 'Could not save the meal — try again.', variant: 'error' });
+      toast({ message: 'Could not save the meal - try again.', variant: 'error' });
     } finally {
       setSaving(false);
     }

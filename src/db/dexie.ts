@@ -17,7 +17,7 @@ import type {
  *   '[a+b]' = compound index
  *   plain field = non-unique index used for queries
  *
- * Bump the version number AND keep the prior call when changing schema —
+ * Bump the version number AND keep the prior call when changing schema -
  * Dexie chains migrations from the user's current installed version.
  */
 class CalorieDB extends Dexie {
@@ -45,7 +45,7 @@ class CalorieDB extends Dexie {
       weight_log: '&id, user_id, date, [user_id+date], updated_at',
     });
 
-    // v2: Fitbit token storage (Phase 12). Additive — Dexie keeps old data.
+    // v2: Fitbit token storage (Phase 12). Additive - Dexie keeps old data.
     this.version(2).stores({
       fitbit_tokens: '&user_id, updated_at',
     });

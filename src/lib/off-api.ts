@@ -242,7 +242,7 @@ export async function lookupBarcode(
     // same row.
     food.id = `off:${barcode}`;
   } else {
-    // Could not parse — but we still want a stable id if we choose to cache
+    // Could not parse - but we still want a stable id if we choose to cache
     // an empty stub. For now, return null and let the UI offer manual entry.
     return null;
   }

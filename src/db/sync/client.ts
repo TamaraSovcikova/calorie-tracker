@@ -6,7 +6,7 @@
  *   3. Apply the response's `pull` to Dexie (last-write-wins by updated_at).
  *   4. Persist the new cursors and lastSyncAt timestamp.
  *
- * The engine is a singleton — only one in-flight sync at a time. If a
+ * The engine is a singleton - only one in-flight sync at a time. If a
  * write happens during a sync, scheduleSync() coalesces it into the next
  * cycle.
  */
@@ -125,7 +125,7 @@ class SyncEngine {
   }
 
   /**
-   * Schedule a sync after a debounce. Call after every write — eager but
+   * Schedule a sync after a debounce. Call after every write - eager but
    * coalesced. If a sync is already running, mark dirty so we re-run after
    * it finishes.
    */
@@ -164,7 +164,7 @@ class SyncEngine {
     const data = (await res.json()) as SyncResponse;
     await this.applyPull(data.pull);
 
-    // Merge cursors — only advance, never go backwards.
+    // Merge cursors - only advance, never go backwards.
     const merged: Cursors = { ...cursors };
     for (const t of TABLES) {
       const next = data.until[t];
@@ -191,7 +191,7 @@ class SyncEngine {
     );
     out.meals = changedMeals;
 
-    // For meal_items we tag each item with its meal's updated_at — the
+    // For meal_items we tag each item with its meal's updated_at - the
     // server uses that as the row cursor since meal_items don't have their
     // own updated_at column.
     const changedMealIds = new Set(changedMeals.map((m) => m.id));
@@ -253,7 +253,7 @@ class SyncEngine {
           );
         }
 
-        // meal_items are a child collection — replace the full item set per
+        // meal_items are a child collection - replace the full item set per
         // changed meal so ingredient removals propagate (a plain bulkPut
         // would leave deleted items behind). Must run BEFORE the meals
         // upsert so the local meal's PRE-sync updated_at is the comparison
@@ -326,7 +326,7 @@ class SyncEngine {
       byMeal.set(rest.meal_id, g);
     }
     // Meals that changed but ended up with zero ingredients (emptied) won't
-    // appear in rawItems — pick them up from the pulled meals list.
+    // appear in rawItems - pick them up from the pulled meals list.
     for (const m of pulledMeals) {
       if (!byMeal.has(m.id)) {
         byMeal.set(m.id, { items: [], mealUpdatedAt: m.updated_at });

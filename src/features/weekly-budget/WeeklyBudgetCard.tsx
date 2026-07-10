@@ -3,7 +3,7 @@ import { formatKcal } from '@/lib/macros';
 import type { WeeklyBudget } from './weeklyBudget';
 
 /**
- * The full budget breakdown — lives on the Pet page so the diary stays
+ * The full budget breakdown - lives on the Pet page so the diary stays
  * uncluttered (the diary just tints today's target instead). Adapts its
  * wording to the active period (week or month).
  */
@@ -33,7 +33,7 @@ export function WeeklyBudgetCard({ weekly }: { weekly: WeeklyBudget }) {
           ? weekly.adjustedTarget < weekly.dailyGoal
             ? `Today trimmed to ${formatKcal(weekly.adjustedTarget)} kcal to stay on budget.`
             : `Today raised to ${formatKcal(weekly.adjustedTarget)} kcal from calories banked earlier this ${periodWord}.`
-          : `On track — ${formatKcal(weekly.adjustedTarget)} kcal/day.`}
+          : `On track - ${formatKcal(weekly.adjustedTarget)} kcal/day.`}
       </p>
       {weekly.carryIn !== 0 && (
         <p className="mt-1 text-[11px] text-muted-foreground/70">

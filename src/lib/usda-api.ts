@@ -7,7 +7,7 @@
  * Datasets we query:
  *   - Foundation     analytical lab data, gold standard ("Bananas, raw")
  *   - SR Legacy      USDA's classic Standard Reference, broad coverage
- *   - Survey (FNDDS) Food and Nutrient Database for Dietary Studies — has
+ *   - Survey (FNDDS) Food and Nutrient Database for Dietary Studies - has
  *                    food portions ("1 medium banana = 118g") which become
  *                    custom_units on our Food rows.
  *   - Branded        packaged-products dataset, used as fallback
@@ -24,7 +24,7 @@ const API_KEY_LS = 'calorie-tracker:usda-key';
 /**
  * Shared USDA FoodData Central key bundled into the app, so the food
  * search works for everyone with zero setup. FDC is a free public
- * database (1000 requests/hour per key) — a single shared key is fine
+ * database (1000 requests/hour per key) - a single shared key is fine
  * for personal use. Overridable at build time via VITE_USDA_API_KEY.
  */
 export const BUNDLED_USDA_KEY: string =
@@ -36,7 +36,7 @@ export function getUserUsdaApiKey(): string | null {
   return localStorage.getItem(API_KEY_LS);
 }
 
-/** The key searches use — the user's own key, else the bundled one. */
+/** The key searches use - the user's own key, else the bundled one. */
 export function getUsdaApiKey(): string | null {
   return getUserUsdaApiKey() ?? BUNDLED_USDA_KEY;
 }
@@ -217,7 +217,7 @@ function portionsToCustomUnits(portions: UsdaPortion[] | undefined): CustomUnit[
 
 /**
  * Convert a USDA hit into our Food shape. Returns null if the hit lacks
- * enough info to be useful (no name, or zero kcal — the search has surfaced
+ * enough info to be useful (no name, or zero kcal - the search has surfaced
  * something we'd render uselessly).
  */
 export function usdaHitToFood(hit: UsdaHit): Food | null {
@@ -229,7 +229,7 @@ export function usdaHitToFood(hit: UsdaHit): Food | null {
   const isBranded = dt === 'branded';
 
   // For Foundation/SR/Survey, foodNutrients are per 100 g.
-  // For Branded, they're per "labelNutrients" serving — but the search
+  // For Branded, they're per "labelNutrients" serving - but the search
   // endpoint already normalises to per-100g for the returned values when
   // dataType=Branded (FDC docs). We treat all four datasets as per-100g
   // here; if Branded hits look off in practice we can refine.
@@ -298,7 +298,7 @@ export function usdaHitToFood(hit: UsdaHit): Food | null {
 /**
  * api.nal.usda.gov occasionally serves the FoodData Central website HTML
  * instead of API JSON (rate-limit / CDN flakiness). res.json() would then
- * throw an opaque "Unexpected token <" — parse the text ourselves and
+ * throw an opaque "Unexpected token <" - parse the text ourselves and
  * raise a clear, retryable error instead.
  */
 async function parseJsonOrThrow(res: Response): Promise<unknown> {
@@ -316,7 +316,7 @@ async function parseJsonOrThrow(res: Response): Promise<unknown> {
 
 export interface SearchUsdaOptions {
   signal?: AbortSignal;
-  /** Restrict to generic datasets — used when the user has hidden packaged. */
+  /** Restrict to generic datasets - used when the user has hidden packaged. */
   genericOnly?: boolean;
 }
 

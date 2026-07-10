@@ -199,17 +199,19 @@ export function ManualEntryForm({
         <p className="text-xs text-muted-foreground">
           {isEdit
             ? 'Changes apply to future logs; entries already in your diary keep their saved values.'
-            : 'Saved to your foods library — always surfaces top of search.'}
+            : 'Saved to your foods library - always surfaces top of search.'}
         </p>
       </div>
 
       <div className="space-y-3 p-4">
-        {/* Scan a nutrition label to auto-fill the macros below. */}
+        {/* Scan or upload a nutrition label to auto-fill the macros below.
+            No `capture` attribute: the OS picker then offers both the camera
+            and the photo library, so a label already saved as a photo works
+            just as well as a fresh snap. */}
         <input
           ref={fileInputRef}
           type="file"
           accept="image/*"
-          capture="environment"
           className="hidden"
           onChange={(e) => void handleLabelFile(e)}
         />
@@ -228,12 +230,12 @@ export function ManualEntryForm({
           ) : (
             <>
               <ScanText className="h-4 w-4" />
-              Scan a nutrition label
+              Scan or upload a nutrition label
             </>
           )}
         </Button>
         <p className="-mt-1 text-center text-[11px] text-muted-foreground">
-          Snap the label and we'll fill in the macros - check them, name it, save.
+          Snap the label or pick a photo and we'll fill in the macros - check them, name it, save.
         </p>
 
         <LabeledInput
@@ -358,7 +360,7 @@ export function ManualEntryForm({
           {suggestions.length > 0 && (
             <div className="space-y-1.5">
               <span className="text-[11px] text-muted-foreground">
-                Suggested for this food — tap to add:
+                Suggested for this food - tap to add:
               </span>
               <div className="flex flex-wrap gap-1.5">
                 {suggestions.map((s) => (

@@ -19,6 +19,7 @@ import {
 } from './petLogic';
 import { useDevPoseStore } from './devPose';
 import { pulseReaction, usePetReaction } from './petReaction';
+import { normalizeSpecies, type PetSpecies } from './petSpecies';
 
 /** How long the eating beat plays after a log (ms). */
 const EAT_BEAT_MS = 2800;
@@ -27,6 +28,8 @@ export interface DogState {
   pose: DogPose;
   fullness: FullnessState;
   petName: string;
+  /** Which animal to render (from the stored pet.breed). */
+  species: PetSpecies;
   wellbeing: number;
   loggedKcal: number;
   goalKcal: number;
@@ -36,14 +39,14 @@ export interface DogState {
 }
 
 interface DogStateOptions {
-  /** Transient: the user just logged food — show the eating pose. */
+  /** Transient: the user just logged food - show the eating pose. */
   justAte?: boolean;
-  /** Transient: the app was just opened — show the greeting pose. */
+  /** Transient: the app was just opened - show the greeting pose. */
   greeting?: boolean;
 }
 
 /**
- * Resolves the dog's current state from the live app data — today's
+ * Resolves the dog's current state from the live app data - today's
  * diary against the calorie goal and the clock (fullness), plus the
  * stored wellbeing score.
  */
@@ -59,6 +62,7 @@ export function useDogState(opts: DogStateOptions = {}): DogState {
   const goalKcal = weekly?.adjustedTarget ?? profile?.kcal_target ?? 0;
   const wellbeing = pet?.wellbeing ?? 70;
   const petName = pet?.name ?? 'Biscuit';
+  const species = normalizeSpecies(pet?.breed);
   const now = new Date();
 
   // Days since the last logged entry. A user who has never logged (no
@@ -112,6 +116,7 @@ export function useDogState(opts: DogStateOptions = {}): DogState {
     pose,
     fullness,
     petName,
+    species,
     wellbeing,
     loggedKcal: totals.kcal,
     goalKcal,

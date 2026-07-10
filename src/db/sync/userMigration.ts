@@ -15,13 +15,13 @@ import { getSyncConfig, setCursors } from './config';
 /**
  * Rewrite every row owned by `from` to `to`, in a single transaction.
  *
- *  - profiles / pet / fitbit_tokens — user_id IS the primary key, so
+ *  - profiles / pet / fitbit_tokens - user_id IS the primary key, so
  *    re-key with delete + put.
- *  - foods / meals / diary_entries / exercise_entries — user_id is an
+ *  - foods / meals / diary_entries / exercise_entries - user_id is an
  *    indexed field, primary key is `id`: modify in place.
- *  - weight_log — the id embeds the user id (`w:{user}:{date}`), so each
+ *  - weight_log - the id embeds the user id (`w:{user}:{date}`), so each
  *    row is re-keyed individually.
- *  - meal_items — no user_id (keyed by meal_id); nothing to do.
+ *  - meal_items - no user_id (keyed by meal_id); nothing to do.
  */
 export async function rewriteUserId(from: string, to: string): Promise<void> {
   if (from === to) return;
@@ -38,7 +38,7 @@ export async function rewriteUserId(from: string, to: string): Promise<void> {
       db.pet,
     ],
     async () => {
-      // user_id IS the primary key here — re-key with delete + put.
+      // user_id IS the primary key here - re-key with delete + put.
       const profile = await db.profiles.get(from);
       if (profile) {
         await db.profiles.delete(from);

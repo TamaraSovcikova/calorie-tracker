@@ -1,5 +1,5 @@
 /**
- * AI recipe scanning — turn a screenshot of a recipe into a draft meal.
+ * AI recipe scanning - turn a screenshot of a recipe into a draft meal.
  *
  * The Worker's vision model extracts the recipe (name, servings,
  * ingredients, method); this module resolves the ingredients to real
@@ -51,14 +51,14 @@ export async function analyzeRecipePhoto(file: Blob): Promise<RecipeScanResult> 
       signal: controller.signal,
     });
     const data = (await res.json().catch(() => null)) as RecipeScanResult | null;
-    if (!data) return { recipe: null, error: 'No response — try again.' };
+    if (!data) return { recipe: null, error: 'No response - try again.' };
     return { recipe: data.recipe ?? null, error: data.error };
   } catch (err) {
     const aborted = err instanceof DOMException && err.name === 'AbortError';
     return {
       recipe: null,
       error: aborted
-        ? 'The scan took too long — try again.'
+        ? 'The scan took too long - try again.'
         : 'Could not reach the recipe scanner.',
     };
   } finally {
@@ -77,7 +77,7 @@ export interface ResolvedRecipe {
 /**
  * Resolve a scanned recipe's ingredients to meal items. An ingredient with
  * no database match becomes a zero-macro custom food so nothing is dropped
- * — the user fixes those in the editor.
+ * - the user fixes those in the editor.
  */
 export async function resolveScannedRecipe(
   recipe: ScannedRecipe,

@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import { Layout } from '@/components/Layout';
 import { PetPage } from '@/app/pet/PetPage';
 import { DiaryPage } from '@/app/diary/DiaryPage';
+import { QuickAddPage } from '@/app/quick-add/QuickAddPage';
 import { LibraryPage } from '@/app/library/LibraryPage';
 import { ProgressPage } from '@/app/progress/ProgressPage';
 import { SettingsPage } from '@/app/settings/SettingsPage';
@@ -25,6 +26,7 @@ export default function App() {
         <Route path="/meals/plan" element={<MealPlannerPage />} />
         <Route path="/meals/:id/edit" element={<MealEditor mode="edit" />} />
         <Route path="/pet" element={<PetPage />} />
+        <Route path="/quick-add" element={<QuickAddPage />} />
 
         <Route element={<Layout />}>
           <Route path="/" element={<Navigate to="/diary" replace />} />

@@ -6,7 +6,7 @@
  *
  * The app always syncs to its own origin (the SPA and the sync API are
  * served by the same Worker), so the only thing a user configures is
- * their private sync code — it doubles as the account.
+ * their private sync code - it doubles as the account.
  */
 
 const TOKEN_KEY = 'calorie-tracker:sync:token';
@@ -45,7 +45,7 @@ export function clearSyncConfig(): void {
   writeLs(LAST_SYNC_KEY, null);
 }
 
-/** The base URL the sync API lives at — always this app's own origin. */
+/** The base URL the sync API lives at - always this app's own origin. */
 export function syncBaseUrl(): string {
   return typeof window !== 'undefined' ? window.location.origin : '';
 }

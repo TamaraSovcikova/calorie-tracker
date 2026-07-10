@@ -76,7 +76,7 @@ export function RecipeScanSheet({ open, onClose }: RecipeScanSheetProps) {
             <ScanLine className="h-7 w-7 text-primary" />
           </div>
           <p className="text-sm text-muted-foreground">
-            Choose a screenshot of a recipe — its ingredients (and method,
+            Choose a screenshot of a recipe - its ingredients (and method,
             if shown). AI reads it and opens a draft meal with estimated
             macros for you to review and save.
           </p>
@@ -85,7 +85,7 @@ export function RecipeScanSheet({ open, onClose }: RecipeScanSheetProps) {
             Choose a screenshot
           </Button>
           <p className="text-[11px] text-muted-foreground">
-            Free, on Cloudflare AI. Macros are estimates — edit anything.
+            Free, on Cloudflare AI. Macros are estimates - edit anything.
           </p>
         </div>
       )}

@@ -1,5 +1,5 @@
 /**
- * AI photo logging — send a meal photo to the Worker's vision endpoint,
+ * AI photo logging - send a meal photo to the Worker's vision endpoint,
  * then resolve the detected foods to real macros from the food database.
  */
 
@@ -72,7 +72,7 @@ export async function analyzePhoto(file: Blob): Promise<PhotoAnalysis> {
       signal: controller.signal,
     });
     const data = (await res.json().catch(() => null)) as PhotoAnalysis | null;
-    if (!data) return { foods: [], error: 'No response — try again.' };
+    if (!data) return { foods: [], error: 'No response - try again.' };
     return {
       foods: Array.isArray(data.foods) ? data.foods : [],
       error: data.error,
@@ -82,7 +82,7 @@ export async function analyzePhoto(file: Blob): Promise<PhotoAnalysis> {
     return {
       foods: [],
       error: aborted
-        ? 'Analysis took too long — try again.'
+        ? 'Analysis took too long - try again.'
         : 'Could not reach the photo analyser.',
     };
   } finally {

@@ -67,7 +67,7 @@ export function MiniChart({
     );
   }
 
-  const width = 360; // viewBox width — chart scales by container
+  const width = 360; // viewBox width - chart scales by container
   const innerW = width - PADDING.left - PADDING.right;
   const innerH = height - PADDING.top - PADDING.bottom;
   const xRange = computed.maxX - computed.minX || 1;

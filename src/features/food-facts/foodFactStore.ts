@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 
 export interface VisibleFact {
-  /** The food the fact is about — shown as the card's eyebrow label. */
+  /** The food the fact is about - shown as the card's eyebrow label. */
   food: string;
   text: string;
 }

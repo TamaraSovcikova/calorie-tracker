@@ -1,5 +1,5 @@
 /**
- * Pure pet logic — the time-aware feeding model and pose selection from
+ * Pure pet logic - the time-aware feeding model and pose selection from
  * REVAMP_PLAN §2. No DB, no React: fully unit-testable.
  *
  * "Fullness" is the moment-to-moment meter (derived, never stored).
@@ -29,7 +29,7 @@ export type DogPose =
   | 'sad'
   | 'sleeping'
   | 'greeting'
-  // Action / expression poses — shown as transient idle beats, never
+  // Action / expression poses - shown as transient idle beats, never
   // logging states.
   | 'stretching'
   | 'bored'
@@ -55,7 +55,7 @@ const INTAKE_CURVE: ReadonlyArray<readonly [number, number]> = [
 
 /**
  * Fraction (0-1) of the daily calorie goal a typical day has reached by
- * this clock time — piecewise-linear interpolation over INTAKE_CURVE.
+ * this clock time - piecewise-linear interpolation over INTAKE_CURVE.
  */
 export function expectedIntakeFraction(now: Date): number {
   const h = now.getHours() + now.getMinutes() / 60;

@@ -6,7 +6,7 @@ import { useFoodFactStore } from './foodFactStore';
 const AUTO_DISMISS_MS = 14000;
 
 /**
- * The food-fact card — a single, dismissible nutrition tip shown after
+ * The food-fact card - a single, dismissible nutrition tip shown after
  * logging a food. Portalled to the body and anchored just above the toast
  * stack so the two never collide.
  */

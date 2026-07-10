@@ -1,12 +1,12 @@
 /**
  * Client side of the AI meal planner.
  *
- *  1. requestMealPlan() — ask the Worker for recipe ideas (ingredient names
- *     + gram amounts only; no macros — the model is unreliable at those).
- *  2. resolveAndFitMeal() — look every ingredient up in the real food
+ *  1. requestMealPlan() - ask the Worker for recipe ideas (ingredient names
+ *     + gram amounts only; no macros - the model is unreliable at those).
+ *  2. resolveAndFitMeal() - look every ingredient up in the real food
  *     database (curated foods, then USDA), compute true macros, and scale
  *     the recipe so each portion fits the kcal / protein targets.
- *  3. savePlanAsMeal() — store the fitted recipe as a multi-portion meal.
+ *  3. savePlanAsMeal() - store the fitted recipe as a multi-portion meal.
  */
 
 import { db } from '@/db/dexie';
@@ -20,7 +20,7 @@ import type { Food } from '@/db/types';
 
 // ---------------------------------------------------------------- types
 
-/** A recipe idea straight from the AI — no macros. */
+/** A recipe idea straight from the AI - no macros. */
 export interface PlannedIngredient {
   name: string;
   /** Amount for the whole batch, in grams. */
@@ -103,7 +103,7 @@ export async function requestMealPlan(
     });
     const data = (await res.json().catch(() => null)) as MealPlanResult | null;
     if (!data) {
-      return { meals: [], error: 'Planner returned nothing — try again.' };
+      return { meals: [], error: 'Planner returned nothing - try again.' };
     }
     return {
       meals: Array.isArray(data.meals) ? data.meals : [],
@@ -114,7 +114,7 @@ export async function requestMealPlan(
     return {
       meals: [],
       error: aborted
-        ? 'The planner took too long — please try again.'
+        ? 'The planner took too long - please try again.'
         : 'Could not reach the planner. Check your connection.',
     };
   } finally {
@@ -124,7 +124,7 @@ export async function requestMealPlan(
 
 // ------------------------------------------------ ingredient resolution
 
-/** Score a candidate food against an ingredient name — higher is better. */
+/** Score a candidate food against an ingredient name - higher is better. */
 function scoreFood(food: Food, query: string): number {
   const name = food.name.toLowerCase();
   let score = 0;
@@ -147,7 +147,7 @@ function scoreFood(food: Food, query: string): number {
 const lookupCache = new Map<string, Promise<Food | null>>();
 let recentsCache: Promise<Food[]> | null = null;
 
-/** The foods the user has logged recently — what they actually buy. */
+/** The foods the user has logged recently - what they actually buy. */
 function loadRecentFoods(): Promise<Food[]> {
   if (!recentsCache) {
     recentsCache = (async () => {
@@ -162,7 +162,7 @@ function loadRecentFoods(): Promise<Food[]> {
 
 let allFoodsCache: Promise<Food[]> | null = null;
 
-/** Every food in the user's library — curated, custom, and cached search
+/** Every food in the user's library - curated, custom, and cached search
  *  hits (incl. barcode-scanned products). Cached for the session. */
 function loadAllFoods(): Promise<Food[]> {
   if (!allFoodsCache) {
@@ -179,7 +179,7 @@ function loadAllFoods(): Promise<Food[]> {
   return allFoodsCache;
 }
 
-/** Clear per-session caches — call when the planner page opens so recents
+/** Clear per-session caches - call when the planner page opens so recents
  *  and lookups are fresh. */
 export function resetPlannerCaches(): void {
   lookupCache.clear();
@@ -193,7 +193,7 @@ function sigWords(s: string): string[] {
 }
 
 /** Two words match if equal, or one is a prefix of the other (shorter
- *  ≥ 4 chars) — so "wrap"/"wraps", "tomato"/"tomatoes" match. */
+ *  ≥ 4 chars) - so "wrap"/"wraps", "tomato"/"tomatoes" match. */
 function wordsMatch(a: string, b: string): boolean {
   if (a === b) return true;
   const [short, long] = a.length <= b.length ? [a, b] : [b, a];
@@ -205,11 +205,11 @@ function wordsMatch(a: string, b: string): boolean {
  * Returns 0 when it doesn't qualify.
  *
  * Tolerant of the AI producing a *more verbose* name than the stored
- * product — e.g. "Lidl Rowan Hill Bakery 6 High Protein Tortilla Wraps"
+ * product - e.g. "Lidl Rowan Hill Bakery 6 High Protein Tortilla Wraps"
  * vs a stored "High Protein Tortilla Wraps": the match is driven by how
  * much of the FOOD's name the query covers (recall), not the reverse, so
  * extra brand words in the AI name don't break it. Recently-logged foods
- * match more leniently — "use what you actually buy".
+ * match more leniently - "use what you actually buy".
  */
 function localMatchScore(
   food: Food,
@@ -270,7 +270,7 @@ export async function lookupIngredientFood(name: string): Promise<Food | null> {
     }
     if (best) return best;
 
-    // 2. USDA FoodData Central — for generic ingredients not in the library.
+    // 2. USDA FoodData Central - for generic ingredients not in the library.
     const apiKey = getUsdaApiKey();
     if (!apiKey) return null;
     try {
@@ -281,7 +281,7 @@ export async function lookupIngredientFood(name: string): Promise<Food | null> {
       await db.foods.put(top).catch(() => undefined);
       return top;
     } catch {
-      return null; // rate-limited / offline / no match — fail soft
+      return null; // rate-limited / offline / no match - fail soft
     }
   })();
 
@@ -347,7 +347,7 @@ export async function resolveAndFitMeal(
     }
   }
 
-  // Step A — lift protein to the floor by growing the anchor.
+  // Step A - lift protein to the floor by growing the anchor.
   if (req.proteinMin && anchor >= 0 && perG[anchor].protein > 0) {
     const perPortionProtein = totalsFor(grams, perG).protein / portions;
     if (perPortionProtein < req.proteinMin) {
@@ -357,7 +357,7 @@ export async function resolveAndFitMeal(
     }
   }
 
-  // Step B — pull calories under the cap by shrinking the fillers.
+  // Step B - pull calories under the cap by shrinking the fillers.
   if (req.kcalMax) {
     const perPortionKcal = totalsFor(grams, perG).kcal / portions;
     if (perPortionKcal > req.kcalMax) {

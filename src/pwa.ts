@@ -20,7 +20,7 @@ export function registerPwa(): void {
 /**
  * Ask the browser to make local storage persistent so IndexedDB (the
  * diary, meals, weight log) can't be evicted under storage pressure.
- * Best-effort — installed PWAs are almost always granted this.
+ * Best-effort - installed PWAs are almost always granted this.
  */
 export async function requestPersistentStorage(): Promise<void> {
   if (!navigator.storage?.persist) return;
@@ -28,6 +28,6 @@ export async function requestPersistentStorage(): Promise<void> {
     if (await navigator.storage.persisted()) return;
     await navigator.storage.persist();
   } catch {
-    /* best-effort — nothing to do if the browser refuses */
+    /* best-effort - nothing to do if the browser refuses */
   }
 }

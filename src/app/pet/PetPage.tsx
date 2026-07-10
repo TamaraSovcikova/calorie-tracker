@@ -9,6 +9,8 @@ import { RenamePetSheet } from '@/features/pet/RenamePetSheet';
 import { useDogState } from '@/features/pet/useDogState';
 import { useDailyGreeting } from '@/features/pet/useDailyGreeting';
 import { wellbeingBand } from '@/features/pet/petLogic';
+import { PET_SPECIES, PET_SPECIES_LABEL } from '@/features/pet/petSpecies';
+import { updatePet } from '@/db/repos/pet';
 import { WeeklyBudgetCard } from '@/features/weekly-budget/WeeklyBudgetCard';
 import { useWeeklyBudget } from '@/features/weekly-budget/weeklyBudget';
 import { useProfile } from '@/db/repos/profile';
@@ -45,15 +47,37 @@ export function PetPage() {
       />
       <div className="mx-auto max-w-md animate-fade-in space-y-4 px-4 py-4">
         {import.meta.env.DEV && <DevPosePanel />}
-        {/* The dog's playground — grab and fling him, he roams on his own. */}
+        {/* The dog's playground - grab and fling him, he roams on his own. */}
         <section className="flex flex-col items-center rounded-3xl border border-border bg-card px-4 pb-5 pt-2 shadow-sm">
-          <DogPlayground pose={dog.pose} className="h-72 w-full" />
+          <DogPlayground pose={dog.pose} species={dog.species} className="h-72 w-full" />
           <p className="max-w-xs text-center text-sm text-muted-foreground">
             {dog.statusLine}
           </p>
           <p className="mt-1 text-xs text-muted-foreground/70">
-            Tip: grab {dog.petName} and fling him around.
+            Tip: grab {dog.petName} and fling them around.
           </p>
+
+          {/* Choose your companion. Switching keeps the name + wellbeing. */}
+          <div className="mt-4 flex w-full flex-wrap justify-center gap-1.5">
+            {PET_SPECIES.map((s) => {
+              const active = s === dog.species;
+              return (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => void updatePet({ breed: s })}
+                  className="rounded-full border px-3 py-1.5 text-xs font-medium transition-colors"
+                  style={{
+                    background: active ? 'var(--color-accent-deep)' : 'transparent',
+                    color: active ? '#fff' : 'var(--color-text-muted)',
+                    borderColor: active ? 'var(--color-accent-deep)' : 'var(--color-border)',
+                  }}
+                >
+                  {PET_SPECIES_LABEL[s]}
+                </button>
+              );
+            })}
+          </div>
         </section>
 
         <Button block size="lg" onClick={() => navigate('/diary')}>
@@ -61,7 +85,7 @@ export function PetPage() {
           Log food
         </Button>
 
-        {/* Wellbeing — the long-arc consistency meter. */}
+        {/* Wellbeing - the long-arc consistency meter. */}
         <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium">Wellbeing</span>
@@ -78,7 +102,7 @@ export function PetPage() {
           </p>
         </section>
 
-        {/* Weekly calorie budget — full breakdown lives here. */}
+        {/* Weekly calorie budget - full breakdown lives here. */}
         {weekly && <WeeklyBudgetCard weekly={weekly} />}
       </div>
 

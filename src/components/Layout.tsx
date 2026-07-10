@@ -45,7 +45,7 @@ export function Layout() {
       {!online && (
         <div className="flex w-full items-center justify-center gap-1.5 bg-muted px-3 py-1.5 text-xs font-medium text-muted-foreground">
           <CloudOff className="h-3.5 w-3.5" />
-          Offline — changes save here and sync when you reconnect
+          Offline - changes save here and sync when you reconnect
         </div>
       )}
       {online && sync.status === 'error' && (
@@ -55,7 +55,7 @@ export function Layout() {
           className="flex w-full items-center justify-center gap-1.5 bg-destructive/90 px-3 py-1.5 text-xs font-medium text-destructive-foreground"
         >
           <AlertTriangle className="h-3.5 w-3.5" />
-          Cloud sync failed — tap to check Settings
+          Cloud sync failed - tap to check Settings
         </button>
       )}
       <main className="flex-1 overflow-y-auto pb-20">

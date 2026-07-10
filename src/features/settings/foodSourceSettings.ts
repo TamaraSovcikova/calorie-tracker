@@ -1,5 +1,5 @@
 /**
- * Tiny localStorage-backed setting layer for the food-search panel —
+ * Tiny localStorage-backed setting layer for the food-search panel -
  * separate from the Dexie profile because these are per-device knobs
  * (the USDA API key especially shouldn't sync via Cloud sync).
  *
@@ -8,6 +8,7 @@
  */
 
 const SHOW_PACKAGED_KEY = 'calorie-tracker:show-packaged';
+const CONTRIBUTE_SHARED_KEY = 'calorie-tracker:contribute-shared';
 
 type Listener = () => void;
 const listeners = new Set<Listener>();
@@ -37,7 +38,24 @@ export function setShowPackaged(value: boolean): void {
   emit();
 }
 
-/** Manually emit — used after the USDA key changes so search re-runs. */
+/**
+ * Opt-in: contribute the foods you enter manually to the shared community
+ * food database, so anyone (including future-you on a fresh device) can find
+ * them without re-typing. Default OFF - contributing publishes the product's
+ * name + macros to a shared pool, so it's an explicit choice.
+ */
+export function getContributeShared(): boolean {
+  if (typeof localStorage === 'undefined') return false;
+  return localStorage.getItem(CONTRIBUTE_SHARED_KEY) === 'true';
+}
+
+export function setContributeShared(value: boolean): void {
+  if (typeof localStorage === 'undefined') return;
+  localStorage.setItem(CONTRIBUTE_SHARED_KEY, value ? 'true' : 'false');
+  emit();
+}
+
+/** Manually emit - used after the USDA key changes so search re-runs. */
 export function notifyFoodSourceChanged(): void {
   emit();
 }

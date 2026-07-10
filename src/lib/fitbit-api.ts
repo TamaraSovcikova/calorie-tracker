@@ -8,7 +8,7 @@
  *
  * Auth: Google OAuth 2.0 Authorization Code with PKCE. Google "Web
  * application" clients are confidential clients, so the token exchange
- * also needs the client secret (kept in the browser — acceptable for a
+ * also needs the client secret (kept in the browser - acceptable for a
  * personal single-user app). Refresh tokens issued while the OAuth client
  * is in "Testing" mode expire after ~7 days; the UI surfaces a reconnect
  * prompt.
@@ -32,7 +32,7 @@ import {
 
 const AUTH_BASE = 'https://accounts.google.com/o/oauth2/v2/auth';
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
-// Relative path — health.googleapis.com sends no CORS headers, so calls go
+// Relative path - health.googleapis.com sends no CORS headers, so calls go
 // through a same-origin proxy (Vite dev server in dev, Worker in prod).
 const API_BASE = '/gh-api/v4';
 
@@ -111,7 +111,7 @@ export function getConnectedAccountEmail(): string | null {
   return localStorage.getItem(ACCOUNT_EMAIL_LS);
 }
 
-/** Decode the email claim from an OpenID id_token JWT (no signature check —
+/** Decode the email claim from an OpenID id_token JWT (no signature check -
  *  it came straight from Google over TLS in our own PKCE exchange). */
 function emailFromIdToken(idToken: string | undefined): string | null {
   if (!idToken) return null;
@@ -158,7 +158,7 @@ function getRedirectUri(): string {
   return `${window.location.origin}${REDIRECT_PATH}`;
 }
 
-// localStorage rather than sessionStorage — Chrome cross-site storage rules
+// localStorage rather than sessionStorage - Chrome cross-site storage rules
 // can wipe sessionStorage across an OAuth redirect chain. The createdAt TTL
 // limits replay risk.
 function storePkce(state: PkceState): void {
@@ -243,7 +243,7 @@ export async function completeFitbitAuth(
 
   const pkce = readPkce();
   if (!pkce) {
-    throw new Error('PKCE verifier missing or expired — start the flow again');
+    throw new Error('PKCE verifier missing or expired - start the flow again');
   }
   clearPkce();
   if (state !== pkce.state) throw new Error('OAuth state mismatch');
@@ -313,7 +313,7 @@ async function refreshTokens(): Promise<void> {
   });
   if (!res.ok) {
     // 400/401 means the refresh token expired or was revoked (testing-mode
-    // tokens last ~7 days) — wipe locally so the UI shows a reconnect prompt.
+    // tokens last ~7 days) - wipe locally so the UI shows a reconnect prompt.
     if (res.status === 400 || res.status === 401) await deleteFitbitTokens();
     throw new Error(`Google refresh failed (HTTP ${res.status})`);
   }
@@ -392,7 +392,7 @@ interface DailyRollupResponse {
   nextPageToken?: string;
 }
 
-/** Build a CivilDateTime for the given local date — start or end of day. */
+/** Build a CivilDateTime for the given local date - start or end of day. */
 function civilDateTime(date: LocalDate, endOfDay: boolean): CivilDateTime {
   const [year, month, day] = date.split('-').map(Number);
   return {
@@ -672,7 +672,7 @@ export async function getDailySummary(
 }
 
 /**
- * Diagnostic used by Settings — returns the raw HTTP outcome for both data
+ * Diagnostic used by Settings - returns the raw HTTP outcome for both data
  * types so a "0 kcal" can be told apart: empty 200 = no migrated data yet,
  * 4xx = a request problem.
  */

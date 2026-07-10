@@ -12,7 +12,7 @@ interface RenamePetSheetProps {
   onClose: () => void;
 }
 
-/** Rename the dog — opened from the tappable name on the Pet screen. */
+/** Rename the dog - opened from the tappable name on the Pet screen. */
 export function RenamePetSheet({ open, currentName, onClose }: RenamePetSheetProps) {
   return (
     <Sheet

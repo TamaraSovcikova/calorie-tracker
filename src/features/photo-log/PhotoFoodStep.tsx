@@ -41,7 +41,7 @@ export function PhotoFoodStep({ date, section, onDone }: PhotoFoodStepProps) {
     const analysis = await analyzePhoto(file);
     if (analysis.foods.length === 0) {
       setError(
-        analysis.error ?? 'No food spotted in that photo — try another.',
+        analysis.error ?? 'No food spotted in that photo - try another.',
       );
       setPhase('error');
       return;
@@ -112,14 +112,14 @@ export function PhotoFoodStep({ date, section, onDone }: PhotoFoodStepProps) {
           </div>
           <p className="text-sm text-muted-foreground">
             Snap a photo of your meal and AI will identify the foods and
-            estimate portions — you confirm before anything is logged.
+            estimate portions - you confirm before anything is logged.
           </p>
           <Button type="button" variant="primary" onClick={() => fileRef.current?.click()}>
             <Camera className="h-4 w-4" />
             Take or choose a photo
           </Button>
           <p className="text-[11px] text-muted-foreground">
-            Free, on Cloudflare AI. Estimates — always check them.
+            Free, on Cloudflare AI. Estimates - always check them.
           </p>
         </div>
       )}
@@ -162,7 +162,7 @@ export function PhotoFoodStep({ date, section, onDone }: PhotoFoodStepProps) {
                 />
               )}
               <p className="text-sm text-muted-foreground">
-                Tap to include or exclude. Amounts are estimates — edit any
+                Tap to include or exclude. Amounts are estimates - edit any
                 entry afterwards.
               </p>
             </div>
@@ -208,7 +208,7 @@ export function PhotoFoodStep({ date, section, onDone }: PhotoFoodStepProps) {
                           {r.name}
                         </span>
                         <span className="block text-xs text-muted-foreground">
-                          Not recognised — add it from the Search tab.
+                          Not recognised - add it from the Search tab.
                         </span>
                       </span>
                     </div>

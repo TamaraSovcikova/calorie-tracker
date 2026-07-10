@@ -1,4 +1,5 @@
-import { Plus } from 'lucide-react';
+import { useRef, useState, type ReactNode } from 'react';
+import { CalendarPlus, Plus } from 'lucide-react';
 import { DiaryRow } from './DiaryRow';
 import { formatKcal, MACRO_LABELS, type MacroKey } from '@/lib/macros';
 import { sumTotals } from '@/db/repos/diary';
@@ -20,6 +21,79 @@ interface DiarySectionProps {
   selectMode?: boolean;
   selectedIds?: Set<string>;
   onToggleSelect?: (entry: DiaryEntry) => void;
+  /** When set, rows can be swiped left to copy that entry onto today. */
+  onCopyToToday?: (entry: DiaryEntry) => void;
+}
+
+const SWIPE_TRIGGER = 72; // px of left-drag to fire the copy
+
+/**
+ * Wraps a diary row so a left-swipe reveals a "Copy to today" action and
+ * fires it past the threshold. Vertical scrolling is preserved (touch-action
+ * pan-y); a real drag suppresses the row's tap so it doesn't open the editor.
+ */
+function SwipeToCopy({
+  onCopy,
+  children,
+}: {
+  onCopy: () => void;
+  children: ReactNode;
+}) {
+  const [dx, setDx] = useState(0);
+  const [dragging, setDragging] = useState(false);
+  const startX = useRef<number | null>(null);
+  const moved = useRef(false);
+
+  const onPointerDown = (e: React.PointerEvent) => {
+    startX.current = e.clientX;
+    moved.current = false;
+    setDragging(true);
+  };
+  const onPointerMove = (e: React.PointerEvent) => {
+    if (startX.current === null) return;
+    const delta = e.clientX - startX.current;
+    if (Math.abs(delta) > 6) moved.current = true;
+    // Left-drag only; clamp so it can't be flung too far.
+    setDx(Math.max(-110, Math.min(0, delta)));
+  };
+  const end = () => {
+    if (dx <= -SWIPE_TRIGGER) onCopy();
+    setDx(0);
+    setDragging(false);
+    startX.current = null;
+  };
+
+  return (
+    <div className="relative overflow-hidden">
+      <div
+        className="absolute inset-y-0 right-0 flex items-center gap-1 pl-6 pr-4 text-xs font-semibold text-white"
+        style={{ background: 'var(--color-accent-deep)' }}
+      >
+        <CalendarPlus className="h-4 w-4" />
+        Today
+      </div>
+      <div
+        className="relative bg-card"
+        style={{
+          touchAction: 'pan-y',
+          transform: `translateX(${dx}px)`,
+          transition: dragging ? 'none' : 'transform 0.2s ease',
+        }}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={end}
+        onPointerCancel={end}
+        onClickCapture={(e) => {
+          if (moved.current) {
+            e.preventDefault();
+            e.stopPropagation();
+          }
+        }}
+      >
+        {children}
+      </div>
+    </div>
+  );
 }
 
 export function DiarySectionView({
@@ -31,6 +105,7 @@ export function DiarySectionView({
   selectMode = false,
   selectedIds,
   onToggleSelect,
+  onCopyToToday,
 }: DiarySectionProps) {
   const totals = sumTotals(entries);
   const primaryVal =
@@ -72,8 +147,8 @@ export function DiarySectionView({
       </header>
       {hasEntries && (
         <ul className="divide-y divide-border px-2 pb-2">
-          {entries.map((e) => (
-            <li key={e.id}>
+          {entries.map((e) => {
+            const row = (
               <DiaryRow
                 entry={e}
                 primaryMacro={primaryMacro}
@@ -82,8 +157,17 @@ export function DiarySectionView({
                 selected={selectedIds?.has(e.id) ?? false}
                 onToggleSelect={onToggleSelect}
               />
-            </li>
-          ))}
+            );
+            return (
+              <li key={e.id}>
+                {onCopyToToday && !selectMode ? (
+                  <SwipeToCopy onCopy={() => onCopyToToday(e)}>{row}</SwipeToCopy>
+                ) : (
+                  row
+                )}
+              </li>
+            );
+          })}
         </ul>
       )}
     </section>

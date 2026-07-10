@@ -1,12 +1,12 @@
 /**
- * The "current user id" — the key every local row is stored under.
+ * The "current user id" - the key every local row is stored under.
  *
  * Each person has a private **sync code**; their account id is a SHA-256
  * hash of that code (the Worker derives the exact same id from the bearer
  * token, so client and server always agree on who owns a row).
  *
  * Before a code is configured everything is keyed under 'local'. On the
- * first connect the 'local' rows are migrated to the derived id — see
+ * first connect the 'local' rows are migrated to the derived id - see
  * `sync/userMigration.ts`.
  */
 export const LOCAL_USER_ID = 'local';

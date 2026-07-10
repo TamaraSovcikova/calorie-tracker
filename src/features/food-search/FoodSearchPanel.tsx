@@ -44,12 +44,15 @@ function Group({
   );
 }
 
+type Category = 'all' | 'favourites' | 'frequent' | 'recent';
+
 export function FoodSearchPanel({
   section,
   onPick,
   onManualEntry,
 }: FoodSearchPanelProps) {
   const [query, setQuery] = useState('');
+  const [category, setCategory] = useState<Category>('all');
   const {
     favorites,
     frequent,
@@ -68,6 +71,11 @@ export function FoodSearchPanel({
 
   const hasQuery = query.trim().length > 0;
   const handleFav = (food: Food) => void toggleFavorite(food.id);
+  // Reset category filter when user starts typing
+  const handleQueryChange = (v: string) => {
+    setQuery(v);
+    if (v.trim().length > 0) setCategory('all');
+  };
   const emptyStateEmpty =
     favorites.length === 0 && frequent.length === 0 && recents.length === 0;
   const noResults =
@@ -88,7 +96,7 @@ export function FoodSearchPanel({
             placeholder="Search foods…"
             className="pl-9"
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => handleQueryChange(e.target.value)}
             autoFocus
           />
           {isSearching && (
@@ -101,6 +109,38 @@ export function FoodSearchPanel({
             {SECTION_TITLES[section]}
           </span>
         </p>
+        {!hasQuery && (favorites.length > 0 || frequent.length > 0 || recents.length > 0) && (
+          <div className="flex gap-1.5 overflow-x-auto pb-0.5" style={{ scrollbarWidth: 'none' }}>
+            {(
+              [
+                { key: 'all', label: 'All' },
+                ...(favorites.length > 0 ? [{ key: 'favourites', label: `Favourites (${favorites.length})` }] : []),
+                ...(frequent.length > 0 ? [{ key: 'frequent', label: `Frequent` }] : []),
+                ...(recents.length > 0 ? [{ key: 'recent', label: `Recent (${recents.length})` }] : []),
+              ] as { key: Category; label: string }[]
+            ).map(({ key, label }) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setCategory(key)}
+                style={{
+                  flexShrink: 0,
+                  fontSize: 12,
+                  fontWeight: 600,
+                  padding: '4px 12px',
+                  borderRadius: 20,
+                  border: category === key ? 'none' : '1px solid var(--color-border)',
+                  background: category === key ? 'var(--color-accent-deep)' : 'transparent',
+                  color: category === key ? '#fff' : 'var(--color-text-muted)',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {needsUsdaKey && hasQuery && (
@@ -121,7 +161,7 @@ export function FoodSearchPanel({
       {(rateLimitedSeconds || errorBanner) && (
         <div className="mx-4 mt-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
           {rateLimitedSeconds != null
-            ? `Search rate limit hit. Showing local + cached results — try again in ${rateLimitedSeconds}s.`
+            ? `Search rate limit hit. Showing local + cached results - try again in ${rateLimitedSeconds}s.`
             : errorBanner}
         </div>
       )}
@@ -137,39 +177,24 @@ export function FoodSearchPanel({
         )}
         {!hasQuery && (
           <>
-            {favorites.length > 0 && (
+            {(category === 'all' || category === 'favourites') && favorites.length > 0 && (
               <Group title="Favourites" hint={`${favorites.length}`}>
                 {favorites.map((f) => (
-                  <FoodResultRow
-                    key={f.id}
-                    food={f}
-                    onClick={onPick}
-                    onToggleFavorite={handleFav}
-                  />
+                  <FoodResultRow key={f.id} food={f} onClick={onPick} onToggleFavorite={handleFav} />
                 ))}
               </Group>
             )}
-            {frequent.length > 0 && (
+            {(category === 'all' || category === 'frequent') && frequent.length > 0 && (
               <Group title="Frequently logged">
                 {frequent.map((f) => (
-                  <FoodResultRow
-                    key={f.id}
-                    food={f}
-                    onClick={onPick}
-                    onToggleFavorite={handleFav}
-                  />
+                  <FoodResultRow key={f.id} food={f} onClick={onPick} onToggleFavorite={handleFav} />
                 ))}
               </Group>
             )}
-            {recents.length > 0 && (
+            {(category === 'all' || category === 'recent') && recents.length > 0 && (
               <Group title="Recent" hint={`${recents.length}`}>
                 {recents.map((f) => (
-                  <FoodResultRow
-                    key={f.id}
-                    food={f}
-                    onClick={onPick}
-                    onToggleFavorite={handleFav}
-                  />
+                  <FoodResultRow key={f.id} food={f} onClick={onPick} onToggleFavorite={handleFav} />
                 ))}
               </Group>
             )}

@@ -2,8 +2,8 @@
  * Pulls Fitbit's daily activity from Google Health for the diary's current
  * date and upserts a single "Fitbit activity" row in exercise_entries.
  *
- * The stored kcal is ACTIVITY calories — Google's total daily burn minus
- * the estimated resting burn (BMR) — so the number reflects movement, not
+ * The stored kcal is ACTIVITY calories - Google's total daily burn minus
+ * the estimated resting burn (BMR) - so the number reflects movement, not
  * metabolism. See features/fitbit/activityCalories.
  *
  * Behaviour:
@@ -31,7 +31,7 @@ const lastFetched = new Map<string, number>();
 
 /**
  * The BMR estimate is part of the key so that filling in / editing
- * profile stats invalidates the cache — otherwise a stale "needs profile"
+ * profile stats invalidates the cache - otherwise a stale "needs profile"
  * row would survive until the 5-minute window elapsed.
  */
 function cacheKey(date: LocalDate, dailyBmr: number | null): string {
@@ -166,7 +166,7 @@ export function useFitbitDailySync(date: LocalDate): { syncFailed: boolean } {
           lastFetched.set(key, Date.now());
         }
       } catch (err) {
-        // Diary works fine without Fitbit — console-warn only.
+        // Diary works fine without Fitbit - console-warn only.
         console.warn('Fitbit sync failed for', date, err);
         if (!cancelled) setSyncFailed(true);
       }

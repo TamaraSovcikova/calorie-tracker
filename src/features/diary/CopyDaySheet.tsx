@@ -14,7 +14,7 @@ interface CopyDaySheetProps {
 }
 
 /**
- * "Copy this day's entries to another date" — for repeating a routine
+ * "Copy this day's entries to another date" - for repeating a routine
  * day. The source day is never modified; entries are duplicated onto the
  * target date.
  */
@@ -33,7 +33,7 @@ export function CopyDaySheet({ open, fromDate, onClose }: CopyDaySheetProps) {
     try {
       const n = await copyDayEntries(fromDate, target);
       if (n === 0) {
-        setResult('Nothing to copy — the source day has no entries.');
+        setResult('Nothing to copy - the source day has no entries.');
       } else {
         onClose();
         toast({

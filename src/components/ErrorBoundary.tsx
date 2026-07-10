@@ -11,7 +11,7 @@ interface State {
 /**
  * Top-level error boundary. Without this a thrown render error blanks the
  * whole PWA to a white screen with no way out. Here it shows a recovery
- * screen — the user's data is local in IndexedDB and untouched, so a
+ * screen - the user's data is local in IndexedDB and untouched, so a
  * reload almost always clears a transient error.
  */
 export class ErrorBoundary extends Component<Props, State> {
@@ -36,7 +36,7 @@ export class ErrorBoundary extends Component<Props, State> {
         <h1 className="text-lg font-semibold">Something went wrong</h1>
         <p className="max-w-xs text-sm text-muted-foreground">
           The app hit an unexpected error. Your diary data is safe on this
-          device — reloading usually fixes it.
+          device - reloading usually fixes it.
         </p>
         <button
           type="button"

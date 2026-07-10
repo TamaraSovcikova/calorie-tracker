@@ -142,26 +142,32 @@ export function ProfileSection({ profile }: ProfileSectionProps) {
         onBlur={commit}
       />
       <div className="grid grid-cols-2 gap-2">
-        <label className="block space-y-1">
+        <div className="space-y-1">
           <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
             Sex
           </span>
-          <Select
-            value={form.sex}
-            onChange={(e) => {
-              const v = e.target.value as Sex | '';
-              update('sex', v);
-              // Persist the new value directly — going via `commit` would
-              // read stale form state (the update above has not applied yet)
-              // and write the previous value back.
-              void updateProfile({ sex: (v || undefined) as Sex | undefined });
-            }}
-          >
-            <option value="">—</option>
-            <option value="female">Female</option>
-            <option value="male">Male</option>
-          </Select>
-        </label>
+          <div className="flex rounded-lg border border-border overflow-hidden" style={{ height: 38 }}>
+            {([['female', 'Female'], ['male', 'Male']] as [Sex, string][]).map(([val, label], i) => (
+              <button
+                key={val}
+                type="button"
+                onClick={() => {
+                  const next = form.sex === val ? '' : val;
+                  update('sex', next);
+                  void updateProfile({ sex: (next || undefined) as Sex | undefined });
+                }}
+                className="flex-1 text-sm font-medium transition-colors"
+                style={{
+                  background: form.sex === val ? 'var(--color-accent-deep)' : 'transparent',
+                  color: form.sex === val ? '#fff' : 'var(--color-text-muted)',
+                  borderRight: i === 0 ? '1px solid var(--color-border)' : 'none',
+                }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
         <LabeledInput
           label="Date of birth"
           type="date"
@@ -208,7 +214,7 @@ export function ProfileSection({ profile }: ProfileSectionProps) {
             });
           }}
         >
-          <option value="">—</option>
+          <option value="">-</option>
           {(Object.keys(ACTIVITY_LABELS) as ActivityLevel[]).map((k) => (
             <option key={k} value={k}>
               {ACTIVITY_LABELS[k]}
@@ -221,7 +227,7 @@ export function ProfileSection({ profile }: ProfileSectionProps) {
         <div className="rounded-lg border border-primary/30 bg-primary/5 p-3">
           <div className="flex items-center gap-1.5 text-xs uppercase tracking-wide text-primary">
             <Sparkles className="h-3.5 w-3.5" />
-            Maintenance (TDEE) {formatKcal(previewTdee)} kcal — pick a goal
+            Maintenance (TDEE) {formatKcal(previewTdee)} kcal - pick a goal
           </div>
           <div className="mt-2 grid grid-cols-3 gap-2">
             {(

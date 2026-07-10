@@ -6,7 +6,7 @@ interface ImportMetaEnv {
   readonly VITE_GOOGLE_CLIENT_SECRET?: string;
   readonly VITE_OFF_APP_NAME?: string;
   readonly VITE_OFF_APP_VERSION?: string;
-  /** Optional bundled USDA FoodData Central key — search works for all users. */
+  /** Optional bundled USDA FoodData Central key - search works for all users. */
   readonly VITE_USDA_API_KEY?: string;
 }
 

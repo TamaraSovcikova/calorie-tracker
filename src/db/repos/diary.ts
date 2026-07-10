@@ -61,7 +61,7 @@ export async function softDeleteDiaryEntry(id: string): Promise<void> {
   await db.diary_entries.update(id, { deleted_at: new Date().toISOString() });
 }
 
-/** Reverse a soft-delete — clears the tombstone so the entry reappears. */
+/** Reverse a soft-delete - clears the tombstone so the entry reappears. */
 export async function restoreDiaryEntry(id: string): Promise<void> {
   await db.diary_entries.update(id, {
     deleted_at: undefined,
@@ -70,7 +70,7 @@ export async function restoreDiaryEntry(id: string): Promise<void> {
 }
 
 /**
- * Copy every (non-deleted) entry from one date onto another date — for the
+ * Copy every (non-deleted) entry from one date onto another date - for the
  * "I ate the same as yesterday" / meal-prep case. Returns the count copied.
  * Copies are fresh rows (new ids, new timestamps); the source day is left
  * untouched.
@@ -99,6 +99,29 @@ export async function copyDayEntries(
   await db.diary_entries.bulkPut(copies);
   if (to === todayLocal()) pulseReaction('eating', EAT_BEAT_MS);
   return copies.length;
+}
+
+/**
+ * Copy a single diary entry onto another date (default: today) - powers the
+ * swipe-to-repeat gesture ("I ate this again today"). A fresh row; the source
+ * entry is untouched.
+ */
+export async function copyEntryToDate(
+  entry: DiaryEntry,
+  to: LocalDate = todayLocal(),
+): Promise<DiaryEntry> {
+  const now = new Date().toISOString();
+  const copy: DiaryEntry = {
+    ...entry,
+    id: uuid(),
+    date: to,
+    created_at: now,
+    updated_at: now,
+    deleted_at: undefined,
+  };
+  await db.diary_entries.put(copy);
+  if (to === todayLocal()) pulseReaction('eating', EAT_BEAT_MS);
+  return copy;
 }
 
 /** Live list of all diary entries on a given date, grouped by section. */
@@ -142,7 +165,7 @@ export interface DayTotals {
   protein: number;
   carbs: number;
   fat: number;
-  /** Micronutrients — fibre/sugar in grams, sodium in mg. */
+  /** Micronutrients - fibre/sugar in grams, sodium in mg. */
   fiber: number;
   sugar: number;
   sodium: number;
@@ -206,12 +229,12 @@ export async function lastQuantityForFood(
 }
 
 /**
- * Recent foods logged across ALL sections, most recent first, deduped —
+ * Recent foods logged across ALL sections, most recent first, deduped -
  * so meal-prepping the same items shows them whichever section you're in.
  */
 export async function recentFoods(limit = 30): Promise<string[]> {
   const userId = currentUserId();
-  // The '0000-00-00' / '9999-99-99' bounds aren't real dates — they're
+  // The '0000-00-00' / '9999-99-99' bounds aren't real dates - they're
   // lexical sentinels that bracket every YYYY-MM-DD string on the
   // [user_id, date] compound index. Safe because dates are fixed-width ISO
   // strings, so a lexical compare equals a date compare.
@@ -283,7 +306,7 @@ export function useMealLogStats():
 }
 
 /**
- * Food ids ranked by how often they've been logged (most-logged first) —
+ * Food ids ranked by how often they've been logged (most-logged first) -
  * the "frequent foods" fast-logging list.
  */
 export async function frequentFoods(limit = 20): Promise<string[]> {

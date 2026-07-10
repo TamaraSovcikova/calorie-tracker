@@ -106,7 +106,7 @@ export function ExerciseSection({ date }: ExerciseSectionProps) {
                 </div>
                 <div className="shrink-0 text-right tabular-nums">
                   {e.needs_profile ? (
-                    <div className="text-sm text-muted-foreground">—</div>
+                    <div className="text-sm text-muted-foreground">-</div>
                   ) : (
                     <>
                       <div className="text-sm font-semibold">

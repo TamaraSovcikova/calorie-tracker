@@ -1,7 +1,7 @@
 /**
  * Google Health gives TOTAL calories burned (resting/BMR + all activity).
- * For the diary we want ACTIVITY calories — the "extra" burn above just
- * existing — so the number reflects movement, not metabolism.
+ * For the diary we want ACTIVITY calories - the "extra" burn above just
+ * existing - so the number reflects movement, not metabolism.
  *
  *   activity = totalBurned - restingBurnSoFar
  *   restingBurnSoFar = dailyBMR * fractionOfDayElapsed

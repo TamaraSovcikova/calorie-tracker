@@ -28,12 +28,12 @@ const queryClient = new QueryClient({
 
 /**
  * Boot order matters for per-user isolation:
- *   1. resolveUserId() — if a sync code is configured, migrate this
+ *   1. resolveUserId() - if a sync code is configured, migrate this
  *      device's 'local' rows onto the derived account id.
  *   2. On a device that has no profile yet but DOES have a code, pull the
  *      account's data first so we don't seed (and then push) a blank
  *      profile over the real one.
- *   3. ensureSeed() — creates defaults only for whatever is still missing.
+ *   3. ensureSeed() - creates defaults only for whatever is still missing.
  */
 async function boot(): Promise<void> {
   try {
@@ -45,7 +45,7 @@ async function boot(): Promise<void> {
   try {
     const hasProfile = Boolean(await db.profiles.get(currentUserId()));
     if (!hasProfile && isConfigured()) {
-      // First run on a fresh device with a code — block once on the
+      // First run on a fresh device with a code - block once on the
       // initial pull so seeding sees the real account data.
       await syncEngine.syncNow().catch(() => undefined);
     }

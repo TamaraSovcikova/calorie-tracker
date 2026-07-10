@@ -116,29 +116,34 @@ export function GoalsSection({ profile }: GoalsSectionProps) {
       </div>
       {macroWarning && (
         <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
-          Macros sum to {formatKcal(macroSum)} kcal — that's{' '}
+          Macros sum to {formatKcal(macroSum)} kcal - that's{' '}
           {Math.round(drift * 100)}% off your {formatKcal(targetKcal)} target.
           You can keep them out of sync, but consider adjusting.
         </div>
       )}
 
-      <label className="block space-y-1">
+      <div className="space-y-1">
         <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
           Primary macro shown alongside kcal
         </span>
-        <Select
-          value={profile.primary_macro}
-          onChange={(e) =>
-            void updateProfile({
-              primary_macro: e.target.value as Profile['primary_macro'],
-            })
-          }
-        >
-          <option value="protein">Protein</option>
-          <option value="carbs">Carbs</option>
-          <option value="fat">Fat</option>
-        </Select>
-      </label>
+        <div className="flex rounded-lg border border-border overflow-hidden">
+          {(['protein', 'carbs', 'fat'] as const).map((m) => (
+            <button
+              key={m}
+              type="button"
+              onClick={() => void updateProfile({ primary_macro: m })}
+              className="flex-1 py-2 text-sm font-medium capitalize transition-colors"
+              style={{
+                background: profile.primary_macro === m ? 'var(--color-accent-deep)' : 'transparent',
+                color: profile.primary_macro === m ? '#fff' : 'var(--color-text-muted)',
+                borderRight: m !== 'fat' ? '1px solid var(--color-border)' : 'none',
+              }}
+            >
+              {m.charAt(0).toUpperCase() + m.slice(1)}
+            </button>
+          ))}
+        </div>
+      </div>
 
       <Switch
         label="Add burned calories to my target"
@@ -149,29 +154,35 @@ export function GoalsSection({ profile }: GoalsSectionProps) {
 
       <Switch
         label="Calorie budget"
-        description="Recalculate each day's target from the period's remaining budget (your daily goal × days in the period). Going over one day trims the rest; going under banks calories forward — so overages aren't forgotten."
+        description="Recalculate each day's target from the period's remaining budget (your daily goal × days in the period). Going over one day trims the rest; going under banks calories forward - so overages aren't forgotten."
         checked={!!profile.weekly_budget_enabled}
         onChange={(v) => void updateProfile({ weekly_budget_enabled: v })}
       />
 
       {profile.weekly_budget_enabled && (
         <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-3">
-          <label className="block space-y-1">
+          <div className="space-y-1">
             <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
               Budget period
             </span>
-            <Select
-              value={profile.budget_period ?? 'week'}
-              onChange={(e) =>
-                void updateProfile({
-                  budget_period: e.target.value as 'week' | 'month',
-                })
-              }
-            >
-              <option value="week">Weekly (daily goal × 7)</option>
-              <option value="month">Monthly (average per day over the calendar month)</option>
-            </Select>
-          </label>
+            <div className="flex rounded-lg border border-border overflow-hidden">
+              {([['week', 'Weekly'], ['month', 'Monthly']] as const).map(([val, label]) => (
+                <button
+                  key={val}
+                  type="button"
+                  onClick={() => void updateProfile({ budget_period: val })}
+                  className="flex-1 py-2 text-sm font-medium transition-colors"
+                  style={{
+                    background: (profile.budget_period ?? 'week') === val ? 'var(--color-accent-deep)' : 'transparent',
+                    color: (profile.budget_period ?? 'week') === val ? '#fff' : 'var(--color-text-muted)',
+                    borderRight: val === 'week' ? '1px solid var(--color-border)' : 'none',
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
 
           {(profile.budget_period ?? 'week') === 'week' && (
             <label className="block space-y-1">
@@ -197,7 +208,7 @@ export function GoalsSection({ profile }: GoalsSectionProps) {
 
           <Switch
             label="Carry over to the next period"
-            description="Roll an unfinished period's surplus or overage into the next one. So an overage on the last day isn't forgotten — it starts the next period in deficit (and banked calories start it ahead)."
+            description="Roll an unfinished period's surplus or overage into the next one. So an overage on the last day isn't forgotten - it starts the next period in deficit (and banked calories start it ahead)."
             checked={!!profile.budget_carryover_enabled}
             onChange={(v) => void updateProfile({ budget_carryover_enabled: v })}
           />

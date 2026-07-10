@@ -19,6 +19,7 @@ import { handleMealPlan } from './mealPlan';
 import { handlePhotoFood } from './photoFood';
 import { handlePhotoRecipe } from './photoRecipe';
 import { handlePhotoLabel } from './photoLabel';
+import { handleSharedFoodSearch, handleSharedFoodContribute } from './sharedFoods';
 import { checkRateLimit } from './rateLimit';
 
 export interface Env {
@@ -213,6 +214,26 @@ export default {
           return await handlePhotoLabel(req, env);
         } catch {
           return jsonResponse({ label: null, error: 'Label scan failed — try again.' });
+        }
+      }
+
+      // /api/shared-foods — community food pool: GET searches it, POST
+      // contributes a manually-entered product to it.
+      if (url.pathname === '/api/shared-foods' && req.method === 'GET') {
+        try {
+          return await handleSharedFoodSearch(req, env);
+        } catch {
+          return jsonResponse({ foods: [] });
+        }
+      }
+      if (url.pathname === '/api/shared-foods' && req.method === 'POST') {
+        if (!(await checkRateLimit(env, `shared:${userId}`, 40, 60))) {
+          return jsonResponse({ ok: false }, { status: 429 });
+        }
+        try {
+          return await handleSharedFoodContribute(req, env, userId);
+        } catch {
+          return jsonResponse({ ok: false });
         }
       }
 

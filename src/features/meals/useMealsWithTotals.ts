@@ -22,7 +22,7 @@ export interface MealWithTotals {
 }
 
 /**
- * Live list of every saved meal with its per-portion totals — for the
+ * Live list of every saved meal with its per-portion totals - for the
  * Library list, where each row shows kcal. Resolves all meals' items and
  * foods in one pass rather than a query per row.
  */

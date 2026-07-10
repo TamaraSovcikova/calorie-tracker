@@ -1,5 +1,5 @@
 /**
- * AI nutrition-label scan — send a label photo to the Worker and get back
+ * AI nutrition-label scan - send a label photo to the Worker and get back
  * transcribed per-100g values to prefill the manual food form. Never throws.
  *
  * Unlike the meal planner / photo log, the numbers here ARE the answer: the
@@ -50,14 +50,14 @@ export async function analyzeLabel(file: Blob): Promise<LabelScanResult> {
       signal: controller.signal,
     });
     const data = (await res.json().catch(() => null)) as LabelScanResult | null;
-    if (!data) return { label: null, error: 'No response — try again.' };
+    if (!data) return { label: null, error: 'No response - try again.' };
     return { label: data.label ?? null, error: data.error };
   } catch (err) {
     const aborted = err instanceof DOMException && err.name === 'AbortError';
     return {
       label: null,
       error: aborted
-        ? 'Scan took too long — try again.'
+        ? 'Scan took too long - try again.'
         : 'Could not reach the label scanner.',
     };
   } finally {

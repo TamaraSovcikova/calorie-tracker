@@ -31,7 +31,7 @@ function sectionForNow(): MealSection {
 }
 
 /**
- * Log a saved meal straight to the diary — pick a date, section, and
+ * Log a saved meal straight to the diary - pick a date, section, and
  * portion. Used from the Library so a meal can be logged without first
  * opening a diary day.
  */

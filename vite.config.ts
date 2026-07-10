@@ -31,6 +31,24 @@ export default defineConfig({
         orientation: 'portrait',
         start_url: '/',
         scope: '/',
+        // Long-press the installed app icon → these jump straight into
+        // fast-logging (meal section auto-picked by time of day).
+        shortcuts: [
+          {
+            name: 'Quick add food',
+            short_name: 'Quick add',
+            description: 'Log food to today',
+            url: '/quick-add',
+            icons: [{ src: 'pwa-192x192.png', sizes: '192x192', type: 'image/png' }],
+          },
+          {
+            name: 'Scan a barcode',
+            short_name: 'Scan',
+            description: 'Scan a product to log it',
+            url: '/quick-add?tab=scan',
+            icons: [{ src: 'pwa-192x192.png', sizes: '192x192', type: 'image/png' }],
+          },
+        ],
         icons: [
           { src: 'pwa-64x64.png', sizes: '64x64', type: 'image/png' },
           { src: 'pwa-192x192.png', sizes: '192x192', type: 'image/png' },

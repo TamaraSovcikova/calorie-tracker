@@ -59,8 +59,8 @@ function Stat({ label, value }: { label: string; value: string }) {
 }
 
 function encouragement(d: WeeklyDigest, name: string): string {
-  if (d.daysLogged >= 7) return `A perfect week of logging — ${name} is thriving!`;
-  if (d.daysLogged >= 5) return `A strong week — ${name} is happy. Keep it going!`;
+  if (d.daysLogged >= 7) return `A perfect week of logging - ${name} is thriving!`;
+  if (d.daysLogged >= 5) return `A strong week - ${name} is happy. Keep it going!`;
   if (d.daysLogged >= 3) return `A decent week. A little more consistency and ${name} will be thriving.`;
-  return `${name} missed you — try to log a little more this week.`;
+  return `${name} missed you - try to log a little more this week.`;
 }

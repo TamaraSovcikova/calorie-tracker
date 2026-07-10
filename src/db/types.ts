@@ -20,7 +20,7 @@ export const MEAL_SECTION_LABELS: Record<MealSection, string> = {
   snacks: 'Snacks',
 };
 
-export type FoodSource = 'off' | 'custom' | 'usda' | 'curated';
+export type FoodSource = 'off' | 'custom' | 'usda' | 'curated' | 'shared';
 
 /**
  * For 'usda' rows, the more specific dataType from FoodData Central.
@@ -60,7 +60,7 @@ export interface Profile {
   theme: 'system' | 'light' | 'dark';
 
   /**
-   * Weekly calorie budget — when on, a day's target is recalculated as the
+   * Weekly calorie budget - when on, a day's target is recalculated as the
    * week's remaining budget split over its remaining days, so going over
    * (or under) on one day adjusts the rest. Optional: rows synced before
    * the feature existed read as off / Monday.
@@ -88,10 +88,10 @@ export interface Profile {
   budget_carryover_cap?: number;
   /** Day the budget week starts on: 0 = Sunday … 6 = Saturday. */
   week_start_day?: number;
-  /** Soft floor — never drop a day's target below ~70% of the daily goal. */
+  /** Soft floor - never drop a day's target below ~70% of the daily goal. */
   weekly_budget_floor?: boolean;
   /**
-   * JSON array of dates (YYYY-MM-DD) the user marked "untracked" — those
+   * JSON array of dates (YYYY-MM-DD) the user marked "untracked" - those
    * days count as exactly on-target for the weekly budget regardless of
    * what is (or isn't) logged. Stored as a string so it round-trips
    * through sync without any JSON transform.
@@ -126,7 +126,7 @@ export interface Food {
   carbs_100: number;
   fat_100: number;
 
-  /** Per-100g micronutrients — fibre/sugar in grams, sodium in mg.
+  /** Per-100g micronutrients - fibre/sugar in grams, sodium in mg.
    *  Optional: curated and pre-feature rows may not have them. */
   fiber_100?: number;
   sugar_100?: number;
@@ -213,7 +213,7 @@ export interface DiaryEntry {
   protein: number;
   carbs: number;
   fat: number;
-  /** Snapshot micronutrients — fibre/sugar in grams, sodium in mg.
+  /** Snapshot micronutrients - fibre/sugar in grams, sodium in mg.
    *  Optional: entries logged before the feature existed lack them. */
   fiber?: number;
   sugar?: number;
@@ -264,7 +264,7 @@ export interface WeightEntry {
 /**
  * OAuth tokens for the connected Fitbit account. One row per user_id (so
  * 'local' until cloud sync, then the synced user id). Stored in Dexie and
- * synced via the worker — connecting on one device makes Fitbit data
+ * synced via the worker - connecting on one device makes Fitbit data
  * available on every device.
  *
  * Plaintext at rest. Security model = the same as everything else here:
@@ -272,7 +272,7 @@ export interface WeightEntry {
  * + private Cloudflare account.
  */
 /**
- * The virtual pet — one row per user. `wellbeing` is the long-arc 0-100
+ * The virtual pet - one row per user. `wellbeing` is the long-arc 0-100
  * consistency score (it replaces the streak); the moment-to-moment
  * "fullness" is always derived from the diary, never stored.
  */

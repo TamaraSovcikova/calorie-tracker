@@ -114,7 +114,7 @@ export function parseUntrackedDates(raw: string | undefined): Set<string> {
  *
  * A day is treated as "on-target" (counted as exactly the daily goal,
  * neither a saving nor an overage) when:
- *  - it is a *past* day with nothing logged at all — a day simply forgotten,
+ *  - it is a *past* day with nothing logged at all - a day simply forgotten,
  *    which would otherwise look like a full day of banked calories; or
  *  - the user explicitly marked it "untracked" (e.g. a day they only
  *    half-logged and don't want skewing the week).

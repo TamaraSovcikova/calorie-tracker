@@ -39,7 +39,7 @@ export function QuantityStep({
   const [newUnitLabel, setNewUnitLabel] = useState('');
   const [newUnitGrams, setNewUnitGrams] = useState('');
 
-  // Resync only when the step is reused for a different food — keying on
+  // Resync only when the step is reused for a different food - keying on
   // food.id (not the units array) avoids clobbering a just-added unit.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => setCustomUnits(food.custom_units), [food.id]);
@@ -173,7 +173,7 @@ export function QuantityStep({
         {editingUnits && customUnits.length > 0 && (
           <div className="space-y-1 rounded-lg border border-dashed border-border p-3">
             <span className="block text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Custom units — tap a trash icon to remove
+              Custom units - tap a trash icon to remove
             </span>
             <ul className="space-y-1">
               {customUnits.map((u) => (
@@ -201,7 +201,7 @@ export function QuantityStep({
         {suggestions.length > 0 && (
           <div className="space-y-1.5">
             <span className="text-xs text-muted-foreground">
-              Typical portions — tap to add:
+              Typical portions - tap to add:
             </span>
             <div className="flex flex-wrap gap-1.5">
               {suggestions.map((u) => (

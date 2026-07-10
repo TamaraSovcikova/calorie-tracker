@@ -39,6 +39,12 @@ import {
 import { db } from '@/db/dexie';
 import type { Food } from '@/db/types';
 import { formatGrams, formatKcal } from '@/lib/macros';
+import { toast } from '@/components/ui/toast';
+import {
+  clearMealDraft,
+  loadMealDraft,
+  saveMealDraft,
+} from './mealDraft';
 
 interface DraftItem {
   /** stable client id so React lists are stable while editing */
@@ -46,7 +52,7 @@ interface DraftItem {
   food_id: string;
   qty: number;
   unit: string;
-  /** snapshot for live totals — refreshed when food changes */
+  /** snapshot for live totals - refreshed when food changes */
   food?: Food;
 }
 
@@ -95,6 +101,7 @@ export function MealEditor({ mode }: MealEditorProps) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [draftActive, setDraftActive] = useState(false);
 
   const handlePickPhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -164,6 +171,70 @@ export function MealEditor({ mode }: MealEditorProps) {
       ),
     );
   }, [mode, resolved]);
+
+  // Create mode: restore an autosaved draft, unless this is a prefilled
+  // session (build-a-meal-from-foods / recipe scan), which takes priority.
+  useEffect(() => {
+    if (mode !== 'create') return;
+    const state = location.state as
+      | { prefillItems?: unknown; prefillName?: unknown }
+      | null;
+    if (state?.prefillItems || state?.prefillName) return;
+    const draft = loadMealDraft();
+    if (!draft) return;
+    setName(draft.name);
+    setNotes(draft.notes);
+    setServings(draft.servings > 0 ? draft.servings : 1);
+    setCategories(draft.categories);
+    setCategoryTouched(draft.categoryTouched);
+    setImageUrl(draft.imageUrl);
+    setDraftActive(true);
+    if (draft.items.length > 0) {
+      void (async () => {
+        const foods = await db.foods.bulkGet(draft.items.map((i) => i.food_id));
+        const byId = new Map<string, Food>();
+        for (const f of foods) if (f) byId.set(f.id, f);
+        setItems(
+          draft.items.map((i) => inputToDraft(i, byId.get(i.food_id), nextKey())),
+        );
+      })();
+    }
+    toast({
+      message: 'Draft restored - pick up where you left off.',
+      variant: 'success',
+    });
+    // Runs once per create session.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode]);
+
+  // Autosave the create-mode draft (debounced) as the meal is built, so
+  // leaving the editor mid-way keeps everything for next time.
+  useEffect(() => {
+    if (mode !== 'create') return;
+    const t = setTimeout(() => {
+      const payload = {
+        name,
+        notes,
+        servings,
+        categories,
+        categoryTouched,
+        imageUrl,
+        items: items.map((it) => ({
+          food_id: it.food_id,
+          qty: it.qty,
+          unit: it.unit,
+        })),
+      };
+      saveMealDraft(payload);
+      setDraftActive(
+        name.trim().length > 0 ||
+          notes.trim().length > 0 ||
+          items.length > 0 ||
+          !!imageUrl,
+      );
+    }, 500);
+    return () => clearTimeout(t);
+  }, [mode, name, notes, servings, categories, categoryTouched, imageUrl, items]);
 
   const totals = useMemo(() => {
     if (items.length === 0)
@@ -245,6 +316,7 @@ export function MealEditor({ mode }: MealEditorProps) {
           categories: effectiveCategories,
           items: itemInputs,
         });
+        clearMealDraft();
       } else if (id) {
         await updateMeal(id, {
           name: trimmed,
@@ -273,6 +345,12 @@ export function MealEditor({ mode }: MealEditorProps) {
     if (!id) return;
     const dup = await duplicateMeal(id);
     if (dup) navigate(`/meals/${dup.id}/edit`);
+  };
+
+  const handleDiscardDraft = () => {
+    if (!confirm('Discard this draft meal?')) return;
+    clearMealDraft();
+    navigate('/library');
   };
 
   if (mode === 'edit' && resolved === undefined) {
@@ -308,6 +386,16 @@ export function MealEditor({ mode }: MealEditorProps) {
         <h1 className="flex-1 truncate text-base font-semibold">
           {mode === 'create' ? 'New meal' : 'Edit meal'}
         </h1>
+        {mode === 'create' && draftActive && (
+          <button
+            type="button"
+            onClick={handleDiscardDraft}
+            className="tap-target rounded-md p-2 text-destructive hover:bg-muted"
+            aria-label="Discard draft"
+          >
+            <Trash2 className="h-5 w-5" />
+          </button>
+        )}
         {mode === 'edit' && (
           <>
             <button
@@ -450,7 +538,7 @@ export function MealEditor({ mode }: MealEditorProps) {
             trailing="portions"
           />
           <p className="px-1 text-xs text-muted-foreground">
-            Add every ingredient for the whole batch — logging one portion
+            Add every ingredient for the whole batch - logging one portion
             uses {servings > 1 ? `1⁄${Math.round(servings)}` : 'all'} of it.
           </p>
         </div>

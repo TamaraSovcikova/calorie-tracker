@@ -30,7 +30,9 @@ import { LogMealStep } from '@/features/meals/LogMealStep';
 import { PhotoFoodStep } from '@/features/photo-log/PhotoFoodStep';
 import { multiplyTotals } from '@/features/meals/mealMath';
 import { useMealResolved } from '@/features/meals/useMealResolved';
+import { cn } from '@/lib/cn';
 import type { LocalDate } from '@/lib/dates';
+import { MEAL_SECTIONS } from '@/db/types';
 import type { Food, Meal, MealSection } from '@/db/types';
 
 interface AddFoodSheetProps {
@@ -38,6 +40,11 @@ interface AddFoodSheetProps {
   onClose: () => void;
   date: LocalDate;
   section: MealSection;
+  /** When provided, a meal-section selector is shown in the picker header so
+   *  the user can retarget the log (used by the quick-add route). */
+  onSectionChange?: (section: MealSection) => void;
+  /** Which tab to open on first render. Defaults to Search. */
+  initialTab?: AddFoodTab;
 }
 
 type Step =
@@ -64,7 +71,8 @@ function rememberedQuantity(
   return state;
 }
 
-type Tab = 'search' | 'scan' | 'photo' | 'meals' | 'quick';
+export type AddFoodTab = 'search' | 'scan' | 'photo' | 'meals' | 'quick';
+type Tab = AddFoodTab;
 
 const SECTION_LABEL: Record<MealSection, string> = {
   breakfast: 'Breakfast',
@@ -73,14 +81,21 @@ const SECTION_LABEL: Record<MealSection, string> = {
   snacks: 'Snacks',
 };
 
-export function AddFoodSheet({ open, onClose, date, section }: AddFoodSheetProps) {
-  const [tab, setTab] = useState<Tab>('search');
+export function AddFoodSheet({
+  open,
+  onClose,
+  date,
+  section,
+  onSectionChange,
+  initialTab = 'search',
+}: AddFoodSheetProps) {
+  const [tab, setTab] = useState<Tab>(initialTab);
   const [step, setStep] = useState<Step>({ kind: 'pick' });
   const [scanError, setScanError] = useState<string | null>(null);
 
   const reset = () => {
     setStep({ kind: 'pick' });
-    setTab('search');
+    setTab(initialTab);
     setScanError(null);
   };
 
@@ -155,7 +170,7 @@ export function AddFoodSheet({ open, onClose, date, section }: AddFoodSheetProps
     setScanError(null);
   };
 
-  // Stable identity — BarcodeScanner has this in its camera-effect deps,
+  // Stable identity - BarcodeScanner has this in its camera-effect deps,
   // so a fresh closure each render would tear down and re-acquire the
   // camera stream (flicker). Only stable setState calls are referenced.
   const handleBarcode = useCallback(async (code: string) => {
@@ -202,7 +217,25 @@ export function AddFoodSheet({ open, onClose, date, section }: AddFoodSheetProps
     title = 'Add food';
     content = (
       <div className="flex h-full flex-col">
-        <div className="border-b border-border p-3">
+        <div className="space-y-3 border-b border-border p-3">
+          {onSectionChange && (
+            <div className="flex overflow-hidden rounded-lg border border-border">
+              {MEAL_SECTIONS.map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => onSectionChange(s)}
+                  className={cn(
+                    'flex-1 py-1.5 text-xs font-medium transition-colors',
+                    s === section ? 'text-white' : 'text-muted-foreground hover:bg-muted',
+                  )}
+                  style={s === section ? { background: 'var(--color-accent-deep)' } : undefined}
+                >
+                  {SECTION_LABEL[s]}
+                </button>
+              ))}
+            </div>
+          )}
           <Tabs<Tab>
             value={tab}
             onChange={setTab}

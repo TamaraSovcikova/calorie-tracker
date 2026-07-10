@@ -109,7 +109,7 @@ export function FitbitSection() {
       title="Health sync"
       description="Auto-imports your daily activity calories into the diary's exercise section, via the Google Health API."
     >
-      {/* Client ID + Secret — both required (Google web clients are
+      {/* Client ID + Secret - both required (Google web clients are
           confidential clients; the token exchange needs the secret). */}
       <LabeledInput
         label="Google OAuth Client ID"
@@ -184,7 +184,7 @@ export function FitbitSection() {
                 </div>
               ) : (
                 <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
-                  Account unknown — reconnect to record which Google account
+                  Account unknown - reconnect to record which Google account
                   is linked (we added the email scope).
                 </div>
               );
@@ -192,7 +192,7 @@ export function FitbitSection() {
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               {isExpired ? (
                 <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-700 dark:text-amber-300">
-                  Token expired — will refresh on next fetch
+                  Token expired - will refresh on next fetch
                 </span>
               ) : (
                 <span className="text-xs text-muted-foreground">
@@ -232,7 +232,7 @@ export function FitbitSection() {
             </Button>
             {debugResult && (
               <div className="space-y-1 rounded-lg border border-border bg-muted/30 p-3 text-[11px]">
-                <div className="font-medium">Diagnostic — {debugResult.date}</div>
+                <div className="font-medium">Diagnostic - {debugResult.date}</div>
                 <div className="break-all">
                   <span className="text-muted-foreground">account: </span>
                   {debugResult.account ?? '(unknown)'}
@@ -319,7 +319,7 @@ export function FitbitSection() {
           </span>{' '}
           Google issues 7-day refresh tokens to apps in "Testing" mode (which
           is normal for personal use, avoids needing app verification).
-          About once a week you'll see a "Reconnect" button — one tap to
+          About once a week you'll see a "Reconnect" button - one tap to
           re-authorise. Connecting on one device propagates to every device
           via cloud sync.
         </p>

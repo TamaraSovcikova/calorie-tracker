@@ -23,7 +23,7 @@ export interface ResolvedMacros {
   protein: number;
   carbs: number;
   fat: number;
-  /** Micronutrients — fibre/sugar in grams, sodium in mg. */
+  /** Micronutrients - fibre/sugar in grams, sodium in mg. */
   fiber: number;
   sugar: number;
   sodium: number;

@@ -2,7 +2,6 @@ interface ArcGaugeProps {
   value: number;
   max: number;
   remaining: number;
-  dogSrc?: string;
   size?: number;
   strokeWidth?: number;
 }
@@ -11,7 +10,6 @@ export function ArcGauge({
   value,
   max,
   remaining,
-  dogSrc,
   size = 236,
   strokeWidth = 5,
 }: ArcGaugeProps) {
@@ -20,6 +18,8 @@ export function ArcGauge({
   const arcFraction = 0.75;
   const arcLength = arcFraction * circumference;
   const fillLength = Math.max(0, Math.min(1, max > 0 ? value / max : 0)) * arcLength;
+  const isOver = value > max;
+  const overage = Math.round(value - max);
 
   const fmt = (n: number) => Math.round(n).toLocaleString();
 
@@ -49,7 +49,7 @@ export function ArcGauge({
           cy={size / 2}
           r={r}
           fill="none"
-          stroke="var(--color-accent)"
+          stroke={isOver ? 'hsl(var(--destructive))' : 'var(--color-accent)'}
           strokeWidth={strokeWidth}
           strokeLinecap="round"
           strokeDasharray={`${fillLength} ${circumference}`}
@@ -60,7 +60,7 @@ export function ArcGauge({
       {/* Centre content */}
       <div
         className="absolute inset-0 flex flex-col items-center justify-center"
-        aria-label={`${remaining} kcal remaining`}
+        aria-label={isOver ? `${overage} kcal over` : `${remaining} kcal remaining`}
       >
         <div style={{ marginTop: -26, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
           <div
@@ -70,22 +70,22 @@ export function ArcGauge({
               letterSpacing: '-0.02em',
               fontVariantNumeric: 'tabular-nums',
               lineHeight: 1,
-              color: 'var(--color-text)',
+              color: isOver ? 'hsl(var(--destructive))' : 'var(--color-text)',
             }}
           >
-            {fmt(remaining)}
+            {isOver ? fmt(overage) : fmt(remaining)}
           </div>
           <div
             style={{
               fontSize: 11,
               fontWeight: 700,
               letterSpacing: '0.1em',
-              color: 'var(--color-accent)',
+              color: isOver ? 'hsl(var(--destructive))' : 'var(--color-accent)',
               marginTop: 6,
               textTransform: 'uppercase',
             }}
           >
-            KCAL LEFT
+            {isOver ? 'KCAL OVER' : 'KCAL LEFT'}
           </div>
           <div
             style={{
@@ -100,23 +100,6 @@ export function ArcGauge({
           </div>
         </div>
       </div>
-
-      {/* Dog image */}
-      {dogSrc && (
-        <img
-          src={dogSrc}
-          alt=""
-          style={{
-            position: 'absolute',
-            left: '50%',
-            bottom: 2,
-            transform: 'translateX(-50%)',
-            width: 74,
-            height: 74,
-            objectFit: 'contain',
-          }}
-        />
-      )}
 
       {/* Scale labels */}
       <span

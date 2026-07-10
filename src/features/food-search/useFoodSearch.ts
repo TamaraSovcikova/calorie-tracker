@@ -5,6 +5,7 @@ import { searchLocalFoods } from '@/db/repos/foods';
 import { frequentFoods, recentFoods } from '@/db/repos/diary';
 import { currentUserId } from '@/db/userId';
 import { OffRateLimitError, searchOff } from '@/lib/off-api';
+import { searchSharedFoods } from '@/lib/shared-foods-api';
 import {
   getUsdaApiKey,
   searchUsda,
@@ -25,18 +26,18 @@ import type { Food } from '@/db/types';
  *  - live Open Food Facts search (rate-limited 10/min, packaged-product DB)
  *
  * Result groups returned to the UI:
- *   recents       — last ~50 foods logged, any section
- *   myProducts    — user's manually-added products (source='custom')
- *   common        — USDA Foundation / SR Legacy / Survey (FNDDS)
- *   packaged      — USDA Branded + OFF (hidden when showPackaged=false)
+ *   recents       - last ~50 foods logged, any section
+ *   myProducts    - user's manually-added products (source='custom')
+ *   common        - USDA Foundation / SR Legacy / Survey (FNDDS)
+ *   packaged      - USDA Branded + OFF (hidden when showPackaged=false)
  *
  * All search hits are also written to Dexie so subsequent searches resolve
- * locally — even offline.
+ * locally - even offline.
  */
 
 export interface FoodSearchResult {
   query: string;
-  /** Starred foods — shown first when the search box is empty. */
+  /** Starred foods - shown first when the search box is empty. */
   favorites: Food[];
   /** Most-logged foods, de-duped against favourites. */
   frequent: Food[];
@@ -53,7 +54,7 @@ export interface FoodSearchResult {
   rateLimitedSeconds: number | null;
   /** Source-agnostic banner for unrecoverable issues. */
   errorBanner: string | null;
-  /** True when the USDA key is missing — prompts to add one in Settings. */
+  /** True when the USDA key is missing - prompts to add one in Settings. */
   needsUsdaKey: boolean;
   showPackaged: boolean;
 }
@@ -104,9 +105,18 @@ function scoreFoodMatch(food: Food, q: string): number {
   // clean USDA generics, which rank above composite Survey dishes.
   if (food.source === 'curated') score += 450;
   else if (food.source === 'custom') score += 300;
+  else if (food.source === 'shared') score += 180; // community-contributed
   else if (food.usda_data_type === 'foundation') score += 250;
   else if (food.usda_data_type === 'sr_legacy') score += 200;
-  else if (food.usda_data_type === 'survey') score += 40;
+  else if (food.usda_data_type === 'survey') score -= 30; // composite dishes rank below single ingredients
+
+  // Prefer simple ingredient-like names: a longer name for a short query
+  // usually means it's a composite dish ("Chicken noodle casserole") not
+  // a raw ingredient ("Chicken breast"). Penalise proportionally.
+  if (tokens.length <= 2 && nameWords.length > 4) {
+    score -= (nameWords.length - 4) * 12;
+  }
+
   return score;
 }
 
@@ -153,6 +163,7 @@ export function useFoodSearch(query: string): FoodSearchResult {
   const [local, setLocal] = useState<Food[]>([]);
   const [usda, setUsda] = useState<Food[]>([]);
   const [off, setOff] = useState<Food[]>([]);
+  const [shared, setShared] = useState<Food[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [rateLimitedSeconds, setRateLimitedSeconds] = useState<number | null>(null);
   const [errorBanner, setErrorBanner] = useState<string | null>(null);
@@ -168,6 +179,7 @@ export function useFoodSearch(query: string): FoodSearchResult {
       setLocal([]);
       setUsda([]);
       setOff([]);
+      setShared([]);
       setIsSearching(false);
       setNeedsUsdaKey(!getUsdaApiKey());
       return;
@@ -178,7 +190,7 @@ export function useFoodSearch(query: string): FoodSearchResult {
       if (!cancelled) setLocal(rows);
     });
 
-    // USDA — only if key is present.
+    // USDA - only if key is present.
     const apiKey = getUsdaApiKey();
     setNeedsUsdaKey(!apiKey);
     const usdaPromise = apiKey
@@ -206,12 +218,12 @@ export function useFoodSearch(query: string): FoodSearchResult {
               return;
             }
             if ((err as DOMException)?.name === 'AbortError') return;
-            // Don't blow up the panel — local + OFF still render.
+            // Don't blow up the panel - local + OFF still render.
             setUsda([]);
           })
       : Promise.resolve();
 
-    // OFF — only when packaged products are enabled.
+    // OFF - only when packaged products are enabled.
     const offPromise = showPackaged
       ? searchOff(debouncedQuery, ctrl.signal)
           .then(async (rows) => {
@@ -236,7 +248,21 @@ export function useFoodSearch(query: string): FoodSearchResult {
           })
       : Promise.resolve(setOff([]));
 
-    void Promise.allSettled([localPromise, usdaPromise, offPromise]).then(() => {
+    // Community shared pool - best-effort, merged into "common".
+    const sharedPromise = searchSharedFoods(debouncedQuery, ctrl.signal).then(
+      (rows) => {
+        if (cancelled) return;
+        setShared(rows);
+        if (rows.length > 0) void db.foods.bulkPut(rows).catch(() => undefined);
+      },
+    );
+
+    void Promise.allSettled([
+      localPromise,
+      usdaPromise,
+      offPromise,
+      sharedPromise,
+    ]).then(() => {
       if (!cancelled) setIsSearching(false);
     });
 
@@ -264,22 +290,38 @@ export function useFoodSearch(query: string): FoodSearchResult {
         !usdaIds.has(f.id),
     );
     const liveUsdaCommon = usda.filter((f) => f.usda_data_type !== 'branded');
-    const common = [...curated, ...liveUsdaCommon, ...cachedUsdaCommon];
+    // Community shared foods: the live remote hits, plus any cached locally
+    // that the live call didn't return (deduped by id).
+    const sharedIds = new Set(shared.map((f) => f.id));
+    const cachedShared = local.filter(
+      (f) => f.source === 'shared' && !sharedIds.has(f.id),
+    );
+    const common = [
+      ...curated,
+      ...liveUsdaCommon,
+      ...cachedUsdaCommon,
+      ...shared,
+      ...cachedShared,
+    ];
 
-    // Packaged items ALREADY in the user's library (barcode-scanned or
-    // previously cached). Always searchable - hiding the user's own saved
-    // foods behind the show-packaged toggle was the "I can't find my whey
-    // protein" bug.
+    // Extract recentIdSet early - used both to gate the library group and
+    // to build the recentMatches group.
+    const recentIdSet = emptyState?.recentIdSet ?? new Set<string>();
+
+    // Foods the user has explicitly logged before that happen to be packaged.
+    // Narrowed to recentIdSet so API-cached search results that the user has
+    // never interacted with don't appear in the high-priority "Saved & scanned"
+    // slot.
     const localPackaged = local.filter(
       (f) =>
-        f.source === 'off' ||
-        (f.source === 'usda' && f.usda_data_type === 'branded'),
+        (f.source === 'off' ||
+          (f.source === 'usda' && f.usda_data_type === 'branded')) &&
+        recentIdSet.has(f.id),
     );
     const localPackagedIds = new Set(localPackaged.map((f) => f.id));
 
-    // Live remote packaged hits (USDA Branded + OFF), minus anything we
-    // already hold locally. Gated by the toggle in the UI - and when it's
-    // off we don't even fetch these.
+    // Live remote packaged hits (USDA Branded + OFF), minus what the user
+    // has already logged locally. Gated by the show-packaged toggle.
     const liveUsdaBranded = usda.filter((f) => f.usda_data_type === 'branded');
     const livePackaged = [...liveUsdaBranded, ...off].filter(
       (f) => !localPackagedIds.has(f.id),
@@ -292,9 +334,7 @@ export function useFoodSearch(query: string): FoodSearchResult {
     const libraryNoMine = localPackaged.filter((f) => !myIds.has(f.id));
     const packagedNoMine = livePackaged.filter((f) => !myIds.has(f.id));
 
-    // Pull recently-logged foods into their own group, just behind My
-    // Products — so re-searching something you've used before is quick.
-    const recentIdSet = emptyState?.recentIdSet ?? new Set<string>();
+    // Pull recently-logged foods into their own group, just behind My Products.
     const seenRecent = new Set<string>();
     const recentMatches: Food[] = [];
     for (const f of [...commonNoMine, ...libraryNoMine, ...packagedNoMine]) {
@@ -312,7 +352,7 @@ export function useFoodSearch(query: string): FoodSearchResult {
         .filter((f) => !seenRecent.has(f.id))
         .sort(byRelevance),
     };
-  }, [local, usda, off, debouncedQuery, emptyState]);
+  }, [local, usda, off, shared, debouncedQuery, emptyState]);
 
   return useMemo(
     () => ({

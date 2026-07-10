@@ -105,14 +105,14 @@ export function SyncSection() {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      /* clipboard unavailable — ignore */
+      /* clipboard unavailable - ignore */
     }
   };
 
   return (
     <SettingCard
       title="Cloud sync"
-      description="Your sync code is your private account. Enter the same code on every device to keep them in sync — and never share it."
+      description="Your sync code is your private account. Enter the same code on every device to keep them in sync - and never share it."
     >
       {!isConfigured ? (
         <>
@@ -134,7 +134,7 @@ export function SyncSection() {
             Generate a new code
           </Button>
           <p className="text-xs text-muted-foreground">
-            New here? Generate a code — that&apos;s your account. Already set up
+            New here? Generate a code - that&apos;s your account. Already set up
             on another device? Enter that device&apos;s code instead.
           </p>
           {testError && (
@@ -207,7 +207,7 @@ export function SyncSection() {
             <p className="break-all font-mono text-xs text-foreground/90">{token}</p>
             <p className="mt-1 text-[11px] text-muted-foreground">
               Enter this on your other devices. Anyone with it can see your
-              data — keep it private.
+              data - keep it private.
             </p>
           </div>
           <Button

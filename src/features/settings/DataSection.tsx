@@ -181,7 +181,7 @@ export function DataSection() {
       <ConfirmDialog
         open={pendingImport !== null}
         title="Restore from backup?"
-        message="Restoring a backup replaces ALL data currently on this device — diary, meals, products, weight log, and goals. This cannot be undone."
+        message="Restoring a backup replaces ALL data currently on this device - diary, meals, products, weight log, and goals. This cannot be undone."
         confirmLabel="Restore"
         onCancel={() => setPendingImport(null)}
         onConfirm={() => {
