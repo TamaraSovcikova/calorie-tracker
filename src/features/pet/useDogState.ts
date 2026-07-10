@@ -19,6 +19,7 @@ import {
 } from './petLogic';
 import { useDevPoseStore } from './devPose';
 import { pulseReaction, usePetReaction } from './petReaction';
+import { petMood, type PetMood } from './petInteraction';
 import { normalizeSpecies, type PetSpecies } from './petSpecies';
 
 /** How long the eating beat plays after a log (ms). */
@@ -30,6 +31,8 @@ export interface DogState {
   petName: string;
   /** Which animal to render (from the stored pet.breed). */
   species: PetSpecies;
+  /** Coarse disposition, so playground interactions can read the pet's state. */
+  mood: PetMood;
   wellbeing: number;
   loggedKcal: number;
   goalKcal: number;
@@ -117,6 +120,7 @@ export function useDogState(opts: DogStateOptions = {}): DogState {
     fullness,
     petName,
     species,
+    mood: petMood(fullness, wellbeing, pose),
     wellbeing,
     loggedKcal: totals.kcal,
     goalKcal,

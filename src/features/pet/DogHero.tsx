@@ -25,7 +25,12 @@ export function DogHero() {
       >
         <Maximize2 className="h-4 w-4" />
       </button>
-      <DogPlayground pose={dog.pose} className="h-44 w-full" />
+      <DogPlayground
+        pose={dog.pose}
+        mood={dog.mood}
+        species={dog.species}
+        className="h-44 w-full"
+      />
       <p className="px-4 text-center text-sm text-muted-foreground">
         {dog.statusLine}
       </p>

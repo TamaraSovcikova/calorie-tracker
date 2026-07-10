@@ -293,7 +293,9 @@ export function DiaryPage() {
               max={effective}
               remaining={remaining}
             />
-            {dog.ready && <DraggableDogArc pose={dog.pose} species={dog.species} />}
+            {dog.ready && (
+              <DraggableDogArc pose={dog.pose} mood={dog.mood} species={dog.species} />
+            )}
           </div>
         )}
 

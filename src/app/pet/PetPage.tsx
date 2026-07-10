@@ -49,7 +49,12 @@ export function PetPage() {
         {import.meta.env.DEV && <DevPosePanel />}
         {/* The dog's playground - grab and fling him, he roams on his own. */}
         <section className="flex flex-col items-center rounded-3xl border border-border bg-card px-4 pb-5 pt-2 shadow-sm">
-          <DogPlayground pose={dog.pose} species={dog.species} className="h-72 w-full" />
+          <DogPlayground
+            pose={dog.pose}
+            mood={dog.mood}
+            species={dog.species}
+            className="h-72 w-full"
+          />
           <p className="max-w-xs text-center text-sm text-muted-foreground">
             {dog.statusLine}
           </p>

@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Dog } from './Dog';
 import type { DogPose } from './petLogic';
+import { idleBeatFor, reactionFor, type PetMood } from './petInteraction';
 import type { PetSpecies } from './petSpecies';
 
 const DOG = 74;
@@ -26,21 +27,11 @@ const RESTFUL = new Set<DogPose>([
   'eating',
 ]);
 
-const BEAT_POSES: DogPose[] = [
-  'stretching',
-  'bored',
-  'curious',
-  'love',
-  'playful',
-  'smile',
-  'surprised',
-];
-
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 
-interface Props { pose: DogPose; species?: PetSpecies }
+interface Props { pose: DogPose; mood?: PetMood; species?: PetSpecies }
 
-export function DraggableDogArc({ pose, species = 'dog' }: Props) {
+export function DraggableDogArc({ pose, mood = 'content', species = 'dog' }: Props) {
   const dogRef = useRef<HTMLDivElement>(null);
   const pos = useRef({ x: (STAGE_W - DOG) / 2, y: STAGE_H - DOG - 2 });
   const vel = useRef({ vx: 0, vy: 0 });
@@ -55,8 +46,24 @@ export function DraggableDogArc({ pose, species = 'dog' }: Props) {
   const ptr = useRef({ x: 0, y: 0, px: 0, py: 0 });
   const restfulRef = useRef(RESTFUL.has(pose));
   restfulRef.current = RESTFUL.has(pose);
+  const moodRef = useRef(mood);
+  moodRef.current = mood;
 
   const [beat, setBeat] = useState<DogPose | null>(null);
+
+  // One owner for the transient beat + its clear timer, shared by the idle
+  // loop and the interaction handlers.
+  const beatTimer = useRef<ReturnType<typeof setTimeout>>();
+  const showBeat = useCallback((p: DogPose, holdMs: number) => {
+    clearTimeout(beatTimer.current);
+    setBeat(p);
+    beatTimer.current = setTimeout(() => setBeat(null), holdMs);
+  }, []);
+
+  // Rough-handling tracker (see DogPlayground for the full rationale).
+  const rough = useRef({ count: 0, at: 0 });
+  const moved = useRef(0);
+  const lastImpact = useRef(0);
 
   useEffect(() => {
     const dogEl = dogRef.current;
@@ -67,6 +74,7 @@ export function DraggableDogArc({ pose, species = 'dog' }: Props) {
 
     let raf = 0;
     let last = performance.now();
+    lastImpact.current = last; // don't "ouch" on the initial drop-in
 
     const frame = (now: number) => {
       const dt = clamp((now - last) / 16.667, 0.4, 2.4);
@@ -94,12 +102,20 @@ export function DraggableDogArc({ pose, species = 'dog' }: Props) {
         p.x += v.vx * dt;
         p.y += v.vy * dt;
 
+        const bonk = (speed: number) => {
+          if (speed > 11 && now - lastImpact.current > 900 && !restfulRef.current) {
+            lastImpact.current = now;
+            showBeat('surprised', 650);
+          }
+        };
         if (p.x <= 0) {
           p.x = 0;
+          bonk(Math.abs(v.vx));
           v.vx = Math.abs(v.vx) * WALL_BOUNCE;
           behavior.current = 'idle';
         } else if (p.x >= STAGE_W - DOG) {
           p.x = STAGE_W - DOG;
+          bonk(Math.abs(v.vx));
           v.vx = -Math.abs(v.vx) * WALL_BOUNCE;
           behavior.current = 'idle';
         }
@@ -109,6 +125,7 @@ export function DraggableDogArc({ pose, species = 'dog' }: Props) {
         }
         if (p.y >= floorY) {
           p.y = floorY;
+          bonk(v.vy - 2); // a plain gravity fall shouldn't count as a crash
           v.vy = v.vy > 1.6 ? -v.vy * FLOOR_BOUNCE : 0;
           if (behavior.current !== 'walking') v.vx *= GROUND_FRICTION ** dt;
           onFloor.current = Math.abs(v.vy) < 0.6;
@@ -169,14 +186,12 @@ export function DraggableDogArc({ pose, species = 'dog' }: Props) {
     };
     roam();
 
-    let beatTimer: ReturnType<typeof setTimeout>;
-    let beatClear: ReturnType<typeof setTimeout>;
+    let idleTimer: ReturnType<typeof setTimeout>;
     const idleBeat = () => {
-      beatTimer = setTimeout(
+      idleTimer = setTimeout(
         () => {
           if (onFloor.current && !dragging.current && !restfulRef.current) {
-            setBeat(BEAT_POSES[Math.floor(Math.random() * BEAT_POSES.length)]);
-            beatClear = setTimeout(() => setBeat(null), 2400);
+            showBeat(idleBeatFor(moodRef.current), 2400);
           }
           idleBeat();
         },
@@ -188,10 +203,10 @@ export function DraggableDogArc({ pose, species = 'dog' }: Props) {
     return () => {
       cancelAnimationFrame(raf);
       clearTimeout(roamTimer);
-      clearTimeout(beatTimer);
-      clearTimeout(beatClear);
+      clearTimeout(idleTimer);
+      clearTimeout(beatTimer.current);
     };
-  }, []);
+  }, [showBeat]);
 
   const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     e.currentTarget.setPointerCapture(e.pointerId);
@@ -205,10 +220,13 @@ export function DraggableDogArc({ pose, species = 'dog' }: Props) {
     ptr.current = { x: e.clientX, y: e.clientY, px: e.clientX, py: e.clientY };
     vel.current = { vx: 0, vy: 0 };
     rot.current = 0;
+    moved.current = 0;
   };
 
   const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!dragging.current || !stageRect.current) return;
+    moved.current +=
+      Math.abs(e.clientX - ptr.current.x) + Math.abs(e.clientY - ptr.current.y);
     ptr.current.px = ptr.current.x;
     ptr.current.py = ptr.current.y;
     ptr.current.x = e.clientX;
@@ -220,10 +238,27 @@ export function DraggableDogArc({ pose, species = 'dog' }: Props) {
   const onPointerUp = () => {
     if (!dragging.current) return;
     dragging.current = false;
+    const dx = ptr.current.x - ptr.current.px;
+    const dy = ptr.current.y - ptr.current.py;
     vel.current = {
-      vx: clamp(ptr.current.x - ptr.current.px, -THROW_CAP, THROW_CAP),
-      vy: clamp(ptr.current.y - ptr.current.py, -THROW_CAP, THROW_CAP),
+      vx: clamp(dx, -THROW_CAP, THROW_CAP),
+      vy: clamp(dy, -THROW_CAP, THROW_CAP),
     };
+    // React to how the pet was handled.
+    const speed = Math.hypot(dx, dy);
+    if (moved.current < 8 && speed < 4) {
+      showBeat(reactionFor('pat', moodRef.current), 1600);
+    } else if (speed >= 7) {
+      const now = performance.now();
+      const r = rough.current;
+      r.count = now - r.at < 2600 ? r.count + 1 : 1;
+      r.at = now;
+      const bullied = r.count >= 3;
+      showBeat(
+        reactionFor(bullied ? 'bully' : 'toss', moodRef.current),
+        bullied ? 2600 : 1800,
+      );
+    }
   };
 
   return (
