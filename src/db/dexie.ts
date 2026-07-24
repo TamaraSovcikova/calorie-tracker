@@ -4,6 +4,7 @@ import type {
   ExerciseEntry,
   FitbitTokens,
   Food,
+  FoodRecent,
   Meal,
   MealItem,
   Pet,
@@ -30,6 +31,7 @@ class CalorieDB extends Dexie {
   weight_log!: EntityTable<WeightEntry, 'id'>;
   fitbit_tokens!: EntityTable<FitbitTokens, 'user_id'>;
   pet!: EntityTable<Pet, 'user_id'>;
+  food_recents!: EntityTable<FoodRecent, 'id'>;
 
   constructor() {
     super('calorie-tracker');
@@ -53,6 +55,12 @@ class CalorieDB extends Dexie {
     // v3: virtual pet (revamp). Additive.
     this.version(3).stores({
       pet: '&user_id, updated_at',
+    });
+
+    // v4: "recently seen" foods - scanned / looked-up foods that may never be
+    // logged, so they still surface in the recent list. Additive.
+    this.version(4).stores({
+      food_recents: '&id, user_id, food_id, at',
     });
   }
 }

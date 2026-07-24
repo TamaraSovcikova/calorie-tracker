@@ -3,7 +3,7 @@ import { ArrowLeft, Loader2, Plus, ScanText, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input, LabeledInput } from '@/components/ui/Input';
 import { createFood, updateFood } from '@/db/repos/foods';
-import { analyzeLabel } from './photoLabel';
+import { analyzeLabel, type ScannedLabel } from './photoLabel';
 import { suggestPortions } from '@/lib/portionSuggestions';
 import { formatGrams } from '@/lib/macros';
 import type { CustomUnit, Food } from '@/db/types';
@@ -11,6 +11,9 @@ import type { CustomUnit, Food } from '@/db/types';
 interface ManualEntryFormProps {
   initialName?: string;
   initialBarcode?: string;
+  /** Pre-fill the macros from an already-scanned nutrition label (e.g. when
+   *  the label was scanned from the Scan tab before reaching this form). */
+  initialLabel?: ScannedLabel;
   /** When set, the form edits this existing custom food instead of creating one. */
   food?: Food;
   onBack: () => void;
@@ -37,38 +40,54 @@ const numField = (v: number | null | undefined): string =>
 export function ManualEntryForm({
   initialName = '',
   initialBarcode,
+  initialLabel,
   food,
   onBack,
   onCreated,
 }: ManualEntryFormProps) {
   const isEdit = food !== undefined;
-  const [form, setForm] = useState<FormState>(() =>
-    food
-      ? {
-          name: food.name,
-          brand: food.brand ?? '',
-          kcal: String(food.kcal_100),
-          protein: String(food.protein_100),
-          carbs: String(food.carbs_100),
-          fat: String(food.fat_100),
-          fiber: numField(food.fiber_100),
-          sugar: numField(food.sugar_100),
-          sodium: numField(food.sodium_100),
-          serving_g: numField(food.serving_g),
-        }
-      : {
-          name: initialName,
-          brand: '',
-          kcal: '',
-          protein: '',
-          carbs: '',
-          fat: '',
-          fiber: '',
-          sugar: '',
-          sodium: '',
-          serving_g: '',
-        },
-  );
+  const [form, setForm] = useState<FormState>(() => {
+    if (food) {
+      return {
+        name: food.name,
+        brand: food.brand ?? '',
+        kcal: String(food.kcal_100),
+        protein: String(food.protein_100),
+        carbs: String(food.carbs_100),
+        fat: String(food.fat_100),
+        fiber: numField(food.fiber_100),
+        sugar: numField(food.sugar_100),
+        sodium: numField(food.sodium_100),
+        serving_g: numField(food.serving_g),
+      };
+    }
+    if (initialLabel) {
+      return {
+        name: initialName || initialLabel.name,
+        brand: initialLabel.brand,
+        kcal: numField(initialLabel.kcal_100),
+        protein: numField(initialLabel.protein_100),
+        carbs: numField(initialLabel.carbs_100),
+        fat: numField(initialLabel.fat_100),
+        fiber: numField(initialLabel.fiber_100),
+        sugar: numField(initialLabel.sugar_100),
+        sodium: numField(initialLabel.sodium_100),
+        serving_g: numField(initialLabel.serving_g),
+      };
+    }
+    return {
+      name: initialName,
+      brand: '',
+      kcal: '',
+      protein: '',
+      carbs: '',
+      fat: '',
+      fiber: '',
+      sugar: '',
+      sodium: '',
+      serving_g: '',
+    };
+  });
   const [units, setUnits] = useState<CustomUnit[]>(food?.custom_units ?? []);
   const [newLabel, setNewLabel] = useState('');
   const [newGrams, setNewGrams] = useState('');

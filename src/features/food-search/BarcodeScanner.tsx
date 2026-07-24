@@ -11,6 +11,9 @@ import { Input } from '@/components/ui/Input';
 
 interface BarcodeScannerProps {
   onCode: (code: string) => void;
+  /** Optional: offer a "scan a nutrition label instead" shortcut (used from
+   *  the Add-food Scan tab, where a label leads into the new-product form). */
+  onScanLabel?: () => void;
 }
 
 const HINTS = new Map<DecodeHintType, unknown>([
@@ -36,7 +39,7 @@ const HINTS = new Map<DecodeHintType, unknown>([
  * iOS Safari quirk: requires HTTPS and a user gesture for getUserMedia.
  * In dev we run http://localhost which is treated as a "secure context".
  */
-export function BarcodeScanner({ onCode }: BarcodeScannerProps) {
+export function BarcodeScanner({ onCode, onScanLabel }: BarcodeScannerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [status, setStatus] = useState<'starting' | 'scanning' | 'denied' | 'error'>(
     'starting',
@@ -214,6 +217,15 @@ export function BarcodeScanner({ onCode }: BarcodeScannerProps) {
         </p>
         {importError && (
           <p className="mt-2 text-center text-xs text-destructive">{importError}</p>
+        )}
+        {onScanLabel && (
+          <button
+            type="button"
+            onClick={onScanLabel}
+            className="mt-3 w-full text-center text-xs font-medium text-primary hover:underline"
+          >
+            No barcode? Scan a nutrition label instead
+          </button>
         )}
       </div>
       <form onSubmit={handleManualSubmit} className="space-y-2 p-4">

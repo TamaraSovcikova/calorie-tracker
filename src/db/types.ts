@@ -145,6 +145,19 @@ export interface Food {
   deleted_at?: ISOTimestamp;
 }
 
+/**
+ * A lightweight "recently interacted with" marker for a food, written when a
+ * food is scanned or looked up even if it is never logged - so a scanned but
+ * unlogged product still appears in the recent list. One row per (user, food);
+ * `at` is the last time it was touched.
+ */
+export interface FoodRecent {
+  id: ID; // `${user_id}:${food_id}`
+  user_id: ID;
+  food_id: ID;
+  at: ISOTimestamp;
+}
+
 /** Coarse meal-type used for filtering the library. */
 export type MealCategory = 'breakfast' | 'lunch' | 'dinner' | 'snack' | 'other';
 

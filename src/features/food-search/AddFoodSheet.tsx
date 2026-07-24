@@ -1,10 +1,11 @@
-import { lazy, Suspense, useCallback, useState } from 'react';
+import { lazy, Suspense, useCallback, useRef, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { Sheet } from '@/components/ui/Sheet';
 import { Tabs } from '@/components/ui/Tabs';
 import { FoodSearchPanel } from './FoodSearchPanel';
 import { QuantityStep } from './QuantityStep';
 import { ManualEntryForm } from './ManualEntryForm';
+import { analyzeLabel, type ScannedLabel } from './photoLabel';
 import { QuickAddForm, type QuickAddValues } from './QuickAddForm';
 import { formatKcal } from '@/lib/macros';
 
@@ -19,7 +20,7 @@ import {
   type QuantityState,
   type ResolvedMacros,
 } from './foodMath';
-import { createDiaryEntry, lastQuantityForFood } from '@/db/repos/diary';
+import { createDiaryEntry, lastQuantityForFood, recordFoodSeen } from '@/db/repos/diary';
 import { maybeShowFoodFact } from '@/features/food-facts/foodFacts';
 import { toast } from '@/components/ui/toast';
 import { db } from '@/db/dexie';
@@ -52,7 +53,12 @@ type Step =
   | { kind: 'looking-up'; barcode: string }
   | { kind: 'quantity'; food: Food; initial?: QuantityState }
   | { kind: 'meal-portion'; meal: Meal }
-  | { kind: 'manual'; presetName?: string; presetBarcode?: string };
+  | {
+      kind: 'manual';
+      presetName?: string;
+      presetBarcode?: string;
+      presetLabel?: ScannedLabel;
+    };
 
 /** Re-use the last logged quantity for a food, validated against the food's
  *  current units; falls back to a sensible default otherwise. */
@@ -92,6 +98,8 @@ export function AddFoodSheet({
   const [tab, setTab] = useState<Tab>(initialTab);
   const [step, setStep] = useState<Step>({ kind: 'pick' });
   const [scanError, setScanError] = useState<string | null>(null);
+  const [labelScanning, setLabelScanning] = useState(false);
+  const labelInputRef = useRef<HTMLInputElement>(null);
 
   const reset = () => {
     setStep({ kind: 'pick' });
@@ -187,12 +195,15 @@ export function AddFoodSheet({
         )
         .first();
       if (cached) {
+        // A scan counts as "recently seen" even if the user never logs it.
+        void recordFoodSeen(cached.id);
         setStep({ kind: 'quantity', food: cached });
         return;
       }
       const food = await lookupBarcode(code);
       if (food) {
         await db.foods.put(food);
+        void recordFoodSeen(food.id);
         setStep({ kind: 'quantity', food });
         return;
       }
@@ -210,6 +221,26 @@ export function AddFoodSheet({
       setStep({ kind: 'manual', presetBarcode: code });
     }
   }, []);
+
+  // Scan tab shortcut: read a nutrition label photo, then drop into the
+  // new-product form pre-filled with the transcribed macros.
+  const handleLabelFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // allow re-picking the same file
+    if (!file) return;
+    setScanError(null);
+    setLabelScanning(true);
+    try {
+      const { label, error } = await analyzeLabel(file);
+      if (!label) {
+        setScanError(error ?? "Couldn't read that label. Try again or add it manually.");
+        return;
+      }
+      setStep({ kind: 'manual', presetLabel: label });
+    } finally {
+      setLabelScanning(false);
+    }
+  };
 
   let title: string;
   let content: React.ReactNode;
@@ -262,6 +293,19 @@ export function AddFoodSheet({
                 {scanError}
               </div>
             )}
+            {labelScanning && (
+              <div className="mx-4 mt-3 flex items-center gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Reading label…
+              </div>
+            )}
+            <input
+              ref={labelInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => void handleLabelFile(e)}
+            />
             <Suspense
               fallback={
                 <div className="flex flex-1 items-center justify-center p-12">
@@ -269,7 +313,10 @@ export function AddFoodSheet({
                 </div>
               }
             >
-              <BarcodeScanner onCode={handleBarcode} />
+              <BarcodeScanner
+                onCode={handleBarcode}
+                onScanLabel={() => labelInputRef.current?.click()}
+              />
             </Suspense>
           </>
         )}
@@ -321,6 +368,7 @@ export function AddFoodSheet({
       <ManualEntryForm
         initialName={step.presetName}
         initialBarcode={step.presetBarcode}
+        initialLabel={step.presetLabel}
         onBack={() => setStep({ kind: 'pick' })}
         onCreated={handleManualCreated}
       />

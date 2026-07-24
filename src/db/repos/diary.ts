@@ -1,8 +1,9 @@
 import { useLiveQuery } from 'dexie-react-hooks';
+import { differenceInCalendarDays } from 'date-fns';
 import { v4 as uuid } from 'uuid';
 import { db } from '../dexie';
 import { currentUserId } from '../userId';
-import { todayLocal, type LocalDate } from '@/lib/dates';
+import { fromLocalDate, todayLocal, type LocalDate } from '@/lib/dates';
 import type { DiaryEntry, MealSection } from '../types';
 import { MEAL_SECTIONS } from '../types';
 import { pulseReaction } from '@/features/pet/petReaction';
@@ -229,32 +230,58 @@ export async function lastQuantityForFood(
 }
 
 /**
- * Recent foods logged across ALL sections, most recent first, deduped -
- * so meal-prepping the same items shows them whichever section you're in.
+ * Mark a food as "recently seen" - written when a food is scanned or looked
+ * up, even if the user never logs it, so it still appears in the recent list.
+ * One row per (user, food); repeated scans just bump the timestamp.
+ */
+export async function recordFoodSeen(foodId: string): Promise<void> {
+  const userId = currentUserId();
+  await db.food_recents.put({
+    id: `${userId}:${foodId}`,
+    user_id: userId,
+    food_id: foodId,
+    at: new Date().toISOString(),
+  });
+}
+
+/**
+ * Recent foods, most recent first, deduped - so meal-prepping the same items
+ * shows them whichever section you're in. Merges two sources by their latest
+ * timestamp: foods actually logged (the diary), and foods merely scanned or
+ * looked up (food_recents), so a scanned-but-never-logged product still shows.
  */
 export async function recentFoods(limit = 30): Promise<string[]> {
   const userId = currentUserId();
-  // The '0000-00-00' / '9999-99-99' bounds aren't real dates - they're
-  // lexical sentinels that bracket every YYYY-MM-DD string on the
-  // [user_id, date] compound index. Safe because dates are fixed-width ISO
-  // strings, so a lexical compare equals a date compare.
-  const rows = await db.diary_entries
+  // food_id -> latest ISO timestamp it was logged or scanned.
+  const latest = new Map<string, string>();
+
+  const bump = (foodId: string, at: string) => {
+    const cur = latest.get(foodId);
+    if (!cur || at > cur) latest.set(foodId, at);
+  };
+
+  // Logged foods: use the entry's created_at as "when it was used".
+  // The '0000-00-00' / '9999-99-99' bounds are lexical sentinels bracketing
+  // every YYYY-MM-DD on the [user_id+date] index (fixed-width ISO strings, so
+  // a lexical compare equals a date compare).
+  await db.diary_entries
     .where('[user_id+date]')
     .between([userId, '0000-00-00'], [userId, '9999-99-99'])
-    .filter((e) => !e.deleted_at && e.kind === 'food' && !!e.food_id)
-    .reverse()
-    .limit(limit * 6)
-    .toArray();
-  const seen = new Set<string>();
-  const ids: string[] = [];
-  for (const r of rows) {
-    if (r.food_id && !seen.has(r.food_id)) {
-      seen.add(r.food_id);
-      ids.push(r.food_id);
-      if (ids.length >= limit) break;
-    }
-  }
-  return ids;
+    .each((e) => {
+      if (e.kind !== 'food' || !e.food_id || e.deleted_at) return;
+      bump(e.food_id, e.created_at);
+    });
+
+  // Scanned / looked-up foods that may never have been logged.
+  await db.food_recents
+    .where('user_id')
+    .equals(userId)
+    .each((r) => bump(r.food_id, r.at));
+
+  return [...latest.entries()]
+    .sort((a, b) => (a[1] < b[1] ? 1 : a[1] > b[1] ? -1 : 0))
+    .slice(0, limit)
+    .map(([id]) => id);
 }
 
 /**
@@ -306,21 +333,43 @@ export function useMealLogStats():
 }
 
 /**
- * Food ids ranked by how often they've been logged (most-logged first) -
- * the "frequent foods" fast-logging list.
+ * Half-life (days) of the recency-weighted frequency score. A food logged
+ * today counts 1; ~2 weeks ago, 0.5; a month ago, 0.25 - so a burst of use
+ * that has since stopped decays away and steady recent use rises to the top.
+ */
+const FREQUENCY_HALF_LIFE_DAYS = 14;
+/**
+ * Minimum decayed score to count as "frequent" (roughly two recent logs).
+ * Below this a food drops off the frequent list entirely, so a single recent
+ * log lands in "recent" instead, and a long-abandoned staple disappears once
+ * its score decays past the floor. This is the natural decay + replacement.
+ */
+const FREQUENCY_MIN_SCORE = 1.5;
+
+/**
+ * Food ids ranked by how frequent they *currently* are - not raw lifetime
+ * count. Each log contributes 0.5^(ageDays / half-life), so heavy use that has
+ * since stopped decays out while steady recent use ranks highest. Foods below
+ * FREQUENCY_MIN_SCORE are dropped.
  */
 export async function frequentFoods(limit = 20): Promise<string[]> {
   const userId = currentUserId();
-  const counts = new Map<string, number>();
+  const today = fromLocalDate(todayLocal());
+  const scores = new Map<string, number>();
   await db.diary_entries
     .where('[user_id+date]')
     .between([userId, '0000-00-00'], [userId, '9999-99-99'])
     .each((e) => {
-      if (e.kind === 'food' && e.food_id && !e.deleted_at) {
-        counts.set(e.food_id, (counts.get(e.food_id) ?? 0) + 1);
-      }
+      if (e.kind !== 'food' || !e.food_id || e.deleted_at) return;
+      const ageDays = Math.max(
+        0,
+        differenceInCalendarDays(today, fromLocalDate(e.date)),
+      );
+      const weight = Math.pow(0.5, ageDays / FREQUENCY_HALF_LIFE_DAYS);
+      scores.set(e.food_id, (scores.get(e.food_id) ?? 0) + weight);
     });
-  return [...counts.entries()]
+  return [...scores.entries()]
+    .filter(([, s]) => s >= FREQUENCY_MIN_SCORE)
     .sort((a, b) => b[1] - a[1])
     .slice(0, limit)
     .map(([id]) => id);
