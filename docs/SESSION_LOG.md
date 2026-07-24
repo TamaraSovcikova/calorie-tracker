@@ -6,8 +6,28 @@ How to use:
 - Start of session: read only the top entry, announce the chat number.
 - End of session: prepend a new entry, bump `Session count`.
 
-Session count: 2
+Session count: 3
 Last updated: 2026-07-10
+
+---
+
+## Chat #3 - 2026-07-10 (pantry planner design + eng review; food-search fixes; deployed)
+
+- Did:
+  - Food-search batch (committed `387aada`, deployed Version f310569b):
+    - Frequent foods now rank by a recency-weighted score, not raw lifetime count. `frequentFoods` in `src/db/repos/diary.ts`: each log contributes `0.5^(ageDays / FREQUENCY_HALF_LIFE_DAYS)` (half-life 14 days), summed per food, filtered by `FREQUENCY_MIN_SCORE` (1.5, ~two recent logs). Use that has stopped decays out; single recent logs fall to recents. Two tunable constants at the top of the function.
+    - Scan tab offers "No barcode? Scan a nutrition label instead": `BarcodeScanner` gained an optional `onScanLabel` prop; `AddFoodSheet` owns the hidden file input + `handleLabelFile` (reuses `analyzeLabel`), then routes into the new-product form via a new `ManualEntryForm` `initialLabel` prop. Only shown in the Add-food Scan tab, not `IngredientPickerSheet`.
+    - Any barcode lookup now adds the product to recents even if never logged. New additive Dexie table `food_recents` (schema v4, `&id, user_id, food_id, at`; `FoodRecent` type). `recordFoodSeen(foodId)` called in `AddFoodSheet.handleBarcode` (cached + OFF branches). `recentFoods` rewritten to merge logged foods (diary `created_at`) + scanned foods (`food_recents.at`) by latest timestamp. Reactive via useLiveQuery.
+  - Pantry planner feature: ran `/office-hours` then `/plan-eng-review` (design only, NO code). Output: `pantry-planner-design.md` in the OneDrive project folder (`C:\Users\tamar\OneDrive\Documents\Workspace\Projects\calorie_tracker\`, NOT the WSL repo). Chosen approach B (canonical ingredient layer), phased. Key locked decision from the eng review: consumption is hybrid derived + cached (D2), NOT a mutable ledger, because decrement must cover all six diary write paths (create/update/soft-delete/restore/copyEntryToDate/copyDayEntries) and the copy paths bypass `createDiaryEntry`. Full locked schema + edge cases + tests in the doc's "Engineering Review" section.
+- State: DEPLOYED to https://calorie-tracker.tamara-sovcik.workers.dev (Version f310569b). `main` at `387aada`, pushed, clean tree, 0 unpushed. `pnpm run build` clean, worker typecheck clean, 184/184 tests pass.
+- Next:
+  - Device-test the food-search batch on the Pixel: frequent-list decay (needs real history, give it a day or two; tune `FREQUENCY_HALF_LIFE_DAYS` / `FREQUENCY_MIN_SCORE` if it feels off), label-scan-in-Scan flow, scan-adds-to-recent.
+  - Pantry planner is design-approved and ready to build. Phase 1 = `canonical_ingredients` (seed from USDA FDC foundation foods) + `pantry_items` + manual `/pantry` screen. Then Phase 3 (decrement, hybrid derived+cached) -> Phase 2 (receipt `analyzeReceipt`) -> Phase 4 (hybrid suggestions). New pure `pantryMath.ts` with the tests speced in the design doc.
+  - Still outstanding from earlier: reinstall the PWA on the Pixel to pick up the new full-bleed app icon + the long-press Quick add / Scan shortcuts (stale WebAPK); feel-test + tune pet reaction thresholds on `/pet` (from Chat #2).
+- Open:
+  - Pet reaction thresholds unverified in-browser (from Chat #2).
+  - (carry from Chat #1) Rotate the Gemini API key pasted in chat.
+- Skills/conventions: pantry design doc lives in the OneDrive folder per that folder's CLAUDE.md ("spec docs and product artefacts go here"), not the WSL repo. From a Windows-cwd session, drive the WSL toolchain via `wsl.exe -d Ubuntu bash -s <<'EOF' ... EOF` (stdin heredoc dodges Git Bash MSYS arg-mangling) with `export PATH="$HOME/.nvm/versions/node/v22.22.2/bin:$PATH"`.
 
 ---
 
