@@ -14,6 +14,9 @@ import type { Profile } from '@/db/types';
 const RANGE_DAYS = { '1M': 30, '3M': 90, '6M': 180, '1Y': 365, ALL: Infinity };
 type RangeKey = keyof typeof RANGE_DAYS;
 
+/** Weigh-ins shown before the list collapses behind "View all". */
+const RECENT_COUNT = 5;
+
 interface WeightLogSectionProps {
   profile: Profile;
 }
@@ -55,6 +58,7 @@ export function WeightLogSection({ profile }: WeightLogSectionProps) {
   const [date, setDate] = useState(todayLocal());
   const [saving, setSaving] = useState(false);
   const [range, setRange] = useState<RangeKey>('3M');
+  const [showAll, setShowAll] = useState(false);
   const [goalInput, setGoalInput] = useState(() =>
     profile.goal_weight_kg != null
       ? (isImperial
@@ -124,7 +128,8 @@ export function WeightLogSection({ profile }: WeightLogSectionProps) {
     });
   };
 
-  const recent = log ? [...log].slice(-5).reverse() : [];
+  const allEntries = log ? [...log].reverse() : [];
+  const recent = showAll ? allEntries : allEntries.slice(0, RECENT_COUNT);
   const projection = goalDisplay != null ? projectGoal(points, goalDisplay) : null;
 
   return (
@@ -214,10 +219,27 @@ export function WeightLogSection({ profile }: WeightLogSectionProps) {
 
       {recent.length > 0 && (
         <div className="mt-4">
-          <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Recent
-          </h3>
-          <ul className="mt-2 divide-y divide-border">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              {showAll ? `All weigh-ins (${allEntries.length})` : 'Recent'}
+            </h3>
+            {allEntries.length > RECENT_COUNT && (
+              <button
+                type="button"
+                onClick={() => setShowAll((v) => !v)}
+                className="text-xs font-medium text-primary hover:underline"
+              >
+                {showAll ? 'Show less' : `View all (${allEntries.length})`}
+              </button>
+            )}
+          </div>
+          {/* Capped height once expanded so a long history scrolls inside
+              the card instead of pushing the rest of the page away. */}
+          <ul
+            className={`mt-2 divide-y divide-border ${
+              showAll ? 'max-h-80 overflow-y-auto pr-1' : ''
+            }`}
+          >
             {recent.map((w) => (
               <li key={w.id} className="flex items-center justify-between py-2 text-sm">
                 <span className="text-muted-foreground tabular-nums">{w.date}</span>

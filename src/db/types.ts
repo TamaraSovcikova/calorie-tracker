@@ -67,6 +67,31 @@ export interface Profile {
    */
   weekly_budget_enabled?: boolean;
   /**
+   * How the budget acts on the daily target. Supersedes the boolean above,
+   * which is kept in step for rows read by older clients:
+   *  - 'off'    - no budget; the daily goal is the target.
+   *  - 'warn'   - the target NEVER moves. Days over the goal simply read as
+   *               over, and a running balance says how far ahead or behind
+   *               you are, so evening it out stays the user's choice.
+   *  - 'adjust' - today's target is recalculated from the period's remaining
+   *               budget (the original behaviour).
+   * Undefined falls back to `weekly_budget_enabled` (true -> 'adjust').
+   */
+  budget_mode?: 'off' | 'warn' | 'adjust';
+  /**
+   * Carry-over start date (YYYY-MM-DD). When set, the running balance
+   * accumulates forward from this date and nothing earlier is ever counted,
+   * so carry-over covers a window the user chose rather than their whole
+   * history. Unset = no carry-over.
+   */
+  budget_carryover_start?: string;
+  /**
+   * Cap (kcal) on how far a single day's target may be trimmed below the
+   * daily goal in 'adjust' mode - the user's own pace for clearing a
+   * deficit. Undefined or <= 0 means no cap.
+   */
+  budget_max_daily_trim?: number;
+  /**
    * Budget period: 'week' (default) recalculates over a 7-day week; 'month'
    * recalculates over the calendar month, so a single bad day dilutes far
    * more and an end-of-period overage still has days left to absorb it.
@@ -88,7 +113,11 @@ export interface Profile {
   budget_carryover_cap?: number;
   /** Day the budget week starts on: 0 = Sunday … 6 = Saturday. */
   week_start_day?: number;
-  /** Soft floor - never drop a day's target below ~70% of the daily goal. */
+  /**
+   * Legacy soft floor - never drop a day's target below ~70% of the daily
+   * goal. Superseded by `budget_max_daily_trim`; still honoured as a
+   * fallback for profiles synced before that field existed.
+   */
   weekly_budget_floor?: boolean;
   /**
    * JSON array of dates (YYYY-MM-DD) the user marked "untracked" - those

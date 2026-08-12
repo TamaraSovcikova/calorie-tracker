@@ -5,8 +5,34 @@ import { Switch } from '@/components/ui/Switch';
 import { SettingCard } from './SettingCard';
 import { updateProfile } from '@/db/repos/profile';
 import { formatKcal } from '@/lib/macros';
-import { WEEK_DAY_LABELS } from '@/features/weekly-budget/weeklyBudget';
+import {
+  resolveBudgetMode,
+  WEEK_DAY_LABELS,
+  type BudgetMode,
+} from '@/features/weekly-budget/weeklyBudget';
+import { shiftDate, todayLocal } from '@/lib/dates';
 import type { Profile } from '@/db/types';
+
+const BUDGET_MODES: [BudgetMode, string][] = [
+  ['off', 'Off'],
+  ['warn', 'Warn only'],
+  ['adjust', 'Auto-adjust'],
+];
+
+const MODE_HELP: Record<BudgetMode, string> = {
+  off: 'Every day gets the same target. Nothing rolls forward.',
+  warn:
+    "Your target never moves. Days over it just read as over, and a running balance shows how far ahead or behind you are - so evening it out is your call, at your pace.",
+  adjust:
+    "Each day's target is recalculated from the period's remaining budget. Going over one day trims the rest; going under banks calories forward.",
+};
+
+/** Quick windows for the carry-over start date. */
+const CARRY_PRESETS: [string, number][] = [
+  ['Last 2 weeks', 14],
+  ['Last month', 30],
+  ['Last 3 months', 90],
+];
 
 interface GoalsSectionProps {
   profile: Profile;
@@ -52,6 +78,20 @@ export function GoalsSection({ profile }: GoalsSectionProps) {
     };
     void updateProfile({ [map[k]]: num });
   };
+
+  const mode = resolveBudgetMode(profile);
+  const carryoverOn = !!profile.budget_carryover_start;
+  // A fresh carry-over window opens two weeks back: enough to be useful,
+  // short enough that turning it on never drags in months of history.
+  const defaultCarryStart = shiftDate(todayLocal(), -14);
+
+  // `weekly_budget_enabled` is kept in step so older clients and the pet's
+  // roll-forward keep reading the same on/off state through sync.
+  const setBudgetMode = (next: BudgetMode) =>
+    void updateProfile({
+      budget_mode: next,
+      weekly_budget_enabled: next !== 'off',
+    });
 
   // Validation: warn if macros don't sum near kcal target.
   const proteinKcal = parseFloat(form.protein) * 4;
@@ -152,14 +192,32 @@ export function GoalsSection({ profile }: GoalsSectionProps) {
         onChange={(v) => void updateProfile({ eat_back_burned: v })}
       />
 
-      <Switch
-        label="Calorie budget"
-        description="Recalculate each day's target from the period's remaining budget (your daily goal × days in the period). Going over one day trims the rest; going under banks calories forward - so overages aren't forgotten."
-        checked={!!profile.weekly_budget_enabled}
-        onChange={(v) => void updateProfile({ weekly_budget_enabled: v })}
-      />
+      <div className="space-y-1">
+        <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          Calorie budget
+        </span>
+        <div className="flex overflow-hidden rounded-lg border border-border">
+          {BUDGET_MODES.map(([val, label], i) => (
+            <button
+              key={val}
+              type="button"
+              onClick={() => setBudgetMode(val)}
+              className="flex-1 py-2 text-sm font-medium transition-colors"
+              style={{
+                background: mode === val ? 'var(--color-accent-deep)' : 'transparent',
+                color: mode === val ? '#fff' : 'var(--color-text-muted)',
+                borderRight:
+                  i < BUDGET_MODES.length - 1 ? '1px solid var(--color-border)' : 'none',
+              }}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <p className="text-xs text-muted-foreground">{MODE_HELP[mode]}</p>
+      </div>
 
-      {profile.weekly_budget_enabled && (
+      {mode !== 'off' && (
         <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-3">
           <div className="space-y-1">
             <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
@@ -207,42 +265,106 @@ export function GoalsSection({ profile }: GoalsSectionProps) {
           )}
 
           <Switch
-            label="Carry over to the next period"
-            description="Roll an unfinished period's surplus or overage into the next one. So an overage on the last day isn't forgotten - it starts the next period in deficit (and banked calories start it ahead)."
-            checked={!!profile.budget_carryover_enabled}
-            onChange={(v) => void updateProfile({ budget_carryover_enabled: v })}
+            label="Carry over between periods"
+            description="Keep a running balance instead of wiping the slate every period. It accumulates from the start date below and never reaches back further, so it covers a window you chose rather than your whole history."
+            checked={carryoverOn}
+            onChange={(v) =>
+              void updateProfile({
+                budget_carryover_start: v ? defaultCarryStart : undefined,
+              })
+            }
           />
 
-          {profile.budget_carryover_enabled && (
+          {carryoverOn && (
+            <>
+              <LabeledInput
+                label="Count from"
+                type="date"
+                max={todayLocal()}
+                hint="Nothing before this date is counted. Move it forward any time to start fresh."
+                value={profile.budget_carryover_start ?? defaultCarryStart}
+                onChange={(e) => {
+                  if (e.target.value) {
+                    void updateProfile({ budget_carryover_start: e.target.value });
+                  }
+                }}
+              />
+              <div className="flex flex-wrap gap-1.5">
+                {CARRY_PRESETS.map(([label, days]) => (
+                  <button
+                    key={label}
+                    type="button"
+                    onClick={() =>
+                      void updateProfile({
+                        budget_carryover_start: shiftDate(todayLocal(), -days),
+                      })
+                    }
+                    className="rounded-full border border-border px-2.5 py-1 text-xs font-medium text-muted-foreground hover:bg-muted"
+                  >
+                    {label}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  onClick={() =>
+                    void updateProfile({ budget_carryover_start: todayLocal() })
+                  }
+                  className="rounded-full border border-border px-2.5 py-1 text-xs font-medium text-muted-foreground hover:bg-muted"
+                >
+                  Reset to today
+                </button>
+              </div>
+              <LabeledInput
+                label="Carry-over cap (optional)"
+                type="number"
+                inputMode="numeric"
+                step="any"
+                min="0"
+                placeholder="No cap"
+                hint="Limits how big the carried balance can get, in either direction."
+                value={
+                  profile.budget_carryover_cap && profile.budget_carryover_cap > 0
+                    ? String(profile.budget_carryover_cap)
+                    : ''
+                }
+                onChange={(e) => {
+                  const n = parseFloat(e.target.value);
+                  void updateProfile({
+                    budget_carryover_cap:
+                      Number.isFinite(n) && n > 0 ? n : undefined,
+                  });
+                }}
+                trailing="kcal"
+              />
+            </>
+          )}
+
+          {mode === 'adjust' && (
             <LabeledInput
-              label="Carry-over cap (optional)"
+              label="Most a day may be trimmed (optional)"
               type="number"
               inputMode="numeric"
               step="any"
               min="0"
-              placeholder="No cap"
+              placeholder="No limit"
+              hint="Your pace for clearing a deficit. With 200 here, no day's target ever drops more than 200 kcal below your goal, however far behind the balance gets."
               value={
-                profile.budget_carryover_cap && profile.budget_carryover_cap > 0
-                  ? String(profile.budget_carryover_cap)
+                profile.budget_max_daily_trim && profile.budget_max_daily_trim > 0
+                  ? String(profile.budget_max_daily_trim)
                   : ''
               }
               onChange={(e) => {
                 const n = parseFloat(e.target.value);
                 void updateProfile({
-                  budget_carryover_cap:
-                    Number.isFinite(n) && n > 0 ? n : undefined,
+                  budget_max_daily_trim:
+                    Number.isFinite(n) && n > 0 ? n : 0,
+                  // Explicit 0 retires the legacy 70% floor for this profile.
+                  weekly_budget_floor: false,
                 });
               }}
               trailing="kcal"
             />
           )}
-
-          <Switch
-            label="Soft floor"
-            description="Never drop a day's target below 70% of your daily goal. If the period can't fully recover, it simply shows as over budget instead."
-            checked={!!profile.weekly_budget_floor}
-            onChange={(v) => void updateProfile({ weekly_budget_floor: v })}
-          />
         </div>
       )}
     </SettingCard>

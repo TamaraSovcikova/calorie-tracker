@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowLeft, Trash2 } from 'lucide-react';
+import { ArrowLeft, Pencil, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { LabeledInput } from '@/components/ui/Input';
 import { useMealResolved } from './useMealResolved';
@@ -20,6 +20,11 @@ interface LogMealStepProps {
   saveLabel?: string;
   /** When set, shows a Delete button (used when editing a logged entry). */
   onDelete?: () => void;
+  /** When set, shows a shortcut into the meal's own editor so the recipe
+   *  itself can be fixed without hunting for it in the library. */
+  onEditRecipe?: () => void;
+  /** Optional inline note shown above the portion controls. */
+  notice?: string;
 }
 
 const QUICK_MULTS = [0.5, 1, 1.5, 2];
@@ -31,6 +36,8 @@ export function LogMealStep({
   initialMultiplier = 1,
   saveLabel = 'Add to diary',
   onDelete,
+  onEditRecipe,
+  notice,
 }: LogMealStepProps) {
   const resolved = useMealResolved(mealId);
   const [mult, setMult] = useState<number>(initialMultiplier);
@@ -61,6 +68,16 @@ export function LogMealStep({
           per portion
           {resolved.servings > 1 && ` · batch makes ${Math.round(resolved.servings)}`}
         </p>
+        {onEditRecipe && (
+          <button
+            type="button"
+            onClick={onEditRecipe}
+            className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+          >
+            <Pencil className="h-3.5 w-3.5" />
+            Edit this meal's ingredients
+          </button>
+        )}
       </div>
 
       {resolved.meal.image_url && (
@@ -74,6 +91,11 @@ export function LogMealStep({
       )}
 
       <div className="space-y-4 p-4">
+        {notice && (
+          <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
+            {notice}
+          </div>
+        )}
         <div className="flex flex-wrap gap-2">
           {QUICK_MULTS.map((q) => (
             <button

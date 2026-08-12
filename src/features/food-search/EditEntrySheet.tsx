@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Sheet } from '@/components/ui/Sheet';
 import { QuantityStep } from './QuantityStep';
 import { QuickAddForm, type QuickAddValues } from './QuickAddForm';
@@ -9,6 +10,7 @@ import { getFood } from '@/db/repos/foods';
 import { LogMealStep } from '@/features/meals/LogMealStep';
 import { useMealResolved } from '@/features/meals/useMealResolved';
 import { multiplyTotals } from '@/features/meals/mealMath';
+import { formatKcal } from '@/lib/macros';
 import type { DiaryEntry, Food } from '@/db/types';
 
 interface EditEntrySheetProps {
@@ -168,6 +170,16 @@ function EditMealEntryInner({
   onClose: () => void;
 }) {
   const resolved = useMealResolved(entry.meal_id);
+  const navigate = useNavigate();
+
+  // The entry stores the macros as they were when logged, so a recipe edited
+  // afterwards leaves the diary showing the old numbers. Say so, since the
+  // fix is simply to hit Save again (which recomputes from the recipe).
+  const currentKcal = resolved
+    ? multiplyTotals(resolved.totals, entry.portion_multiplier ?? 1).kcal
+    : null;
+  const stale =
+    currentKcal !== null && Math.abs(currentKcal - entry.kcal) >= 1;
 
   const handleSave = async (multiplier: number) => {
     if (!resolved) return;
@@ -207,6 +219,15 @@ function EditMealEntryInner({
           onBack={onClose}
           onSave={handleSave}
           onDelete={handleDelete}
+          onEditRecipe={() => {
+            onClose();
+            navigate(`/meals/${entry.meal_id}/edit`);
+          }}
+          notice={
+            stale
+              ? `This meal's recipe changed since you logged it - it now comes to ${formatKcal(currentKcal!)} kcal at this portion. Save to update the entry, or leave it as logged.`
+              : undefined
+          }
         />
       ) : (
         <div className="p-8 text-center text-sm text-muted-foreground">

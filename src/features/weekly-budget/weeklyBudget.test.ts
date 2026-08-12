@@ -1,13 +1,23 @@
 import { describe, expect, it } from 'vitest';
 import {
   carryInClamped,
+  clampCarry,
+  datesBetween,
   effectiveDailyKcal,
+  maxDailyTrimFor,
   monthDates,
   periodDatesFor,
   previousPeriodDatesFor,
+  resolveBudgetMode,
   weekDates,
   weekStartFor,
 } from './weeklyBudget';
+import type { Profile } from '@/db/types';
+
+/** Minimal profile for the pure-helper tests. */
+function profileOf(patch: Partial<Profile>): Profile {
+  return { kcal_target: 2000, ...patch } as Profile;
+}
 
 // 2026-05-19 is a Tuesday.
 describe('weekStartFor', () => {
@@ -183,5 +193,95 @@ describe('carryInClamped', () => {
 
   it('treats a zero or negative cap as no cap', () => {
     expect(carryInClamped(14000, 9000, 0)).toBe(5000);
+  });
+});
+
+describe('clampCarry', () => {
+  it('passes a balance through untouched with no cap', () => {
+    expect(clampCarry(-3200, undefined)).toBe(-3200);
+    expect(clampCarry(3200, 0)).toBe(3200);
+  });
+
+  it('clamps both directions to the cap', () => {
+    expect(clampCarry(-3200, 1500)).toBe(-1500);
+    expect(clampCarry(3200, 1500)).toBe(1500);
+  });
+});
+
+describe('resolveBudgetMode', () => {
+  it('reads the explicit mode when set', () => {
+    expect(resolveBudgetMode(profileOf({ budget_mode: 'warn' }))).toBe('warn');
+    expect(resolveBudgetMode(profileOf({ budget_mode: 'off' }))).toBe('off');
+  });
+
+  it('falls back to the pre-mode boolean for older profiles', () => {
+    expect(resolveBudgetMode(profileOf({ weekly_budget_enabled: true }))).toBe('adjust');
+    expect(resolveBudgetMode(profileOf({ weekly_budget_enabled: false }))).toBe('off');
+    expect(resolveBudgetMode(profileOf({}))).toBe('off');
+  });
+
+  it('prefers the explicit mode over a stale boolean', () => {
+    expect(
+      resolveBudgetMode(
+        profileOf({ budget_mode: 'warn', weekly_budget_enabled: true }),
+      ),
+    ).toBe('warn');
+  });
+
+  it('is off with no profile at all', () => {
+    expect(resolveBudgetMode(undefined)).toBe('off');
+  });
+});
+
+describe('maxDailyTrimFor', () => {
+  it('uses the explicit kcal cap when set', () => {
+    expect(maxDailyTrimFor(profileOf({ budget_max_daily_trim: 200 }), 2000)).toBe(200);
+  });
+
+  it('falls back to the legacy 70% floor when the cap was never set', () => {
+    // 70% floor on a 2000 goal = never below 1400, i.e. a 600 kcal trim.
+    expect(
+      maxDailyTrimFor(profileOf({ weekly_budget_floor: true }), 2000),
+    ).toBeCloseTo(600);
+  });
+
+  it('treats an explicit 0 as "no limit", retiring the legacy floor', () => {
+    expect(
+      maxDailyTrimFor(
+        profileOf({ budget_max_daily_trim: 0, weekly_budget_floor: true }),
+        2000,
+      ),
+    ).toBeUndefined();
+  });
+
+  it('is undefined when neither is configured', () => {
+    expect(maxDailyTrimFor(profileOf({}), 2000)).toBeUndefined();
+  });
+});
+
+describe('datesBetween', () => {
+  it('is inclusive of both ends', () => {
+    expect(datesBetween('2026-05-18', '2026-05-21')).toEqual([
+      '2026-05-18',
+      '2026-05-19',
+      '2026-05-20',
+      '2026-05-21',
+    ]);
+  });
+
+  it('returns a single date when start equals end', () => {
+    expect(datesBetween('2026-05-19', '2026-05-19')).toEqual(['2026-05-19']);
+  });
+
+  it('returns nothing when the range is inverted', () => {
+    expect(datesBetween('2026-05-20', '2026-05-19')).toEqual([]);
+  });
+
+  it('keeps only the most recent days when the window is huge', () => {
+    // A carry-over start left untouched for a decade must not scan it all.
+    const dates = datesBetween('2016-01-01', '2026-05-19');
+    expect(dates.length).toBe(1096);
+    expect(dates[dates.length - 1]).toBe('2026-05-19');
+    expect(dates[0]).toBe('2023-05-20');
   });
 });

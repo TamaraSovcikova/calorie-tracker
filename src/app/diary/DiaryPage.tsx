@@ -4,6 +4,7 @@ import { format } from 'date-fns';
 import {
   AlertCircle,
   CalendarCheck,
+  CalendarDays,
   CalendarOff,
   ChevronLeft,
   ChevronRight,
@@ -11,6 +12,8 @@ import {
   ListChecks,
   Loader2,
   MoreVertical,
+  TrendingDown,
+  TrendingUp,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { ArcGauge } from '@/components/ArcGauge';
@@ -175,34 +178,49 @@ export function DiaryPage() {
             <ChevronLeft className="h-5 w-5" />
           </button>
 
-          <button
-            type="button"
-            onClick={openDatePicker}
-            className="flex flex-col items-center"
-          >
-            <div
-              style={{
-                fontSize: 11,
-                fontWeight: 600,
-                letterSpacing: '0.18em',
-                color: 'var(--color-text-faint)',
-                textTransform: 'uppercase',
-              }}
+          <div className="flex flex-col items-center">
+            <button
+              type="button"
+              onClick={openDatePicker}
+              className="flex flex-col items-center"
             >
-              {format(fromLocalDate(currentDate), 'EEEE d MMMM')}
-            </div>
-            <div
-              style={{
-                fontSize: 26,
-                fontWeight: 600,
-                letterSpacing: '-0.02em',
-                marginTop: 4,
-                color: 'var(--color-text)',
-              }}
-            >
-              {onToday ? 'Today' : formatDayHeader(currentDate)}
-            </div>
-          </button>
+              <div
+                style={{
+                  fontSize: 11,
+                  fontWeight: 600,
+                  letterSpacing: '0.18em',
+                  color: 'var(--color-text-faint)',
+                  textTransform: 'uppercase',
+                }}
+              >
+                {format(fromLocalDate(currentDate), 'EEEE d MMMM')}
+              </div>
+              <div
+                style={{
+                  fontSize: 26,
+                  fontWeight: 600,
+                  letterSpacing: '-0.02em',
+                  marginTop: 4,
+                  color: 'var(--color-text)',
+                }}
+              >
+                {onToday ? 'Today' : formatDayHeader(currentDate)}
+              </div>
+            </button>
+            {/* One tap back to today from anywhere in history, instead of
+                stepping through every day with the chevrons. */}
+            {!onToday && (
+              <button
+                type="button"
+                onClick={() => goToDate(todayLocal())}
+                className="mt-1.5 inline-flex items-center gap-1 rounded-full border border-border px-2.5 py-1 text-[11px] font-semibold hover:bg-muted"
+                style={{ color: 'var(--color-text-muted)' }}
+              >
+                <CalendarDays className="h-3 w-3" />
+                Jump to today
+              </button>
+            )}
+          </div>
 
           <div className="flex items-center gap-0.5">
             <button
@@ -235,15 +253,6 @@ export function DiaryPage() {
                     onClick={() => setMenuOpen(false)}
                   />
                   <div className="absolute right-0 top-full z-[56] mt-1 w-56 overflow-hidden rounded-xl border border-border bg-card p-1 shadow-lg">
-                    {!onToday && (
-                      <button
-                        type="button"
-                        onClick={() => { goToDate(todayLocal()); setMenuOpen(false); }}
-                        className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-sm hover:bg-muted"
-                      >
-                        Go to today
-                      </button>
-                    )}
                     <button
                       type="button"
                       onClick={() => { setCopyOpen(true); setMenuOpen(false); }}
@@ -262,7 +271,7 @@ export function DiaryPage() {
                         Build a meal from foods
                       </button>
                     )}
-                    {profile?.weekly_budget_enabled && (
+                    {weekly && (
                       <button
                         type="button"
                         onClick={toggleUntracked}
@@ -319,6 +328,41 @@ export function DiaryPage() {
           >
             {dog.statusLine}
             <ChevronRight size={13} strokeWidth={2} style={{ opacity: 0.5, flexShrink: 0 }} />
+          </button>
+        )}
+
+        {/* Running balance, shown on its own so an overage is visible without
+            the app silently eating into the day's target to pay it off. */}
+        {weekly && Math.abs(Math.round(weekly.carryBalance)) >= 1 && (
+          <button
+            type="button"
+            onClick={() => navigate('/pet')}
+            className="flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11.5px] font-semibold"
+            style={{
+              marginTop: -2,
+              borderColor:
+                weekly.carryBalance < 0
+                  ? 'rgba(217,119,6,0.35)'
+                  : 'var(--color-border)',
+              color:
+                weekly.carryBalance < 0
+                  ? 'rgb(180,83,9)'
+                  : 'var(--color-text-muted)',
+              background:
+                weekly.carryBalance < 0 ? 'rgba(217,119,6,0.08)' : 'transparent',
+            }}
+          >
+            {weekly.carryBalance < 0 ? (
+              <TrendingUp className="h-3 w-3" />
+            ) : (
+              <TrendingDown className="h-3 w-3" />
+            )}
+            {weekly.carryBalance < 0
+              ? `${Math.round(-weekly.carryBalance).toLocaleString()} kcal over`
+              : `${Math.round(weekly.carryBalance).toLocaleString()} kcal banked`}
+            <span style={{ fontWeight: 500, opacity: 0.7 }}>
+              since {format(fromLocalDate(weekly.balanceFrom), 'd MMM')}
+            </span>
           </button>
         )}
 

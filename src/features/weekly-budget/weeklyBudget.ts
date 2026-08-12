@@ -1,24 +1,37 @@
 /**
  * Calorie budget over a period (week or month).
  *
- * When enabled, the period's budget is `kcal_target × daysInPeriod` and a
- * given day's target is recalculated as:
+ * Two modes, chosen by the user:
  *
- *   adjusted = (period budget + carry-in − kcal eaten on earlier days) ÷ days left
+ * 'adjust' - the period's budget is `kcal_target × daysInPeriod` and a given
+ *   day's target is recalculated as
  *
- * so an overage on one day trims the rest of the period, and a surplus rolls
- * forward. With carry-over on, a period's net surplus/deficit also rolls into
- * the next period (so an overage on the very last day is not forgotten). The
- * week runs 7 days from a configurable start day; the month is the calendar
- * month.
+ *     adjusted = (period budget + carry-in − kcal eaten on earlier days) ÷ days left
+ *
+ *   so an overage on one day trims the rest of the period and a surplus rolls
+ *   forward. `budget_max_daily_trim` caps how hard any one day can be trimmed.
+ *
+ * 'warn' - the target never moves off the daily goal. Days over it read as
+ *   over, and the running balance below is shown on its own so the user can
+ *   decide when (and how fast) to even it out.
+ *
+ * Carry-over is a DATE WINDOW, not a single previous period: when
+ * `budget_carryover_start` is set, the balance accumulates day by day from
+ * that date and nothing earlier is ever counted. Accumulating (rather than
+ * reading only the previous period) is also what stops a trimmed period from
+ * later reading as a surplus and refunding the very overage it just paid off.
+ *
+ * The week runs 7 days from a configurable start day; the month is the
+ * calendar month.
  */
 
-import { addDays, getDaysInMonth, startOfMonth } from 'date-fns';
+import { addDays, differenceInCalendarDays, getDaysInMonth, startOfMonth } from 'date-fns';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db/dexie';
 import { currentUserId } from '@/db/userId';
 import {
   fromLocalDate,
+  shiftDate,
   toLocalDate,
   todayLocal,
   type LocalDate,
@@ -36,10 +49,53 @@ export const WEEK_DAY_LABELS = [
 ];
 
 export type BudgetPeriod = 'week' | 'month';
+export type BudgetMode = 'off' | 'warn' | 'adjust';
 
-/** Never drop a day below this fraction of the daily goal when the soft
- *  floor is enabled. */
+/** Legacy soft floor: never drop a day below this fraction of the daily
+ *  goal. Only used for profiles predating `budget_max_daily_trim`. */
 const FLOOR_FRACTION = 0.7;
+
+/** Hard ceiling on how far back a carry-over window is walked, so a start
+ *  date left untouched for years can't turn every render into a huge scan.
+ *  Older days are simply outside the window. */
+const MAX_CARRYOVER_DAYS = 1096; // ~3 years
+
+/**
+ * Which mode the budget is in. Falls back to the pre-mode boolean so
+ * profiles synced before the picker existed keep behaving as they did.
+ */
+export function resolveBudgetMode(profile: Profile | undefined): BudgetMode {
+  if (!profile) return 'off';
+  if (profile.budget_mode) return profile.budget_mode;
+  return profile.weekly_budget_enabled ? 'adjust' : 'off';
+}
+
+/**
+ * How far a day's target may be trimmed below the daily goal, in kcal.
+ * Undefined = no limit. Honours the legacy 70% floor when the explicit
+ * kcal cap has never been set on this profile.
+ */
+export function maxDailyTrimFor(
+  profile: Profile,
+  dailyGoal: number,
+): number | undefined {
+  const explicit = profile.budget_max_daily_trim;
+  if (explicit !== undefined && explicit > 0) return explicit;
+  if (explicit === undefined && profile.weekly_budget_floor) {
+    return dailyGoal * (1 - FLOOR_FRACTION);
+  }
+  return undefined;
+}
+
+/** Inclusive list of dates from `start` to `end`, empty when start > end.
+ *  Truncated to the most recent MAX_CARRYOVER_DAYS. */
+export function datesBetween(start: LocalDate, end: LocalDate): LocalDate[] {
+  if (start > end) return [];
+  const span = differenceInCalendarDays(fromLocalDate(end), fromLocalDate(start)) + 1;
+  const n = Math.min(span, MAX_CARRYOVER_DAYS);
+  const first = addDays(fromLocalDate(end), -(n - 1));
+  return Array.from({ length: n }, (_, i) => toLocalDate(addDays(first, i)));
+}
 
 /** The local date the budget week containing `date` starts on. */
 export function weekStartFor(date: LocalDate, weekStartDay: number): LocalDate {
@@ -91,7 +147,11 @@ export function carryInClamped(
   prevConsumed: number,
   cap: number | undefined,
 ): number {
-  const raw = prevBudget - prevConsumed;
+  return clampCarry(prevBudget - prevConsumed, cap);
+}
+
+/** Clamp a signed carry balance to +/- `cap` kcal; no clamp when cap <= 0. */
+export function clampCarry(raw: number, cap: number | undefined): number {
   if (cap && cap > 0) return Math.max(-cap, Math.min(cap, raw));
   return raw;
 }
@@ -142,6 +202,8 @@ export function effectiveDailyKcal(
 }
 
 export interface WeeklyBudget {
+  /** 'warn' (target fixed, balance shown) or 'adjust' (target recalculated). */
+  mode: Exclude<BudgetMode, 'off'>;
   /** Whether the active period is a week or a calendar month. */
   periodLabel: BudgetPeriod;
   /** Index of `date` within its period (0 = the first day). */
@@ -151,8 +213,22 @@ export interface WeeklyBudget {
   /** Base period budget = daily goal x days in the period. */
   weeklyBudget: number;
   dailyGoal: number;
-  /** Signed kcal carried in from the previous period (0 when carry-over off). */
+  /** Signed kcal actually fed into this period's target. 0 in 'warn' mode
+   *  and whenever carry-over has no start date. */
   carryIn: number;
+  /**
+   * The running balance through the day before `date`: positive = banked
+   * (came in under), negative = owed. This is the "accumulated calories"
+   * figure shown on its own so the user can pace clearing it themselves.
+   */
+  carryBalance: number;
+  /** The date `carryBalance` accumulates from. */
+  balanceFrom: LocalDate;
+  /** True when a carry-over start date is configured. */
+  carryoverOn: boolean;
+  /** kcal the target was prevented from dropping by `budget_max_daily_trim`
+   *  (0 when the cap did not bite). */
+  trimHeldBack: number;
   /** kcal eaten on the days before `date` this period. */
   consumedBeforeDay: number;
   /** kcal eaten on all days up to and including `date`. */
@@ -208,39 +284,47 @@ async function fetchEffective(
 }
 
 /**
+ * Signed running balance across `[start, end]` inclusive: budget minus what
+ * was effectively consumed. Positive = banked, negative = owed. Returns 0
+ * for an empty or inverted range.
+ */
+export async function accumulatedBalance(
+  start: LocalDate,
+  end: LocalDate,
+  profile: Profile,
+  dailyGoal: number,
+): Promise<number> {
+  const dates = datesBetween(start, end);
+  if (dates.length === 0) return 0;
+  const { total } = await fetchEffective(dates, profile, dailyGoal);
+  return dailyGoal * dates.length - total;
+}
+
+/**
  * Budget computation for the diary day `date`. Returns null when the
- * feature is disabled (so callers fall back to the daily goal). Async and
+ * feature is off (so callers fall back to the daily goal). Async and
  * hook-free so it can also be used outside React (e.g. the pet's wellbeing
- * roll-forward). Honours the week/month period and optional carry-over.
+ * roll-forward). Honours the mode, the week/month period, and the
+ * carry-over window.
  */
 export async function computeWeeklyBudget(
   date: LocalDate,
   profile: Profile | undefined,
 ): Promise<WeeklyBudget | null> {
-  if (!profile?.weekly_budget_enabled) return null;
+  const mode = resolveBudgetMode(profile);
+  if (!profile || mode === 'off') return null;
   const weekStartDay = profile.week_start_day ?? 1;
   const dailyGoal = profile.kcal_target ?? 0;
-  const floor = !!profile.weekly_budget_floor;
   const period: BudgetPeriod = profile.budget_period ?? 'week';
   const dates = periodDatesFor(date, period, weekStartDay);
+  const carryStart = profile.budget_carryover_start;
+  const carryoverOn = !!carryStart;
 
   const { effective, missedCount } = await fetchEffective(
     dates,
     profile,
     dailyGoal,
   );
-
-  // Carry-over: roll the previous period's net surplus/deficit into this one.
-  let carryIn = 0;
-  if (profile.budget_carryover_enabled) {
-    const prevDates = previousPeriodDatesFor(date, period, weekStartDay);
-    const prev = await fetchEffective(prevDates, profile, dailyGoal);
-    carryIn = carryInClamped(
-      dailyGoal * prevDates.length,
-      prev.total,
-      profile.budget_carryover_cap,
-    );
-  }
 
   const dayIndex = Math.max(0, dates.indexOf(date));
   const daysRemaining = dates.length - dayIndex;
@@ -252,20 +336,56 @@ export async function computeWeeklyBudget(
     .slice(0, dayIndex + 1)
     .reduce((a, b) => a + b, 0);
 
-  let adjustedTarget =
-    (weeklyBudget + carryIn - consumedBeforeDay) / daysRemaining;
-  if (floor) {
-    adjustedTarget = Math.max(adjustedTarget, dailyGoal * FLOOR_FRACTION);
+  // Carry-in: everything banked or owed between the user's chosen start date
+  // and the day this period opened. Accumulated day by day, so a period that
+  // already paid a deficit down cannot read as a fresh surplus next time.
+  let carryIn = 0;
+  if (carryoverOn && mode === 'adjust') {
+    const raw = await accumulatedBalance(
+      carryStart,
+      shiftDate(dates[0], -1),
+      profile,
+      dailyGoal,
+    );
+    carryIn = clampCarry(raw, profile.budget_carryover_cap);
   }
-  adjustedTarget = Math.max(0, adjustedTarget);
+
+  // The figure shown to the user: where they stand right now, from the
+  // carry-over start date when set, otherwise just this period.
+  const balanceFrom =
+    carryoverOn && carryStart < dates[0] ? carryStart : dates[0];
+  const carryBalance = await accumulatedBalance(
+    balanceFrom,
+    shiftDate(date, -1),
+    profile,
+    dailyGoal,
+  );
+
+  let adjustedTarget = dailyGoal;
+  let trimHeldBack = 0;
+  if (mode === 'adjust') {
+    adjustedTarget = (weeklyBudget + carryIn - consumedBeforeDay) / daysRemaining;
+    const maxTrim = maxDailyTrimFor(profile, dailyGoal);
+    if (maxTrim !== undefined) {
+      const capped = Math.max(adjustedTarget, dailyGoal - maxTrim);
+      trimHeldBack = capped - adjustedTarget;
+      adjustedTarget = capped;
+    }
+    adjustedTarget = Math.max(0, adjustedTarget);
+  }
 
   return {
+    mode,
     periodLabel: period,
     dayIndex,
     daysRemaining,
     weeklyBudget,
     dailyGoal,
     carryIn,
+    carryBalance,
+    balanceFrom,
+    carryoverOn,
+    trimHeldBack,
     consumedBeforeDay,
     weekConsumed,
     adjustedTarget,

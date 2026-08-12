@@ -36,7 +36,9 @@ export async function analyzeLabel(file: Blob): Promise<LabelScanResult> {
       error: 'Connect a sync code in Settings to scan labels.',
     };
   }
-  const body = await downscaleImage(file);
+  // Labels are fine print, not a plate of food - keep more pixels than the
+  // photo-log default (1024) or small per-100g figures come back garbled.
+  const body = await downscaleImage(file, 1600);
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 60_000);
   try {

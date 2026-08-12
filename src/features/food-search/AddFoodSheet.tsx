@@ -1,10 +1,11 @@
-import { lazy, Suspense, useCallback, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { Sheet } from '@/components/ui/Sheet';
 import { Tabs } from '@/components/ui/Tabs';
 import { FoodSearchPanel } from './FoodSearchPanel';
 import { QuantityStep } from './QuantityStep';
 import { ManualEntryForm } from './ManualEntryForm';
+import { LabelCaptureOverlay } from './LabelCaptureOverlay';
 import { analyzeLabel, type ScannedLabel } from './photoLabel';
 import { QuickAddForm, type QuickAddValues } from './QuickAddForm';
 import { formatKcal } from '@/lib/macros';
@@ -99,7 +100,7 @@ export function AddFoodSheet({
   const [step, setStep] = useState<Step>({ kind: 'pick' });
   const [scanError, setScanError] = useState<string | null>(null);
   const [labelScanning, setLabelScanning] = useState(false);
-  const labelInputRef = useRef<HTMLInputElement>(null);
+  const [labelCaptureOpen, setLabelCaptureOpen] = useState(false);
 
   const reset = () => {
     setStep({ kind: 'pick' });
@@ -224,14 +225,12 @@ export function AddFoodSheet({
 
   // Scan tab shortcut: read a nutrition label photo, then drop into the
   // new-product form pre-filled with the transcribed macros.
-  const handleLabelFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = ''; // allow re-picking the same file
-    if (!file) return;
+  const handleLabelImage = async (image: Blob) => {
+    setLabelCaptureOpen(false);
     setScanError(null);
     setLabelScanning(true);
     try {
-      const { label, error } = await analyzeLabel(file);
+      const { label, error } = await analyzeLabel(image);
       if (!label) {
         setScanError(error ?? "Couldn't read that label. Try again or add it manually.");
         return;
@@ -299,12 +298,10 @@ export function AddFoodSheet({
                 Reading label…
               </div>
             )}
-            <input
-              ref={labelInputRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={(e) => void handleLabelFile(e)}
+            <LabelCaptureOverlay
+              open={labelCaptureOpen}
+              onClose={() => setLabelCaptureOpen(false)}
+              onCapture={(image) => void handleLabelImage(image)}
             />
             <Suspense
               fallback={
@@ -315,7 +312,7 @@ export function AddFoodSheet({
             >
               <BarcodeScanner
                 onCode={handleBarcode}
-                onScanLabel={() => labelInputRef.current?.click()}
+                onScanLabel={() => setLabelCaptureOpen(true)}
               />
             </Suspense>
           </>

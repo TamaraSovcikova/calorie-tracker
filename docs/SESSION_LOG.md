@@ -6,10 +6,28 @@ How to use:
 - Start of session: read only the top entry, announce the chat number.
 - End of session: prepend a new entry, bump `Session count`.
 
-Session count: 3
-Last updated: 2026-07-10
+Session count: 4
+Last updated: 2026-08-12
 
 ---
+
+## Chat #4 - 2026-08-12 (six-feature batch: jump-to-today, live label capture, curated foods, weight view-all, budget mode rework, meal-editor jump; NOT deployed)
+
+- Did (all local, built + tested, nothing pushed or deployed):
+  - **Jump to today.** `DiaryPage` header: a "Jump to today" pill appears under the date whenever the day is not today. Removed the now-redundant "Go to today" overflow-menu item. The date title and the pill are siblings in a flex-col (nested buttons would be invalid).
+  - **Live nutrition-label capture.** New `src/features/food-search/LabelCaptureOverlay.tsx`: getUserMedia video preview + canvas-grab shutter, with a Gallery button beside it. Replaces the bare `<input type=file>` at BOTH call sites - the Scan tab's "No barcode? Scan a nutrition label instead" (`AddFoodSheet`) and the new-product form (`ManualEntryForm`, which is where a failed barcode lands). Reason for owning the stream rather than `<input capture>`: the OS hand-off silently falls back to the gallery picker on some Android builds. Portalled to `document.body` and `z-[120]` because both call sites sit inside a `Sheet`, whose `animate-slide-up` transform becomes the containing block for `position: fixed`. Escape is handled in the capture phase so it closes the camera, not the sheet. `analyzeLabel` now downscales to 1600px (was the photo-log default 1024) - label fine print was losing digits.
+  - **Curated foods +83.** `curatedFoods.ts` gained 35 vegetables, 23 fruits, 25 breads (UK/EU-first: swede, celeriac, tenderstem, sourdough, granary, soda bread, crispbread, sandwich thins, chapati...). `CURATED_VERSION` 2 -> 3, so installed apps re-seed on next load.
+  - **Weight log "View all".** `WeightLogSection` shows 5 by default with a `View all (n)` / `Show less` toggle; expanded list is `max-h-80 overflow-y-auto` so a long history scrolls inside the card.
+  - **Budget rework** (the big one). Three-way mode replaces the on/off switch: `budget_mode: 'off' | 'warn' | 'adjust'`.
+    - `'warn'` = the daily target NEVER moves. Days over the goal read as over (the ArcGauge already had a "KCAL OVER" state), and the running balance is shown on its own - a pill under the diary arc and a line on the `WeeklyBudgetCard` - so evening it out is the user's call.
+    - Carry-over is now a DATE WINDOW (`budget_carryover_start`), not "the previous period". This also fixes a real defect: the old one-period-back read meant a period that had been trimmed to pay off a deficit later read as a fresh surplus and REFUNDED the very overage it just paid. Accumulating day by day from a fixed start date settles instead of oscillating. Walk is capped at `MAX_CARRYOVER_DAYS` (1096) so a start date left untouched for years can't turn every render into a huge scan.
+    - `budget_max_daily_trim` (absolute kcal) replaces the 70% `weekly_budget_floor`. The floor is still honoured as a fallback when the new field was never set; an explicit `0` retires it for that profile.
+    - `ensureProfile` now runs `legacyBudgetPatch` once: old boolean -> mode, old carry-over boolean -> a start date 14 days back (deliberately not further - the old switch reached back exactly one period, so anything longer would pull in history never opted into).
+  - **Meal-entry -> meal editor.** `LogMealStep` gained `onEditRecipe` (renders "Edit this meal's ingredients" under the meal name) and `notice`. `EditEntrySheet`'s meal branch wires it to `/meals/:id/edit`, and shows a notice when the stored entry kcal no longer matches the recipe (hitting Save recomputes).
+- State: NOT deployed, NOT committed. `npm run typecheck`, `npm run build`, `npx eslint src worker` all clean (the 2 remaining lint hits - `portionSuggestions.ts` control regex, `Dog.tsx` fast-refresh - are pre-existing). 198/198 tests pass (was 184; +14 for `clampCarry`, `resolveBudgetMode`, `maxDailyTrimFor`, `datesBetween`).
+- Next: **the D1 migration MUST run before `wrangler deploy`.** `worker/sync.ts` builds `INSERT INTO profiles (...)` straight from its COLUMNS list, so deploying the worker against an unmigrated D1 breaks profile sync for every user with "no such column". Three additive ALTERs, one at a time, documented at the bottom of the profiles block in `worker/schema.sql`: `budget_mode TEXT`, `budget_carryover_start TEXT`, `budget_max_daily_trim REAL`.
+- Then device-test on the Pixel: live camera capture (the whole point of the change - confirm the shutter works and Gallery still offers the library), the balance pill under the arc in warn mode, and the re-seeded curated foods showing up in search.
+- Open: everything from Chat #3 still stands (pantry planner build, PWA reinstall for the icon/shortcuts, pet reaction thresholds, rotate the Gemini key).
 
 ## Chat #3 - 2026-07-10 (pantry planner design + eng review; food-search fixes; deployed)
 

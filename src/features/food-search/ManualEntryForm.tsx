@@ -1,8 +1,9 @@
-import { useRef, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ArrowLeft, Loader2, Plus, ScanText, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input, LabeledInput } from '@/components/ui/Input';
 import { createFood, updateFood } from '@/db/repos/foods';
+import { LabelCaptureOverlay } from './LabelCaptureOverlay';
 import { analyzeLabel, type ScannedLabel } from './photoLabel';
 import { suggestPortions } from '@/lib/portionSuggestions';
 import { formatGrams } from '@/lib/macros';
@@ -94,7 +95,7 @@ export function ManualEntryForm({
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [scanning, setScanning] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [captureOpen, setCaptureOpen] = useState(false);
 
   // Suggestions update live as the user types the name (filtered to exclude
   // units they've already added).
@@ -106,14 +107,12 @@ export function ManualEntryForm({
     [form.name, form.brand, units],
   );
 
-  const handleLabelFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = ''; // allow re-picking the same file
-    if (!file) return;
+  const handleLabelImage = async (image: Blob) => {
+    setCaptureOpen(false);
     setError(null);
     setScanning(true);
     try {
-      const { label, error: scanError } = await analyzeLabel(file);
+      const { label, error: scanError } = await analyzeLabel(image);
       if (!label) {
         setError(scanError ?? "Couldn't read that label.");
         return;
@@ -223,23 +222,20 @@ export function ManualEntryForm({
       </div>
 
       <div className="space-y-3 p-4">
-        {/* Scan or upload a nutrition label to auto-fill the macros below.
-            No `capture` attribute: the OS picker then offers both the camera
-            and the photo library, so a label already saved as a photo works
-            just as well as a fresh snap. */}
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*"
-          className="hidden"
-          onChange={(e) => void handleLabelFile(e)}
+        {/* Scan a nutrition label to auto-fill the macros below. The overlay
+            opens a live camera with a gallery option beside the shutter, so
+            shooting the label now and picking one shot earlier both work. */}
+        <LabelCaptureOverlay
+          open={captureOpen}
+          onClose={() => setCaptureOpen(false)}
+          onCapture={(image) => void handleLabelImage(image)}
         />
         <Button
           type="button"
           variant="secondary"
           block
           disabled={scanning}
-          onClick={() => fileInputRef.current?.click()}
+          onClick={() => setCaptureOpen(true)}
         >
           {scanning ? (
             <>
@@ -249,12 +245,14 @@ export function ManualEntryForm({
           ) : (
             <>
               <ScanText className="h-4 w-4" />
-              Scan or upload a nutrition label
+              Scan a nutrition label
             </>
           )}
         </Button>
         <p className="-mt-1 text-center text-[11px] text-muted-foreground">
-          Snap the label or pick a photo and we'll fill in the macros - check them, name it, save.
+          {initialBarcode && !initialLabel
+            ? "That barcode isn't in the database yet - scan its nutrition label and we'll fill the macros in for you."
+            : "Shoot the label or pick one from your gallery and we'll fill in the macros - check them, name it, save."}
         </p>
 
         <LabeledInput
