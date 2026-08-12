@@ -11,6 +11,12 @@ Last updated: 2026-08-12
 
 ---
 
+## Chat #4b - 2026-08-12 (warn-mode paydown rate; deployed)
+
+- Did: `budget_warn_catchup` (kcal/day). In `'warn'` mode the target never moved, so there was no way to actually clear a balance short of eating under by eye. Set a rate and that much comes off the daily target while the balance is in the red. New pure `catchupTrim(rate, balance)` takes the LESSER of the rate and what is owed, so it cannot overshoot into a fresh surplus (150/day against 40 outstanding takes 40), and returns 0 as soon as the balance is level or banked. Field shows only under `mode === 'warn'`; `WeeklyBudgetCard` explains the lowered target when it applies. `WeeklyBudget.catchupApplied` carries it for display.
+- D1: `ALTER TABLE profiles ADD COLUMN budget_warn_catchup REAL` applied to the remote DB BEFORE deploy, then the full 33-column `SELECT` from `worker/sync.ts` COLUMNS smoke-tested green against live (2 rows).
+- State: deployed. 203/203 tests, typecheck + build + eslint clean.
+
 ## Chat #4 - 2026-08-12 (six-feature batch: jump-to-today, live label capture, curated foods, weight view-all, budget mode rework, meal-editor jump; NOT deployed)
 
 - Did (all local, built + tested, nothing pushed or deployed):

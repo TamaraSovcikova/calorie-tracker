@@ -37,7 +37,9 @@ export function WeeklyBudgetCard({ weekly }: { weekly: WeeklyBudget }) {
 
       <p className="mt-2 text-xs text-muted-foreground">
         {warnOnly
-          ? `Target held at ${formatKcal(weekly.dailyGoal)} kcal/day - nothing is trimmed for you.`
+          ? weekly.catchupApplied > 0
+            ? `Today set to ${formatKcal(weekly.adjustedTarget)} kcal - ${formatKcal(weekly.catchupApplied)} off your goal, at the rate you chose to work the balance off.`
+            : `Target held at ${formatKcal(weekly.dailyGoal)} kcal/day - nothing is trimmed for you.`
           : weekly.isAdjusted
             ? weekly.adjustedTarget < weekly.dailyGoal
               ? `Today trimmed to ${formatKcal(weekly.adjustedTarget)} kcal to stay on budget.`

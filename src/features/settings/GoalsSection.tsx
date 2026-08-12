@@ -339,6 +339,30 @@ export function GoalsSection({ profile }: GoalsSectionProps) {
             </>
           )}
 
+          {mode === 'warn' && (
+            <LabeledInput
+              label="Work off the balance at (optional)"
+              type="number"
+              inputMode="numeric"
+              step="any"
+              min="0"
+              placeholder="Don't touch my target"
+              hint="While you're over, take this much off your daily target to chip away at it. Put 150 here and you'll aim 150 lower each day until the balance clears - it never takes off more than you actually owe, and it stops on its own."
+              value={
+                profile.budget_warn_catchup && profile.budget_warn_catchup > 0
+                  ? String(profile.budget_warn_catchup)
+                  : ''
+              }
+              onChange={(e) => {
+                const n = parseFloat(e.target.value);
+                void updateProfile({
+                  budget_warn_catchup: Number.isFinite(n) && n > 0 ? n : 0,
+                });
+              }}
+              trailing="kcal/day"
+            />
+          )}
+
           {mode === 'adjust' && (
             <LabeledInput
               label="Most a day may be trimmed (optional)"

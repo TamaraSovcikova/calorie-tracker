@@ -71,6 +71,7 @@ const COLUMNS: Record<TableName, string[]> = {
     'budget_carryover_cap',
     'budget_carryover_start',
     'budget_max_daily_trim',
+    'budget_warn_catchup',
     'week_start_day',
     'weekly_budget_floor',
     'untracked_dates',

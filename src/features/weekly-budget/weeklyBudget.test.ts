@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   carryInClamped,
+  catchupTrim,
   clampCarry,
   datesBetween,
   effectiveDailyKcal,
@@ -283,5 +284,40 @@ describe('datesBetween', () => {
     expect(dates.length).toBe(1096);
     expect(dates[dates.length - 1]).toBe('2026-05-19');
     expect(dates[0]).toBe('2023-05-20');
+  });
+});
+
+describe('catchupTrim', () => {
+  it('takes the full daily rate off while plenty is owed', () => {
+    expect(catchupTrim(150, -1200)).toBe(150);
+  });
+
+  it('never takes off more than is actually owed', () => {
+    // 150/day rate but only 40 outstanding - clear the 40, don't overshoot
+    // into a fresh surplus.
+    expect(catchupTrim(150, -40)).toBe(40);
+  });
+
+  it('stops once the balance is level or banked', () => {
+    expect(catchupTrim(150, 0)).toBe(0);
+    expect(catchupTrim(150, 900)).toBe(0);
+  });
+
+  it('is off when no rate is set', () => {
+    expect(catchupTrim(undefined, -1200)).toBe(0);
+    expect(catchupTrim(0, -1200)).toBe(0);
+  });
+
+  it('clears a balance over several days at the chosen rate', () => {
+    // 500 owed, 200/day -> 200, 200, then the remaining 100, then nothing.
+    let owed = -500;
+    const taken: number[] = [];
+    for (let day = 0; day < 4; day++) {
+      const t = catchupTrim(200, owed);
+      taken.push(t);
+      owed += t;
+    }
+    expect(taken).toEqual([200, 200, 100, 0]);
+    expect(owed).toBe(0);
   });
 });

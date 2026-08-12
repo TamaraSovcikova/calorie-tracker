@@ -87,6 +87,22 @@ export function maxDailyTrimFor(
   return undefined;
 }
 
+/**
+ * How many kcal to take off today's target to work off a balance that is in
+ * the red, at the user's chosen daily rate. Never more than is actually
+ * owed - a 150/day rate against 40 kcal outstanding takes off 40, not 150,
+ * so the paydown can't overshoot into a new surplus. Returns 0 when the
+ * balance is level or banked, or when no rate is set.
+ */
+export function catchupTrim(
+  catchup: number | undefined,
+  balance: number,
+): number {
+  if (!catchup || catchup <= 0) return 0;
+  if (balance >= 0) return 0;
+  return Math.min(catchup, -balance);
+}
+
 /** Inclusive list of dates from `start` to `end`, empty when start > end.
  *  Truncated to the most recent MAX_CARRYOVER_DAYS. */
 export function datesBetween(start: LocalDate, end: LocalDate): LocalDate[] {
@@ -229,6 +245,9 @@ export interface WeeklyBudget {
   /** kcal the target was prevented from dropping by `budget_max_daily_trim`
    *  (0 when the cap did not bite). */
   trimHeldBack: number;
+  /** 'warn' mode: kcal taken off today's target to work off the balance at
+   *  the user's chosen rate (0 when off, or when nothing is owed). */
+  catchupApplied: number;
   /** kcal eaten on the days before `date` this period. */
   consumedBeforeDay: number;
   /** kcal eaten on all days up to and including `date`. */
@@ -363,6 +382,13 @@ export async function computeWeeklyBudget(
 
   let adjustedTarget = dailyGoal;
   let trimHeldBack = 0;
+  // 'warn' mode leaves the target alone unless the user asked for a paydown
+  // rate. Even then it is their number, applied only while something is owed.
+  const catchupApplied =
+    mode === 'warn' ? catchupTrim(profile.budget_warn_catchup, carryBalance) : 0;
+  if (catchupApplied > 0) {
+    adjustedTarget = Math.max(0, dailyGoal - catchupApplied);
+  }
   if (mode === 'adjust') {
     adjustedTarget = (weeklyBudget + carryIn - consumedBeforeDay) / daysRemaining;
     const maxTrim = maxDailyTrimFor(profile, dailyGoal);
@@ -386,6 +412,7 @@ export async function computeWeeklyBudget(
     balanceFrom,
     carryoverOn,
     trimHeldBack,
+    catchupApplied,
     consumedBeforeDay,
     weekConsumed,
     adjustedTarget,

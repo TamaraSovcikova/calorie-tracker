@@ -92,6 +92,14 @@ export interface Profile {
    */
   budget_max_daily_trim?: number;
   /**
+   * 'warn' mode only. When the running balance is in the red, take this many
+   * kcal off the daily target to chip away at it - the user's own paydown
+   * rate, opted into rather than imposed. Never takes off more than is
+   * actually owed, and stops once the balance clears. Undefined or <= 0
+   * leaves the target untouched.
+   */
+  budget_warn_catchup?: number;
+  /**
    * Budget period: 'week' (default) recalculates over a 7-day week; 'month'
    * recalculates over the calendar month, so a single bad day dilutes far
    * more and an end-of-period overage still has days left to absorb it.
