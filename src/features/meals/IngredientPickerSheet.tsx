@@ -1,7 +1,7 @@
 import { lazy, Suspense, useCallback, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { Sheet } from '@/components/ui/Sheet';
-import { Tabs } from '@/components/ui/Tabs';
+import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { FoodSearchPanel } from '@/features/food-search/FoodSearchPanel';
 import { QuantityStep } from '@/features/food-search/QuantityStep';
 import { ManualEntryForm } from '@/features/food-search/ManualEntryForm';
@@ -116,7 +116,7 @@ export function IngredientPickerSheet({
     content = (
       <div className="flex h-full flex-col">
         <div className="border-b border-border p-3">
-          <Tabs<Tab>
+          <SegmentedControl<Tab>
             value={tab}
             onChange={setTab}
             options={[

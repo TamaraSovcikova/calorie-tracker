@@ -6,6 +6,7 @@ import {
   CalendarCheck,
   CalendarDays,
   CalendarOff,
+  Check,
   ChevronLeft,
   ChevronRight,
   CopyPlus,
@@ -16,6 +17,7 @@ import {
   TrendingUp,
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { CoachTip } from '@/components/ui/CoachTip';
 import { ArcGauge } from '@/components/ArcGauge';
 import { DiarySectionView } from '@/features/diary/DiarySection';
 import { CopyDaySheet } from '@/features/diary/CopyDaySheet';
@@ -185,25 +187,12 @@ export function DiaryPage() {
               className="flex flex-col items-center"
             >
               <div
-                style={{
-                  fontSize: 11,
-                  fontWeight: 600,
-                  letterSpacing: '0.18em',
-                  color: 'var(--color-text-faint)',
-                  textTransform: 'uppercase',
-                }}
+                className="text-eyebrow uppercase"
+                style={{ color: 'var(--color-text-faint)' }}
               >
                 {format(fromLocalDate(currentDate), 'EEEE d MMMM')}
               </div>
-              <div
-                style={{
-                  fontSize: 26,
-                  fontWeight: 600,
-                  letterSpacing: '-0.02em',
-                  marginTop: 4,
-                  color: 'var(--color-text)',
-                }}
-              >
+              <div className="mt-1 text-title" style={{ color: 'var(--color-text)' }}>
                 {onToday ? 'Today' : formatDayHeader(currentDate)}
               </div>
             </button>
@@ -213,7 +202,7 @@ export function DiaryPage() {
               <button
                 type="button"
                 onClick={() => goToDate(todayLocal())}
-                className="mt-1.5 inline-flex items-center gap-1 rounded-full border border-border px-2.5 py-1 text-[11px] font-semibold hover:bg-muted"
+                className="tap-target mt-1 inline-flex items-center gap-1 rounded-full border border-border px-3 text-[11px] font-semibold hover:bg-muted"
                 style={{ color: 'var(--color-text-muted)' }}
               >
                 <CalendarDays className="h-3 w-3" />
@@ -336,20 +325,21 @@ export function DiaryPage() {
         {weekly && Math.abs(Math.round(weekly.carryBalance)) >= 1 && (
           <button
             type="button"
-            onClick={() => navigate('/pet')}
-            className="flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11.5px] font-semibold"
+            onClick={() => navigate('/progress')}
+            className="tap-target flex items-center gap-1.5 rounded-full border px-3 text-[11.5px] font-semibold"
             style={{
               marginTop: -2,
+              // Same --over token as the arc, so one meaning has one colour.
               borderColor:
                 weekly.carryBalance < 0
-                  ? 'rgba(217,119,6,0.35)'
+                  ? 'hsl(var(--over) / 0.35)'
                   : 'var(--color-border)',
               color:
                 weekly.carryBalance < 0
-                  ? 'rgb(180,83,9)'
+                  ? 'hsl(var(--over))'
                   : 'var(--color-text-muted)',
               background:
-                weekly.carryBalance < 0 ? 'rgba(217,119,6,0.08)' : 'transparent',
+                weekly.carryBalance < 0 ? 'hsl(var(--over) / 0.08)' : 'transparent',
             }}
           >
             {weekly.carryBalance < 0 ? (
@@ -368,68 +358,89 @@ export function DiaryPage() {
 
         {profile && (
           <div style={{ display: 'flex', gap: 26, marginTop: 4 }}>
-            {macroRows.map(({ key, label, value, target }) => (
-              <div
-                key={key}
-                style={{
-                  width: 78,
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  gap: 7,
-                }}
-              >
+            {macroRows.map(({ key, label, value, target }) => {
+              // Hitting a macro target used to pass completely unmarked. It is
+              // acknowledged where it happens rather than with a celebration
+              // overlay - a tracker that congratulates you loudly gets tiring
+              // by the third day.
+              const hit = target > 0 && value >= target;
+              return (
                 <div
+                  key={key}
                   style={{
-                    fontSize: 15,
-                    fontWeight: 700,
-                    fontVariantNumeric: 'tabular-nums',
-                    color: 'var(--color-text)',
-                  }}
-                >
-                  {value}
-                  <span
-                    style={{
-                      fontSize: 10.5,
-                      fontWeight: 500,
-                      color: 'var(--color-text-faint)',
-                    }}
-                  >
-                    /{target}g
-                  </span>
-                </div>
-                <div
-                  style={{
-                    width: '100%',
-                    height: 2,
-                    borderRadius: 2,
-                    background: 'var(--color-border)',
-                    overflow: 'hidden',
+                    width: 78,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: 7,
                   }}
                 >
                   <div
                     style={{
-                      height: '100%',
-                      borderRadius: 2,
-                      background: 'var(--color-text)',
-                      width: `${target > 0 ? Math.min(100, (value / target) * 100) : 0}%`,
-                      transition: 'width 0.6s ease',
+                      fontSize: 15,
+                      fontWeight: 700,
+                      fontVariantNumeric: 'tabular-nums',
+                      color: hit ? 'var(--color-accent-deep)' : 'var(--color-text)',
+                      display: 'flex',
+                      alignItems: 'baseline',
+                      gap: 2,
                     }}
-                  />
+                  >
+                    {hit && (
+                      <Check
+                        className="h-3 w-3 self-center"
+                        strokeWidth={3}
+                        aria-label="target reached"
+                      />
+                    )}
+                    {value}
+                    <span
+                      style={{
+                        fontSize: 10.5,
+                        fontWeight: 500,
+                        color: 'var(--color-text-faint)',
+                      }}
+                    >
+                      /{target}g
+                    </span>
+                  </div>
+                  <div
+                    style={{
+                      width: '100%',
+                      height: 2,
+                      borderRadius: 2,
+                      background: 'var(--color-border)',
+                      overflow: 'hidden',
+                    }}
+                  >
+                    <div
+                      style={{
+                        height: '100%',
+                        borderRadius: 2,
+                        background: hit
+                          ? 'var(--color-accent-deep)'
+                          : 'var(--color-text)',
+                        width: `${target > 0 ? Math.min(100, (value / target) * 100) : 0}%`,
+                        transition: 'width 0.6s ease, background 0.4s ease',
+                      }}
+                    />
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 10.5,
+                      fontWeight: 600,
+                      letterSpacing: '0.04em',
+                      color: hit
+                        ? 'var(--color-accent-deep)'
+                        : 'var(--color-text-faint)',
+                      textTransform: 'uppercase',
+                    }}
+                  >
+                    {label}
+                  </div>
                 </div>
-                <div
-                  style={{
-                    fontSize: 10.5,
-                    fontWeight: 600,
-                    letterSpacing: '0.04em',
-                    color: 'var(--color-text-faint)',
-                    textTransform: 'uppercase',
-                  }}
-                >
-                  {label}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
@@ -465,6 +476,17 @@ export function DiaryPage() {
               Health sync couldn't connect - tap to go to Settings and reconnect.
             </span>
           </button>
+        )}
+
+        {/* First run: the diary is an arc reading 0, four section cards and
+            nothing pointing anywhere. Shown only while today is genuinely
+            empty, and dismissed for good on the first tap. */}
+        {!selectMode && onToday && !loading && entries?.length === 0 && (
+          <CoachTip id="diary-first-log">
+            Tap <span className="font-medium text-foreground">Add</span> on any
+            meal to log something. Search a food, scan a barcode, or snap a
+            photo - and swipe a past day's row to copy it here.
+          </CoachTip>
         )}
 
         {!selectMode && onToday && <WeeklyDigestCard />}

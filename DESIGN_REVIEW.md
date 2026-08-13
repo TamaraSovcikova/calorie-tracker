@@ -245,44 +245,56 @@ Each derives from a finding above. P1 blocks ship, P2 same branch, P3 follow-up.
       Hanken Grotesk (finding 5.5). Pulled forward out of T7 because the
       typeface was silently not applying to any `font-sans` utility.
 
-### P2
+### P2 — done 2026-08-13
 
-- [ ] **T5** — `app/progress/ProgressPage.tsx`, `app/pet/PetPage.tsx` — move
-      `WeeklyBudgetCard` to Progress and rebuild the page hierarchy
-  - Surfaced by: 1.1 + 1.3 — budget explanation is off-nav; Progress under-earns its slot
-  - Verify: diary balance pill routes to Progress; Pet still renders
-- [ ] **T6** — `src/index.css`, `components/ArcGauge.tsx` — dedicated
-      over-budget token in the amber family; ArcGauge stops using `--destructive`
-  - Surfaced by: 3.1 — over-target and data-loss share one colour
-  - Verify: go over target; arc and balance pill agree
-- [ ] **T7** — `src/index.css`, `tailwind.config.ts` — type and space scales
-  - Surfaced by: 5.2 — `0.18em` and `fontSize: 26` hand-written in two files
-- [ ] **T8** — `app/diary`, `app/library` — adopt `PageHeader`, delete the
-      hand-rolled headers
-  - Surfaced by: 5.3 — two header systems
-- [ ] **T9** — new `components/ui/SegmentedControl.tsx` — one control; migrate
-      `ui/Tabs`, the LibraryPage pill switcher and the three Settings variants
-  - Surfaced by: 5.1 — three implementations, a fourth instance added recently
-- [ ] **T10** — new `DESIGN.md` — palette, type scale, space scale, component
-      vocabulary, which primitive to reach for
-  - Surfaced by: 5.4 — root cause of 5.1-5.3
-- [ ] **T11** — apply `.tap-target` to the Jump-to-today pill, balance pill,
-      weight-log View all, and Edit-this-meal link
-  - Surfaced by: 6.3 — four controls at roughly 22-28px
-- [ ] **T12** — Progress nutrition summary gets the weight chart's range toggle
-  - Surfaced by: Pass 7 — asymmetry on the page being rebuilt; folds into T5
+- [x] **T5** — `WeeklyBudgetCard` moved from `PetPage` to `ProgressPage`, and
+      Progress rebuilt into three labelled horizons: Right now (budget and
+      balance), Recent days (nutrition), Over time (weight and goal). The
+      diary balance pill now routes to `/progress`; Pet gets a "See your
+      calorie budget" link out.
+- [x] **T6** — new `--over` token in both themes. `ArcGauge` and the diary
+      balance pill both use it; `--destructive` is back to meaning destructive.
+      Added to the contrast test — it carries an 11px "KCAL OVER" label, so it
+      needs the body-text floor, and the first value picked (`32 68% 42%`)
+      failed at 3.58:1 and was darkened to `32 68% 36%` (4.65:1).
+- [x] **T7** — named type scale in `tailwind.config.ts`: `text-display`,
+      `text-title`, `text-eyebrow`. Tailwind's own spacing scale is the space
+      scale; deliberately no second one.
+- [x] **T8** — `PageHeader` gained an `eyebrow` and a `display` variant.
+      Library uses it. Diary keeps its date navigator, which is genuinely a
+      different component, but now draws from the type scale rather than
+      hand-written values — folding it into `PageHeader` would have bloated
+      that component to serve one caller.
+- [x] **T9** — new `ui/SegmentedControl` with `track` and `solid` variants and
+      an `onDeselect` for optional fields. `ui/Tabs` deleted; all five call
+      sites migrated (AddFoodSheet, IngredientPickerSheet, LibraryPage,
+      PreferencesSection, GoalsSection, ProfileSection). Only `Tabs` had any
+      ARIA before; all of them do now.
+- [x] **T10** — `DESIGN.md` written.
+- [x] **T11** — `.tap-target` on the Jump-to-today pill, balance pill,
+      weight-log View all, Edit-this-meal link, and every nav item.
+- [x] **T12** — **the original finding was wrong.** Inherited from the stale
+      `UX_AUDIT.md` §7.1, which predated the nutrition summary getting its own
+      7/14/30 toggle. The real asymmetry was span (nutrition stopped at 30 days
+      while weight ran to a year) and a fifth near-duplicate pill control.
+      Added 90D, and extracted `ui/RangePills` used by both charts.
 
-### P3
+### P3 — done 2026-08-13
 
-- [ ] **T13** — `features/diary/DiarySection.tsx` — visible affordance for
-      swipe-to-copy on past-day rows
-  - Surfaced by: Pass 7 — shipped gesture with near-zero discovery
-- [ ] **T14** — goal-hit moment wired to the pet reaction system
-  - Surfaced by: 3.2 — raised as `UX_AUDIT.md` §5.6, never built
-- [ ] **T15** — first-run `CoachTip` on the diary
-  - Surfaced by: 2.2 — component exists, used once
-- [ ] **T16** — intentional layout above phone width (deferred, note only)
-  - Surfaced by: 6.4
+- [x] **T13** — `SwipeToCopy` now shows a thin grip at the row's trailing edge
+      that fades once the drag starts.
+- [x] **T14** — a macro reaching its target turns its value, bar and label
+      accent-coloured and adds a check. Deliberately not a celebration overlay:
+      the dog already pulses happy on calorie fullness, and a tracker that
+      congratulates loudly gets tiring by the third day.
+- [x] **T15** — first-run `CoachTip` on the diary, shown only while today is
+      genuinely empty.
+
+### Deferred
+
+- [ ] **T16** — intentional layout above phone width. Real product decision,
+      not design debt; `max-w-md` stands until you want a desktop story.
+- [ ] Onboarding goal direction (cut / maintain / gain), `UX_AUDIT.md` §6.1.
 
 ---
 

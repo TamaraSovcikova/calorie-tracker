@@ -57,6 +57,10 @@ const TEXT_ON_BG: [text: string, bg: string][] = [
   ['--card-foreground', '--card'],
   ['--color-text-muted', '--card'],
   ['--color-text-faint', '--card'],
+  // The over-budget colour carries an 11px "KCAL OVER" label, so it is body
+  // text and needs the normal floor, not the large-text one.
+  ['--over', '--color-bg'],
+  ['--over', '--card'],
 ];
 
 describe('parseHex', () => {

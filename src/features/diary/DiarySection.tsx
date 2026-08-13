@@ -72,6 +72,31 @@ function SwipeToCopy({
         <CalendarPlus className="h-4 w-4" />
         Today
       </div>
+      {/* Without a hint this gesture was undiscoverable - nothing on the row
+          suggested it existed, so it was only ever found by accident. A thin
+          grip at the trailing edge shows there is something to pull, and
+          fades out once the drag is under way so it does not fight the
+          revealed action. */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-y-0 right-1 z-10 flex flex-col items-center justify-center gap-[3px]"
+        style={{
+          opacity: dx < -4 ? 0 : 0.5,
+          transition: 'opacity 0.15s ease',
+        }}
+      >
+        {[0, 1].map((i) => (
+          <span
+            key={i}
+            style={{
+              width: 2,
+              height: 9,
+              borderRadius: 1,
+              background: 'var(--color-text-faint)',
+            }}
+          />
+        ))}
+      </div>
       <div
         className="relative bg-card"
         style={{

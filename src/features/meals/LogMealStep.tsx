@@ -72,7 +72,7 @@ export function LogMealStep({
           <button
             type="button"
             onClick={onEditRecipe}
-            className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+            className="tap-target -ml-2 mt-1 inline-flex items-center gap-1 px-2 text-xs font-medium text-primary hover:underline"
           >
             <Pencil className="h-3.5 w-3.5" />
             Edit this meal's ingredients

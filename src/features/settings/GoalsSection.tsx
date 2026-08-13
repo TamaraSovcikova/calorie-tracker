@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { LabeledInput } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { Switch } from '@/components/ui/Switch';
+import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { SettingCard } from './SettingCard';
 import { updateProfile } from '@/db/repos/profile';
 import { formatKcal } from '@/lib/macros';
@@ -162,28 +163,17 @@ export function GoalsSection({ profile }: GoalsSectionProps) {
         </div>
       )}
 
-      <div className="space-y-1">
-        <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          Primary macro shown alongside kcal
-        </span>
-        <div className="flex rounded-lg border border-border overflow-hidden">
-          {(['protein', 'carbs', 'fat'] as const).map((m) => (
-            <button
-              key={m}
-              type="button"
-              onClick={() => void updateProfile({ primary_macro: m })}
-              className="flex-1 py-2 text-sm font-medium capitalize transition-colors"
-              style={{
-                background: profile.primary_macro === m ? 'var(--color-accent-deep)' : 'transparent',
-                color: profile.primary_macro === m ? '#fff' : 'var(--color-text-muted)',
-                borderRight: m !== 'fat' ? '1px solid var(--color-border)' : 'none',
-              }}
-            >
-              {m.charAt(0).toUpperCase() + m.slice(1)}
-            </button>
-          ))}
-        </div>
-      </div>
+      <SegmentedControl
+        label="Primary macro shown alongside kcal"
+        variant="solid"
+        value={profile.primary_macro ?? 'protein'}
+        onChange={(m) => void updateProfile({ primary_macro: m })}
+        options={[
+          { value: 'protein', label: 'Protein' },
+          { value: 'carbs', label: 'Carbs' },
+          { value: 'fat', label: 'Fat' },
+        ]}
+      />
 
       <Switch
         label="Add burned calories to my target"
@@ -193,54 +183,28 @@ export function GoalsSection({ profile }: GoalsSectionProps) {
       />
 
       <div className="space-y-1">
-        <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          Calorie budget
-        </span>
-        <div className="flex overflow-hidden rounded-lg border border-border">
-          {BUDGET_MODES.map(([val, label], i) => (
-            <button
-              key={val}
-              type="button"
-              onClick={() => setBudgetMode(val)}
-              className="flex-1 py-2 text-sm font-medium transition-colors"
-              style={{
-                background: mode === val ? 'var(--color-accent-deep)' : 'transparent',
-                color: mode === val ? '#fff' : 'var(--color-text-muted)',
-                borderRight:
-                  i < BUDGET_MODES.length - 1 ? '1px solid var(--color-border)' : 'none',
-              }}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+        <SegmentedControl
+          label="Calorie budget"
+          variant="solid"
+          value={mode}
+          onChange={setBudgetMode}
+          options={BUDGET_MODES.map(([value, label]) => ({ value, label }))}
+        />
         <p className="text-xs text-muted-foreground">{MODE_HELP[mode]}</p>
       </div>
 
       {mode !== 'off' && (
         <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-3">
-          <div className="space-y-1">
-            <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Budget period
-            </span>
-            <div className="flex rounded-lg border border-border overflow-hidden">
-              {([['week', 'Weekly'], ['month', 'Monthly']] as const).map(([val, label]) => (
-                <button
-                  key={val}
-                  type="button"
-                  onClick={() => void updateProfile({ budget_period: val })}
-                  className="flex-1 py-2 text-sm font-medium transition-colors"
-                  style={{
-                    background: (profile.budget_period ?? 'week') === val ? 'var(--color-accent-deep)' : 'transparent',
-                    color: (profile.budget_period ?? 'week') === val ? '#fff' : 'var(--color-text-muted)',
-                    borderRight: val === 'week' ? '1px solid var(--color-border)' : 'none',
-                  }}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-          </div>
+          <SegmentedControl
+            label="Budget period"
+            variant="solid"
+            value={profile.budget_period ?? 'week'}
+            onChange={(v) => void updateProfile({ budget_period: v })}
+            options={[
+              { value: 'week', label: 'Weekly' },
+              { value: 'month', label: 'Monthly' },
+            ]}
+          />
 
           {(profile.budget_period ?? 'week') === 'week' && (
             <label className="block space-y-1">

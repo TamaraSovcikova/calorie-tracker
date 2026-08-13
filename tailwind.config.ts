@@ -35,6 +35,7 @@ const config: Config = {
           DEFAULT: 'hsl(var(--card))',
           foreground: 'hsl(var(--card-foreground))',
         },
+        over: 'hsl(var(--over))',
         kcal: 'hsl(var(--kcal))',
         protein: 'hsl(var(--protein))',
         carbs: 'hsl(var(--carbs))',
@@ -44,6 +45,23 @@ const config: Config = {
         lg: 'var(--radius)',
         md: 'calc(var(--radius) - 2px)',
         sm: 'calc(var(--radius) - 4px)',
+      },
+      /**
+       * Named type scale. Before this, DiaryPage and LibraryPage each
+       * hand-wrote `fontSize: 26, letterSpacing: '-0.02em'` for the page
+       * title and `fontSize: 11, letterSpacing: '0.18em'` for the eyebrow -
+       * identical values, two files, no shared source. Tailwind's own
+       * spacing scale is the canonical space scale; there is deliberately
+       * no second one.
+       */
+      fontSize: {
+        // The number inside the calorie arc. One use, but it is the single
+        // largest thing in the app and wants naming.
+        display: ['42px', { lineHeight: '1', letterSpacing: '-0.02em', fontWeight: '300' }],
+        // Page titles: Today, Library, Progress, Settings.
+        title: ['26px', { lineHeight: '1.15', letterSpacing: '-0.02em', fontWeight: '600' }],
+        // The uppercase line above a page title, and section labels.
+        eyebrow: ['11px', { lineHeight: '1.2', letterSpacing: '0.18em', fontWeight: '600' }],
       },
       // Must lead with Hanken Grotesk to match `body` in index.css. Without
       // it, anything using Tailwind's `font-sans` utility silently fell back

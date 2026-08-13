@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Sparkles } from 'lucide-react';
 import { LabeledInput } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
+import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { SettingCard } from './SettingCard';
 import { updateProfile } from '@/db/repos/profile';
 import {
@@ -142,32 +143,24 @@ export function ProfileSection({ profile }: ProfileSectionProps) {
         onBlur={commit}
       />
       <div className="grid grid-cols-2 gap-2">
-        <div className="space-y-1">
-          <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Sex
-          </span>
-          <div className="flex rounded-lg border border-border overflow-hidden" style={{ height: 38 }}>
-            {([['female', 'Female'], ['male', 'Male']] as [Sex, string][]).map(([val, label], i) => (
-              <button
-                key={val}
-                type="button"
-                onClick={() => {
-                  const next = form.sex === val ? '' : val;
-                  update('sex', next);
-                  void updateProfile({ sex: (next || undefined) as Sex | undefined });
-                }}
-                className="flex-1 text-sm font-medium transition-colors"
-                style={{
-                  background: form.sex === val ? 'var(--color-accent-deep)' : 'transparent',
-                  color: form.sex === val ? '#fff' : 'var(--color-text-muted)',
-                  borderRight: i === 0 ? '1px solid var(--color-border)' : 'none',
-                }}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        </div>
+        <SegmentedControl<Sex>
+          label="Sex"
+          variant="solid"
+          value={(form.sex || '') as Sex | ''}
+          options={[
+            { value: 'female', label: 'Female' },
+            { value: 'male', label: 'Male' },
+          ]}
+          onChange={(next) => {
+            update('sex', next);
+            void updateProfile({ sex: next });
+          }}
+          // Optional field: tapping the active one clears it again.
+          onDeselect={() => {
+            update('sex', '');
+            void updateProfile({ sex: undefined });
+          }}
+        />
         <LabeledInput
           label="Date of birth"
           type="date"

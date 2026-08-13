@@ -49,7 +49,7 @@ export function ArcGauge({
           cy={size / 2}
           r={r}
           fill="none"
-          stroke={isOver ? 'hsl(var(--destructive))' : 'var(--color-accent)'}
+          stroke={isOver ? 'hsl(var(--over))' : 'var(--color-accent)'}
           strokeWidth={strokeWidth}
           strokeLinecap="round"
           strokeDasharray={`${fillLength} ${circumference}`}
@@ -70,7 +70,7 @@ export function ArcGauge({
               letterSpacing: '-0.02em',
               fontVariantNumeric: 'tabular-nums',
               lineHeight: 1,
-              color: isOver ? 'hsl(var(--destructive))' : 'var(--color-text)',
+              color: isOver ? 'hsl(var(--over))' : 'var(--color-text)',
             }}
           >
             {isOver ? fmt(overage) : fmt(remaining)}
@@ -80,7 +80,7 @@ export function ArcGauge({
               fontSize: 11,
               fontWeight: 700,
               letterSpacing: '0.1em',
-              color: isOver ? 'hsl(var(--destructive))' : 'var(--color-accent)',
+              color: isOver ? 'hsl(var(--over))' : 'var(--color-accent)',
               marginTop: 6,
               textTransform: 'uppercase',
             }}

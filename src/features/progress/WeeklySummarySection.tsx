@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { format } from 'date-fns';
 import { CalendarDays } from 'lucide-react';
+import { RangePills } from '@/components/ui/RangePills';
 import { useWeeklySummary } from './useWeeklySummary';
 import { fromLocalDate } from '@/lib/dates';
 import { formatKcal } from '@/lib/macros';
@@ -10,7 +11,10 @@ interface WeeklySummarySectionProps {
   profile: Profile;
 }
 
-const RANGES = [7, 14, 30] as const;
+// 90 added so the nutrition span reaches far enough to sit alongside the
+// weight chart's 3M view - previously it stopped at 30 days while weight went
+// out to a year, so the two halves of Progress answered different questions.
+const RANGES = [7, 14, 30, 90] as const;
 type Range = (typeof RANGES)[number];
 
 export function WeeklySummarySection({ profile }: WeeklySummarySectionProps) {
@@ -24,22 +28,12 @@ export function WeeklySummarySection({ profile }: WeeklySummarySectionProps) {
           <CalendarDays className="h-4 w-4 text-muted-foreground" />
           Last {range} days
         </h2>
-        <div className="flex gap-1">
-          {RANGES.map((r) => (
-            <button
-              key={r}
-              type="button"
-              onClick={() => setRange(r)}
-              className={`rounded-full border px-2.5 py-1 text-xs font-medium transition-colors ${
-                range === r
-                  ? 'border-primary bg-primary text-primary-foreground'
-                  : 'border-border text-muted-foreground hover:bg-muted'
-              }`}
-            >
-              {r}D
-            </button>
-          ))}
-        </div>
+        <RangePills<Range>
+          label="Nutrition range"
+          value={range}
+          onChange={setRange}
+          options={RANGES.map((r) => ({ value: r, label: `${r}D` }))}
+        />
       </header>
 
       {!summary ? (

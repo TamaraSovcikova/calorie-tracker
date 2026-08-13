@@ -33,6 +33,13 @@
     --destructive: 10 36% 58%;
     --destructive-foreground: 0 0% 100%;
 
+    /* Going over your calorie target is not an error. It used to render in
+     * --destructive, the same token as "delete this entry" and "cloud sync
+     * failed", which reads as punishment - and Warn mode deliberately
+     * produces more over-days, as information the user chose to see. This is
+     * the amber the untracked banner and the balance pill already use. */
+    --over: 32 68% 36%;
+
     --border: 42 17% 88%;           /* #E6E3DC */
     --input: 42 17% 87%;
     --ring: 37 48% 52%;
@@ -91,6 +98,9 @@
 
     --destructive: 10 42% 56%;
     --destructive-foreground: 0 0% 100%;
+
+    /* See the light-mode note. Lightened for the dark canvas. */
+    --over: 36 72% 60%;
 
     --border: 45 15% 16%;           /* #2E2B22 */
     --input: 45 15% 18%;

@@ -3,21 +3,57 @@ import { ChevronDown, ChevronLeft } from 'lucide-react';
 
 interface PageHeaderProps {
   title: string;
+  /** Small uppercase line above the title. */
+  eyebrow?: string;
   subtitle?: string;
   trailing?: ReactNode;
   /** When set, the title becomes a button (with a chevron) that calls this. */
   onTitleClick?: () => void;
   /** When set, a back arrow is shown before the title. */
   onBack?: () => void;
+  /**
+   * 'bar' (default) is the compact sticky bar used by Progress and Settings.
+   * 'display' is the taller eyebrow-plus-large-title treatment Library used
+   * to hand-roll. Both draw from the same type scale.
+   */
+  variant?: 'bar' | 'display';
+  children?: ReactNode;
 }
 
 export function PageHeader({
   title,
+  eyebrow,
   subtitle,
   trailing,
   onTitleClick,
   onBack,
+  variant = 'bar',
+  children,
 }: PageHeaderProps) {
+  if (variant === 'display') {
+    return (
+      <header
+        className="sticky top-0 z-10 px-6 pt-8"
+        style={{ background: 'var(--color-bg)' }}
+      >
+        <div className="mx-auto max-w-md">
+          {eyebrow && (
+            <div className="text-eyebrow uppercase" style={{ color: 'var(--color-text-faint)' }}>
+              {eyebrow}
+            </div>
+          )}
+          <h1 className="mt-1 text-title" style={{ color: 'var(--color-text)' }}>
+            {title}
+          </h1>
+          {subtitle && (
+            <p className="mt-0.5 text-xs text-muted-foreground">{subtitle}</p>
+          )}
+          {children}
+        </div>
+      </header>
+    );
+  }
+
   return (
     <header className="sticky top-0 z-40 border-b border-border bg-background/90 backdrop-blur">
       <div className="mx-auto flex max-w-md items-center gap-2 px-4 py-3">

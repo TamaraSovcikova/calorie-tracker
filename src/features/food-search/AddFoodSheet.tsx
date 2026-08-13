@@ -1,7 +1,7 @@
 import { lazy, Suspense, useCallback, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { Sheet } from '@/components/ui/Sheet';
-import { Tabs } from '@/components/ui/Tabs';
+import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { FoodSearchPanel } from './FoodSearchPanel';
 import { QuantityStep } from './QuantityStep';
 import { ManualEntryForm } from './ManualEntryForm';
@@ -268,7 +268,7 @@ export function AddFoodSheet({
               ))}
             </div>
           )}
-          <Tabs<Tab>
+          <SegmentedControl<Tab>
             value={tab}
             onChange={setTab}
             options={[

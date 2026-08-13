@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Switch } from '@/components/ui/Switch';
+import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { SettingCard } from './SettingCard';
 import { updateProfile } from '@/db/repos/profile';
 import {
@@ -16,41 +17,11 @@ interface PreferencesSectionProps {
   profile: Profile;
 }
 
-function SegmentedControl<T extends string>({
-  label,
-  value,
-  options,
-  onChange,
-}: {
-  label: string;
-  value: T;
-  options: { value: T; label: string }[];
-  onChange: (v: T) => void;
-}) {
-  return (
-    <div className="space-y-1">
-      <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-        {label}
-      </span>
-      <div className="flex overflow-hidden rounded-lg border border-border">
-        {options.map((opt, i) => (
-          <button
-            key={opt.value}
-            type="button"
-            onClick={() => onChange(opt.value)}
-            className="flex-1 py-2 text-sm font-medium transition-colors"
-            style={{
-              background: value === opt.value ? 'var(--color-accent-deep)' : 'transparent',
-              color: value === opt.value ? '#fff' : 'var(--color-text-muted)',
-              borderRight: i < options.length - 1 ? '1px solid var(--color-border)' : 'none',
-            }}
-          >
-            {opt.label}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
+/** Local wrapper: this section only ever wants the solid variant. */
+function Segmented<T extends string>(
+  props: Omit<React.ComponentProps<typeof SegmentedControl<T>>, 'variant'>,
+) {
+  return <SegmentedControl<T> {...props} variant="solid" />;
 }
 
 export function PreferencesSection({ profile }: PreferencesSectionProps) {
@@ -59,7 +30,7 @@ export function PreferencesSection({ profile }: PreferencesSectionProps) {
 
   return (
     <SettingCard title="Preferences">
-      <SegmentedControl
+      <Segmented
         label="Units"
         value={profile.units ?? 'metric'}
         options={[
@@ -69,7 +40,7 @@ export function PreferencesSection({ profile }: PreferencesSectionProps) {
         onChange={(v) => void updateProfile({ units: v as Profile['units'] })}
       />
 
-      <SegmentedControl
+      <Segmented
         label="Theme"
         value={profile.theme ?? 'system'}
         options={[

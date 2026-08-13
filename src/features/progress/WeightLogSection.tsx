@@ -3,6 +3,7 @@ import { format } from 'date-fns';
 import { Trash2, Scale } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { LabeledInput } from '@/components/ui/Input';
+import { RangePills } from '@/components/ui/RangePills';
 import { MiniChart, type ChartPoint } from './MiniChart';
 import { deleteWeight, logWeight, useWeightLog } from '@/db/repos/weight';
 import { updateProfile } from '@/db/repos/profile';
@@ -167,22 +168,16 @@ export function WeightLogSection({ profile }: WeightLogSectionProps) {
         </Button>
       </div>
 
-      <div className="mt-4 flex flex-wrap gap-1">
-        {(Object.keys(RANGE_DAYS) as RangeKey[]).map((k) => (
-          <button
-            key={k}
-            type="button"
-            onClick={() => setRange(k)}
-            className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
-              range === k
-                ? 'border-primary bg-primary text-primary-foreground'
-                : 'border-border text-muted-foreground hover:bg-muted'
-            }`}
-          >
-            {k}
-          </button>
-        ))}
-      </div>
+      <RangePills<RangeKey>
+        label="Weight range"
+        className="mt-4"
+        value={range}
+        onChange={setRange}
+        options={(Object.keys(RANGE_DAYS) as RangeKey[]).map((k) => ({
+          value: k,
+          label: k,
+        }))}
+      />
 
       <div className="mt-3 w-36">
         <LabeledInput
@@ -227,7 +222,7 @@ export function WeightLogSection({ profile }: WeightLogSectionProps) {
               <button
                 type="button"
                 onClick={() => setShowAll((v) => !v)}
-                className="text-xs font-medium text-primary hover:underline"
+                className="tap-target -mr-2 px-2 text-xs font-medium text-primary hover:underline"
               >
                 {showAll ? 'Show less' : `View all (${allEntries.length})`}
               </button>

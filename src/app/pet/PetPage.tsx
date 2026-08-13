@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Loader2, Utensils } from 'lucide-react';
+import { LineChart, Loader2, Utensils } from 'lucide-react';
 import { PageHeader } from '@/components/PageHeader';
 import { Button } from '@/components/ui/Button';
 import { DogPlayground } from '@/features/pet/DogPlayground';
@@ -11,17 +11,11 @@ import { useDailyGreeting } from '@/features/pet/useDailyGreeting';
 import { wellbeingBand } from '@/features/pet/petLogic';
 import { PET_SPECIES, PET_SPECIES_LABEL } from '@/features/pet/petSpecies';
 import { updatePet } from '@/db/repos/pet';
-import { WeeklyBudgetCard } from '@/features/weekly-budget/WeeklyBudgetCard';
-import { useWeeklyBudget } from '@/features/weekly-budget/weeklyBudget';
-import { useProfile } from '@/db/repos/profile';
-import { todayLocal } from '@/lib/dates';
 
 export function PetPage() {
   const navigate = useNavigate();
   const greeting = useDailyGreeting();
   const dog = useDogState({ greeting });
-  const profile = useProfile();
-  const weekly = useWeeklyBudget(todayLocal(), profile);
   const [renameOpen, setRenameOpen] = useState(false);
 
   if (!dog.ready) {
@@ -107,8 +101,12 @@ export function PetPage() {
           </p>
         </section>
 
-        {/* Weekly calorie budget - full breakdown lives here. */}
-        {weekly && <WeeklyBudgetCard weekly={weekly} />}
+        {/* The budget breakdown moved to Progress, which has a nav entry.
+            This page had no way in except tapping the dog's caption. */}
+        <Button variant="secondary" block onClick={() => navigate('/progress')}>
+          <LineChart className="h-4 w-4" />
+          See your calorie budget
+        </Button>
       </div>
 
       <RenamePetSheet
