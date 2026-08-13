@@ -189,6 +189,20 @@ function loadFrequentIds(): Promise<Set<string>> {
 }
 
 /**
+ * Whether the user has logged enough for "one of your foods" to mean
+ * anything. Drives how strict the recipe review is: on a fresh install
+ * nothing can reach a personal tier, so demanding one would flag every
+ * ingredient.
+ */
+export async function hasPersonalFoodHistory(): Promise<boolean> {
+  const [frequentIds, recents] = await Promise.all([
+    loadFrequentIds(),
+    loadRecentFoods(),
+  ]);
+  return frequentIds.size > 0 || recents.length > 0;
+}
+
+/**
  * Rank every plausible food for an ingredient name, best first.
  *
  * Tiering is the point: the user asked for the ingredients they actually

@@ -13,6 +13,7 @@ import type { MealItemInput } from '@/db/repos/meals';
 import {
   rankIngredientCandidates,
   resetPlannerCaches,
+  hasPersonalFoodHistory,
 } from '@/features/meal-planner/mealPlanner';
 import {
   isConfident,
@@ -108,6 +109,9 @@ export async function resolveScannedRecipe(
   recipe: ScannedRecipe,
 ): Promise<ResolvedRecipe> {
   resetPlannerCaches(); // resolve against the current food library
+  // On a fresh install nothing can reach a personal tier, so requiring one
+  // would flag every single ingredient.
+  const ctx = { hasPersonalHistory: await hasPersonalFoodHistory() };
   const ingredients: RecipeIngredientDraft[] = [];
   for (const ing of recipe.ingredients) {
     const candidates = await rankIngredientCandidates(ing.name);
@@ -116,7 +120,7 @@ export async function resolveScannedRecipe(
       grams: ing.grams,
       candidates,
       chosen: candidates.length > 0 ? 0 : -1,
-      confident: isConfident(candidates),
+      confident: isConfident(candidates, ctx),
     });
   }
   return {

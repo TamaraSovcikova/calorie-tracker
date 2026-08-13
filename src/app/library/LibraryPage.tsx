@@ -19,7 +19,7 @@ export function LibraryPage() {
     <>
       <PageHeader
         variant="display"
-        eyebrow="Saved meals &amp; foods"
+        eyebrow="Saved meals & foods"
         title="Library"
       >
         <div className="mb-3.5 mt-3.5 flex justify-center">

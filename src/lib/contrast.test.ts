@@ -61,6 +61,15 @@ const TEXT_ON_BG: [text: string, bg: string][] = [
   // text and needs the normal floor, not the large-text one.
   ['--over', '--color-bg'],
   ['--over', '--card'],
+  // Text on FILLED surfaces. Missed by the first pass, which only checked
+  // text on page backgrounds - and behind that hole sat the most-tapped
+  // button in the app at 2.83:1.
+  ['--accent-foreground', '--accent'],
+  ['--primary-foreground', '--primary'],
+  ['--destructive-foreground', '--destructive'],
+  // The active nav label and the diary's accent numerals.
+  ['--color-accent-deep', '--color-bg'],
+  ['--color-accent-deep', '--card'],
 ];
 
 describe('parseHex', () => {

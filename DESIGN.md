@@ -55,6 +55,12 @@ shipped with `--color-text-faint` at 1.91:1 carrying the macro labels, the
 date eyebrow and the arc scale numbers, and nobody noticed — pale-on-cream
 looks fine indoors on the device you designed it on.
 
+**"Background" includes filled surfaces, not just the page.** The first
+version of the guard only checked text on page backgrounds, and behind that
+hole sat white-on-amber at 2.83:1 — the label on every Add, Save and Log
+button in the app. Button fills, chips, banners and badges all count. When you
+add a filled surface that carries text, add the pair to `TEXT_ON_BG`.
+
 Consequence worth knowing: muted and faint sit closer together in lightness
 than a designer would naturally choose, because both have to clear the same
 floor against the same pale canvas. **Secondary/tertiary hierarchy leans on
@@ -69,6 +75,11 @@ If you add a text token, add its pairs to `TEXT_ON_BG` in the test.
 | `--destructive` | Destructive or broken: delete, sync failure |
 | `--over` | Over your calorie target |
 | `--primary` / `--color-accent` | On track, active, primary action |
+
+The primary button carries a **near-black** label, not white, in both themes.
+That is what lets the amber stay exactly as designed while clearing AA. The
+destructive fill is deepened instead, so it keeps the conventional
+white-on-red read that a destructive action wants.
 
 **`--over` and `--destructive` are not interchangeable.** Going over your
 target is information, not an error — Warn mode deliberately produces over-days

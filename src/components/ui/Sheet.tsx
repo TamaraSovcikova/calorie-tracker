@@ -18,6 +18,16 @@ const FOCUSABLE =
   'a[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
 
 /**
+ * Every open Sheet, innermost last.
+ *
+ * Escape and the Tab trap are bound to `window`, so with a sheet open inside
+ * another sheet BOTH handlers fired: one Escape closed the inner picker and
+ * the recipe review underneath it in the same keystroke, losing the review.
+ * Only the topmost sheet reacts.
+ */
+const sheetStack: symbol[] = [];
+
+/**
  * Bottom-sheet on mobile, centred dialog on desktop. Plain Tailwind +
  * portal. Escape / backdrop close, background scroll lock, and a focus
  * trap: focus moves into the sheet on open, Tab cycles within it, and
@@ -38,6 +48,9 @@ export function Sheet({
     if (!open) return;
     const sheet = ref.current;
     const previouslyFocused = document.activeElement as HTMLElement | null;
+    const stackId = Symbol('sheet');
+    sheetStack.push(stackId);
+    const isTopmost = () => sheetStack[sheetStack.length - 1] === stackId;
 
     // Move focus into the sheet (first focusable, else the container).
     const focusables = sheet
@@ -46,6 +59,8 @@ export function Sheet({
     (focusables[0] ?? sheet)?.focus();
 
     const onKey = (e: KeyboardEvent) => {
+      // A sheet under another sheet ignores the keyboard entirely.
+      if (!isTopmost()) return;
       if (e.key === 'Escape') {
         onClose();
         return;
@@ -76,6 +91,8 @@ export function Sheet({
 
     return () => {
       window.removeEventListener('keydown', onKey);
+      const at = sheetStack.indexOf(stackId);
+      if (at >= 0) sheetStack.splice(at, 1);
       document.body.style.overflow = prevOverflow;
       // Restore focus to whatever triggered the sheet.
       previouslyFocused?.focus?.();

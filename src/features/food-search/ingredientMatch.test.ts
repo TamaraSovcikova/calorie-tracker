@@ -216,4 +216,34 @@ describe('isConfident', () => {
   it('is not confident with nothing to go on', () => {
     expect(isConfident([])).toBe(false);
   });
+
+  describe('a user with no logging history', () => {
+    const fresh = { hasPersonalHistory: false };
+
+    it('accepts a strong curated match, so a fresh install is not all warnings', () => {
+      // Otherwise nothing can reach a personal tier and every ingredient in
+      // a twelve-ingredient recipe opens flagged.
+      expect(isConfident([cand('Bell pepper', 'curated', 1.1)], fresh)).toBe(true);
+    });
+
+    it('still refuses a generic estimate', () => {
+      // 'external' is USDA / the shared pool - where the junk came from.
+      expect(isConfident([cand('BEEF', 'external', 1.6)], fresh)).toBe(false);
+    });
+
+    it('still refuses when a rival is close', () => {
+      expect(
+        isConfident(
+          [cand('Bell pepper', 'curated', 1.1), cand('Peppers, raw', 'curated', 1.0)],
+          fresh,
+        ),
+      ).toBe(false);
+    });
+
+    it('does not loosen anything for a user who does have history', () => {
+      expect(
+        isConfident([cand('Bell pepper', 'curated', 1.6)], { hasPersonalHistory: true }),
+      ).toBe(false);
+    });
+  });
 });

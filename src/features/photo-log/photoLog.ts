@@ -5,7 +5,10 @@
 
 import { getSyncConfig, syncBaseUrl } from '@/db/sync/config';
 import { computeMacros, type ResolvedMacros } from '@/features/food-search/foodMath';
-import { lookupIngredientFood } from '@/features/meal-planner/mealPlanner';
+import {
+  lookupIngredientFood,
+  resetPlannerCaches,
+} from '@/features/meal-planner/mealPlanner';
 import type { Food } from '@/db/types';
 
 export interface PhotoFood {
@@ -94,6 +97,10 @@ export async function analyzePhoto(file: Blob): Promise<PhotoAnalysis> {
 export async function resolvePhotoFoods(
   foods: PhotoFood[],
 ): Promise<ResolvedPhotoFood[]> {
+  // The recipe scanner and the planner both do this; the photo log did not,
+  // so logging a new food and then photo-logging in the same session matched
+  // against a stale library and never saw the food just added.
+  resetPlannerCaches();
   return Promise.all(
     foods.map(async (f) => {
       const food = await lookupIngredientFood(f.name);

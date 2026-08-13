@@ -19,7 +19,10 @@
     --card-foreground: 45 9% 9%;
 
     --primary: 37 48% 52%;          /* #BF9248 amber */
-    --primary-foreground: 0 0% 100%;
+    /* Was white, which measured 2.83:1 on the amber - every Add, Save and
+     * Log button in the app. Near-black gets 6.24:1 and leaves the brand
+     * colour untouched. Dark mode already did it this way. */
+    --primary-foreground: 45 9% 9%;
 
     --secondary: 45 15% 94%;
     --secondary-foreground: 45 9% 9%;
@@ -30,7 +33,10 @@
     --accent: 37 30% 90%;
     --accent-foreground: 37 48% 32%;
 
-    --destructive: 10 36% 58%;
+    /* Deepened from 10 36% 58%, where white sat at 3.45:1. Darkening the
+     * fill rather than the label keeps the conventional white-on-red read
+     * for a destructive action. Now 5.44:1. */
+    --destructive: 10 42% 45%;
     --destructive-foreground: 0 0% 100%;
 
     /* Going over your calorie target is not an error. It used to render in
@@ -63,7 +69,10 @@
     --color-text-muted:   #605D55;
     --color-text-faint:   #6F6C63;
     --color-accent:       #BF9248;
-    --color-accent-deep:  #8C6A30;
+    /* Was #8C6A30, which measured 4.48:1 on the canvas - a hair under AA,
+     * and it carries the active nav label. #866430 gets 4.87:1, and white
+     * on it (the solid segmented control) 5.41:1. */
+    --color-accent-deep:  #866430;
     --color-border:       #E6E3DC;
     --color-thumb-bg:     #ECEAE4;
     --color-tab-track:    #E6E3DC;
@@ -96,7 +105,8 @@
     --accent: 40 20% 18%;
     --accent-foreground: 41 60% 70%;
 
-    --destructive: 10 42% 56%;
+    /* Was 10 42% 56% - white at 3.73:1. Now 4.90:1. */
+    --destructive: 10 45% 48%;
     --destructive-foreground: 0 0% 100%;
 
     /* See the light-mode note. Lightened for the dark canvas. */

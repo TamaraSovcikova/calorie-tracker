@@ -223,18 +223,38 @@ const CONFIDENT_MARGIN = 0.25;
 /** Below this the top match is not good enough to auto-accept. */
 const CONFIDENT_MIN_SCORE = 0.9;
 
+export interface ConfidenceContext {
+  /**
+   * Whether this user has enough logging history for "one of your foods" to
+   * mean anything. Without it, nothing can ever reach a personal tier, so a
+   * fresh install would flag EVERY ingredient - a twelve-ingredient recipe
+   * would open as twelve warnings, which reads as broken rather than
+   * careful. With no history, a strong curated match is accepted instead.
+   */
+  hasPersonalHistory: boolean;
+}
+
 /**
  * Whether the top candidate can be taken without asking.
  *
- * Confident means: it is one of the user's own foods, it matches the name
- * well, and nothing else is close enough to be a real alternative. Anything
- * else opens the picker - which is the point, since the old code committed
- * silently to whatever won and that is how the bad matches shipped.
+ * Confident means: it matches the name well, nothing else is close enough to
+ * be a real alternative, and it comes from a source worth trusting silently.
+ * Anything else opens the picker - which is the point, since the old code
+ * committed to whatever won and that is how the bad matches shipped.
+ *
+ * `external` (USDA / shared pool) is never confident. That is where the junk
+ * came from, and a generic estimate is exactly the case worth a glance.
  */
-export function isConfident(candidates: IngredientCandidate[]): boolean {
+export function isConfident(
+  candidates: IngredientCandidate[],
+  ctx: ConfidenceContext = { hasPersonalHistory: true },
+): boolean {
   const top = candidates[0];
   if (!top) return false;
-  if (!PERSONAL_TIERS.has(top.tier)) return false;
+  const trusted = ctx.hasPersonalHistory
+    ? PERSONAL_TIERS.has(top.tier)
+    : PERSONAL_TIERS.has(top.tier) || top.tier === 'curated';
+  if (!trusted) return false;
   if (top.score < CONFIDENT_MIN_SCORE) return false;
   const runnerUp = candidates[1];
   if (!runnerUp) return true;
