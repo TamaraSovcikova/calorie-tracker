@@ -214,7 +214,7 @@ Considered and deliberately excluded from this review:
 
 Each derives from a finding above. P1 blocks ship, P2 same branch, P3 follow-up.
 
-### P1 — done 2026-08-13, not yet deployed
+### P1 — done and deployed 2026-08-13 (commit `f132d99`)
 
 - [x] **T1** — `components/Layout.tsx` — nav `label` now renders under each
       icon, and each `NavLink` carries `aria-label`; icons are `aria-hidden`

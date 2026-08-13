@@ -6,20 +6,96 @@ How to use:
 - Start of session: read only the top entry, announce the chat number.
 - End of session: prepend a new entry, bump `Session count`.
 
-Session count: 4
-Last updated: 2026-08-12
+Session count: 5
+Last updated: 2026-08-13
 
 ---
 
-## Chat #4b - 2026-08-12 (warn-mode paydown rate; deployed)
+## Chat #4c - 2026-08-13 (whole-app design review + the entire task list; deployed)
+
+Ran `/plan-design-review` scoped to the whole app, from the code. Output is
+`DESIGN_REVIEW.md` (scores, findings, method) and `DESIGN.md` (the system,
+which had never been written down). Then built every task in it.
+
+- **Scores:** overall 6/10 -> 9/10. Info arch 5->9, states 6->9, journey 6->9,
+  AI-slop 8->8 (no change needed - passes all 7 hard rejections and all 11
+  blacklist patterns, no gradients anywhere, real typeface), design system
+  4->9, responsive/a11y 3->9.
+- **The big finding was arithmetic, not taste.** Five token/theme pairs failed
+  WCAG AA for body text, worst `--color-text-faint` at **1.91:1** (floor 4.5:1)
+  - and that token carried the macro labels, the date eyebrow, the arc scale
+  numbers and the inactive nav icons. `--muted-foreground`, the most-used
+  secondary colour in the app, was 3.79:1. Retuned all of them in both themes.
+- **`src/lib/contrast.ts` + `contrast.test.ts` is the durable part.** WCAG
+  relative luminance and ratio, plus a guard that parses the REAL token values
+  out of `index.css` (not a copy) and fails the build below 4.5:1 for 12
+  text-on-background pairs per theme. Verified by regression before trusting
+  it. It caught a live mistake the same session: the first `--over` value I
+  picked failed at 3.58:1 and had to be darkened.
+- **Nav had no names.** `NAV_ITEMS` declared `label` for all four entries and
+  `Layout` destructured `{ to, icon }`, dropping it. Four unlabelled icons (a
+  book for Today beside a book for Library) and no `aria-label`, so a screen
+  reader announced the href. One line, fixed both the visual and the
+  accessible name.
+- **AI features failed after the effort, not before it.** Label scan, photo
+  log, recipe scan and the planner all need a sync code and none checked. A
+  new user could open the camera, grant permission, frame a label, shoot, wait
+  for the upload, then be told it was never available. New
+  `aiAvailability.ts` + `AiFeatureGate.tsx`; entry points stay visible (still
+  discoverable) but explain in place. NOTE: the live-capture overlay shipped
+  in #4 made this failure much more expensive than the old file picker did.
+- **IA:** `WeeklyBudgetCard` lived on `/pet`, which has no nav entry - the only
+  explanation of carry-over, trim cap and balance was behind a tap on the dog's
+  caption. Moved to Progress, which is rebuilt into three labelled horizons
+  (Right now / Recent days / Over time). Diary balance pill repoints there.
+- **`--over` token.** Going over your target rendered in `--destructive`, same
+  as delete and sync failure - directly contradicting Warn mode, whose premise
+  is that over-days are expected information. Now its own token, shared by the
+  arc and the balance pill.
+- **Consolidation:** three segmented controls (only one had ARIA) -> one
+  `ui/SegmentedControl` with `track`/`solid` variants and `onDeselect`;
+  `ui/Tabs` deleted, six call sites migrated. Chart range pickers were a
+  fourth near-duplicate -> `ui/RangePills`. Type scale (`text-display`,
+  `text-title`, `text-eyebrow`) replaces `fontSize: 26` / `0.18em`
+  hand-written in two files. `PageHeader` gained `eyebrow` + `display`
+  variant.
+- **Bug found in passing:** `tailwind.config.ts` had `fontFamily.sans` starting
+  at `system-ui` with Hanken Grotesk absent, so any `font-sans` utility
+  silently fell back to system UI. Fixed.
+- **Two corrections worth remembering.** (1) The T12 finding ("nutrition locked
+  to 7 days") was inherited from `UX_AUDIT.md` §7.1 and was WRONG - the summary
+  already had a 7/14/30 toggle. I took a stale doc's claim without checking.
+  Real gap was span, so 90D added. (2) `UX_AUDIT.md` as a whole is stale; most
+  of its P0/P1 band shipped long ago. Don't trust it without re-checking.
+- **Also:** tap targets on every nav item + 4 controls that missed 44px
+  (three of which I had added in #4), first-run `CoachTip` on an empty diary,
+  visible grip on swipe-to-copy rows, macros mark themselves on hitting target.
+- **Deferred deliberately:** desktop/tablet layout (`max-w-md` stands) and the
+  onboarding cut/maintain/gain step. Product decisions, not design debt.
+- **State:** deployed, Version `4571e1ad`, commits `f132d99` (P1) and
+  `88100ae` (P2/P3). 237 tests (was 184 this morning), typecheck + build clean,
+  lint back to the 2 pre-existing issues. **No schema change in this chat.**
+- **Tooling gap on this machine:** `bun` and `jq` are both missing, so
+  `gstack-review-log`, `gstack-learnings-log` and the tasks JSONL artifact all
+  fail. Review entry written directly to
+  `~/.gstack/projects/calorie-tracker/main-reviews.jsonl` instead. Also
+  `SendUserFile` cannot take a `\\wsl.localhost\...` UNC path.
+- **Next:** everything left is device work. The contrast retune needs a real
+  look in daylight (it will read less airy - that is the tradeoff, and a
+  darker canvas is the lever if you hate it); four labels in the nav bar may
+  be cramped on the Pixel; Progress has never been seen with its new
+  three-section structure; the live camera from #4 is still untested on
+  hardware.
+
+## Chat #4b - 2026-08-13 (warn-mode paydown rate; deployed)
 
 - Did: `budget_warn_catchup` (kcal/day). In `'warn'` mode the target never moved, so there was no way to actually clear a balance short of eating under by eye. Set a rate and that much comes off the daily target while the balance is in the red. New pure `catchupTrim(rate, balance)` takes the LESSER of the rate and what is owed, so it cannot overshoot into a fresh surplus (150/day against 40 outstanding takes 40), and returns 0 as soon as the balance is level or banked. Field shows only under `mode === 'warn'`; `WeeklyBudgetCard` explains the lowered target when it applies. `WeeklyBudget.catchupApplied` carries it for display.
 - D1: `ALTER TABLE profiles ADD COLUMN budget_warn_catchup REAL` applied to the remote DB BEFORE deploy, then the full 33-column `SELECT` from `worker/sync.ts` COLUMNS smoke-tested green against live (2 rows).
 - State: deployed. 203/203 tests, typecheck + build + eslint clean.
 
-## Chat #4 - 2026-08-12 (six-feature batch: jump-to-today, live label capture, curated foods, weight view-all, budget mode rework, meal-editor jump; NOT deployed)
+## Chat #4 - 2026-08-13 (six-feature batch: jump-to-today, live label capture, curated foods, weight view-all, budget mode rework, meal-editor jump; deployed)
 
-- Did (all local, built + tested, nothing pushed or deployed):
+- Did (written up before deploying; shipped later the same session as commit `cf003b2`, Version `b8c720c7`, after the D1 migration below):
   - **Jump to today.** `DiaryPage` header: a "Jump to today" pill appears under the date whenever the day is not today. Removed the now-redundant "Go to today" overflow-menu item. The date title and the pill are siblings in a flex-col (nested buttons would be invalid).
   - **Live nutrition-label capture.** New `src/features/food-search/LabelCaptureOverlay.tsx`: getUserMedia video preview + canvas-grab shutter, with a Gallery button beside it. Replaces the bare `<input type=file>` at BOTH call sites - the Scan tab's "No barcode? Scan a nutrition label instead" (`AddFoodSheet`) and the new-product form (`ManualEntryForm`, which is where a failed barcode lands). Reason for owning the stream rather than `<input capture>`: the OS hand-off silently falls back to the gallery picker on some Android builds. Portalled to `document.body` and `z-[120]` because both call sites sit inside a `Sheet`, whose `animate-slide-up` transform becomes the containing block for `position: fixed`. Escape is handled in the capture phase so it closes the camera, not the sheet. `analyzeLabel` now downscales to 1600px (was the photo-log default 1024) - label fine print was losing digits.
   - **Curated foods +83.** `curatedFoods.ts` gained 35 vegetables, 23 fruits, 25 breads (UK/EU-first: swede, celeriac, tenderstem, sourdough, granary, soda bread, crispbread, sandwich thins, chapati...). `CURATED_VERSION` 2 -> 3, so installed apps re-seed on next load.
@@ -30,7 +106,7 @@ Last updated: 2026-08-12
     - `budget_max_daily_trim` (absolute kcal) replaces the 70% `weekly_budget_floor`. The floor is still honoured as a fallback when the new field was never set; an explicit `0` retires it for that profile.
     - `ensureProfile` now runs `legacyBudgetPatch` once: old boolean -> mode, old carry-over boolean -> a start date 14 days back (deliberately not further - the old switch reached back exactly one period, so anything longer would pull in history never opted into).
   - **Meal-entry -> meal editor.** `LogMealStep` gained `onEditRecipe` (renders "Edit this meal's ingredients" under the meal name) and `notice`. `EditEntrySheet`'s meal branch wires it to `/meals/:id/edit`, and shows a notice when the stored entry kcal no longer matches the recipe (hitting Save recomputes).
-- State: NOT deployed, NOT committed. `npm run typecheck`, `npm run build`, `npx eslint src worker` all clean (the 2 remaining lint hits - `portionSuggestions.ts` control regex, `Dog.tsx` fast-refresh - are pre-existing). 198/198 tests pass (was 184; +14 for `clampCarry`, `resolveBudgetMode`, `maxDailyTrimFor`, `datesBetween`).
+- State (at time of writing, superseded): built and tested but not yet committed. Shipped later the same session. `npm run typecheck`, `npm run build`, `npx eslint src worker` all clean (the 2 remaining lint hits - `portionSuggestions.ts` control regex, `Dog.tsx` fast-refresh - are pre-existing). 198/198 tests pass (was 184; +14 for `clampCarry`, `resolveBudgetMode`, `maxDailyTrimFor`, `datesBetween`).
 - Next: **the D1 migration MUST run before `wrangler deploy`.** `worker/sync.ts` builds `INSERT INTO profiles (...)` straight from its COLUMNS list, so deploying the worker against an unmigrated D1 breaks profile sync for every user with "no such column". Three additive ALTERs, one at a time, documented at the bottom of the profiles block in `worker/schema.sql`: `budget_mode TEXT`, `budget_carryover_start TEXT`, `budget_max_daily_trim REAL`.
 - Then device-test on the Pixel: live camera capture (the whole point of the change - confirm the shutter works and Gallery still offers the library), the balance pill under the arc in warn mode, and the re-seeded curated foods showing up in search.
 - Open: everything from Chat #3 still stands (pantry planner build, PWA reinstall for the icon/shortcuts, pet reaction thresholds, rotate the Gemini key).
