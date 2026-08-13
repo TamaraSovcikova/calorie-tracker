@@ -12,6 +12,8 @@ import {
   type ResolvedPhotoFood,
 } from './photoLog';
 import { IngredientCandidateSheet } from '@/features/food-search/IngredientCandidateSheet';
+import { ALIAS_SCORE } from '@/features/food-search/ingredientMatch';
+import { rememberAlias } from '@/db/repos/ingredientAliases';
 import type { LocalDate } from '@/lib/dates';
 import type { MealSection } from '@/db/types';
 
@@ -243,6 +245,28 @@ export function PhotoFoodStep({ date, section, onDone }: PhotoFoodStepProps) {
               chosen={rows[picking].chosen}
               onPick={(chosen) => {
                 repick(picking, chosen);
+                setPicking(null);
+              }}
+              onPickFood={(food) => {
+                // Same escape hatch as the recipe review: a product the
+                // matcher could never suggest becomes reachable, and the pick
+                // teaches the alias for next time.
+                setRows((rs) =>
+                  rs.map((x, i) => {
+                    if (i !== picking) return x;
+                    const at = x.candidates.findIndex((c) => c.food.id === food.id);
+                    if (at >= 0) return { ...repickPhotoFood(x, at), included: true };
+                    const withFood = {
+                      ...x,
+                      candidates: [
+                        { food, tier: 'alias' as const, nameScore: 1, score: ALIAS_SCORE },
+                        ...x.candidates,
+                      ],
+                    };
+                    return { ...repickPhotoFood(withFood, 0), included: true };
+                  }),
+                );
+                void rememberAlias(rows[picking].name, food.id);
                 setPicking(null);
               }}
               onGramsChange={(grams) =>

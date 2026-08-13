@@ -54,7 +54,7 @@ export const TIER_BONUS: Record<MatchTier, number> = {
 
 /** How a tier is described to the user, on the review row and the picker. */
 export const TIER_LABEL: Record<MatchTier, string> = {
-  alias: 'You chose this before',
+  alias: 'Your choice',
   frequent: 'You use often',
   recent: 'You used recently',
   custom: 'Your food',

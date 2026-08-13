@@ -3,6 +3,7 @@ import { AlertTriangle, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { computeMacros } from '@/features/food-search/foodMath';
 import {
+  ALIAS_SCORE,
   PERSONAL_TIERS,
   TIER_LABEL,
 } from '@/features/food-search/ingredientMatch';
@@ -10,6 +11,7 @@ import { IngredientCandidateSheet } from '@/features/food-search/IngredientCandi
 import { rememberAlias } from '@/db/repos/ingredientAliases';
 import { formatKcal } from '@/lib/macros';
 import { cn } from '@/lib/cn';
+import type { Food } from '@/db/types';
 import type { ResolvedRecipe, RecipeIngredientDraft } from './recipeScan';
 
 interface RecipeReviewStepProps {
@@ -56,6 +58,31 @@ export function RecipeReviewStep({
     // French-named supermarket product - no word list would contain it.
     const picked = chosen >= 0 ? ing.candidates[chosen] : undefined;
     if (picked) void rememberAlias(ing.name, picked.food.id);
+    setPicking(null);
+  };
+
+  /**
+   * A food chosen from search rather than the shortlist. Products the
+   * matcher can never suggest - a Belgian "Américain naturel" against "beef
+   * mince" - only become reachable this way, and picking one is what teaches
+   * the alias so it resolves by itself next time.
+   */
+  const setChosenFood = (ingIndex: number, food: Food) => {
+    const ing = recipe.ingredients[ingIndex];
+    const existing = ing.candidates.findIndex((c) => c.food.id === food.id);
+    if (existing >= 0) {
+      setChosen(ingIndex, existing);
+      return;
+    }
+    patch(ingIndex, {
+      candidates: [
+        { food, tier: 'alias', nameScore: 1, score: ALIAS_SCORE },
+        ...ing.candidates,
+      ],
+      chosen: 0,
+      confident: true,
+    });
+    void rememberAlias(ing.name, food.id);
     setPicking(null);
   };
 
@@ -144,6 +171,7 @@ export function RecipeReviewStep({
           candidates={recipe.ingredients[picking].candidates}
           chosen={recipe.ingredients[picking].chosen}
           onPick={(chosen) => setChosen(picking, chosen)}
+          onPickFood={(food) => setChosenFood(picking, food)}
           onGramsChange={(grams) => patch(picking, { grams })}
           onClose={() => setPicking(null)}
         />
