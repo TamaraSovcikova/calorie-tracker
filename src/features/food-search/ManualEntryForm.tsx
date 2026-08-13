@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/Button';
 import { Input, LabeledInput } from '@/components/ui/Input';
 import { createFood, updateFood } from '@/db/repos/foods';
 import { LabelCaptureOverlay } from './LabelCaptureOverlay';
+import { aiUnavailableReason } from '@/features/settings/aiAvailability';
 import { analyzeLabel, type ScannedLabel } from './photoLabel';
 import { suggestPortions } from '@/lib/portionSuggestions';
 import { formatGrams } from '@/lib/macros';
@@ -235,7 +236,16 @@ export function ManualEntryForm({
           variant="secondary"
           block
           disabled={scanning}
-          onClick={() => setCaptureOpen(true)}
+          onClick={() => {
+            // Check before the camera, not after the upload.
+            const reason = aiUnavailableReason('scan nutrition labels');
+            if (reason) {
+              setError(reason);
+              return;
+            }
+            setError(null);
+            setCaptureOpen(true);
+          }}
         >
           {scanning ? (
             <>

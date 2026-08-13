@@ -69,30 +69,33 @@ export function Layout() {
           'pb-[env(safe-area-inset-bottom)]',
         )}
       >
-        <ul className="mx-auto flex h-16 max-w-md items-center justify-around px-[30px]">
-          {NAV_ITEMS.map(({ to, icon: Icon }) => (
+        <ul className="mx-auto flex h-16 max-w-md items-center justify-around px-[18px]">
+          {NAV_ITEMS.map(({ to, label, icon: Icon }) => (
             <li key={to}>
-              <NavLink to={to}>
+              {/* The label is both the visible name and the accessible one:
+                  four unlabelled icons failed the trunk test (a book icon for
+                  "Today" next to a book icon for "Library"), and a bare SVG
+                  link announced only its href to a screen reader. */}
+              <NavLink to={to} aria-label={label} className="tap-target block">
                 {({ isActive }) => (
-                  <div className="relative flex items-center justify-center p-2">
+                  <div className="flex flex-col items-center justify-center gap-[3px] px-2 pt-1.5 pb-1">
                     <Icon
                       className="h-[21px] w-[21px]"
+                      aria-hidden="true"
                       strokeWidth={isActive ? 2 : 1.6}
-                      style={{ color: isActive ? 'var(--color-accent-deep)' : 'var(--color-text-faint)' }}
+                      style={{ color: isActive ? 'var(--color-accent-deep)' : 'var(--color-text-muted)' }}
                     />
-                    {isActive && (
-                      <span
-                        className="absolute rounded-full"
-                        style={{
-                          width: 4,
-                          height: 4,
-                          background: 'var(--color-accent-deep)',
-                          bottom: -2,
-                          left: '50%',
-                          transform: 'translateX(-50%)',
-                        }}
-                      />
-                    )}
+                    <span
+                      style={{
+                        fontSize: 10.5,
+                        lineHeight: 1,
+                        fontWeight: isActive ? 600 : 500,
+                        letterSpacing: '-0.005em',
+                        color: isActive ? 'var(--color-accent-deep)' : 'var(--color-text-muted)',
+                      }}
+                    >
+                      {label}
+                    </span>
                   </div>
                 )}
               </NavLink>

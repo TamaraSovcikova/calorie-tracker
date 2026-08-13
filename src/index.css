@@ -25,7 +25,7 @@
     --secondary-foreground: 45 9% 9%;
 
     --muted: 45 12% 93%;
-    --muted-foreground: 45 6% 47%;
+    --muted-foreground: 45 8% 38%;  /* was 45 6% 47% - 3.79:1, below AA */
 
     --accent: 37 30% 90%;
     --accent-foreground: 37 48% 32%;
@@ -47,8 +47,14 @@
     /* Stone & Amber design tokens (used directly in new components) */
     --color-bg:           #F4F3EF;
     --color-text:         #1A1916;
-    --color-text-muted:   #989690;
-    --color-text-faint:   #B4B2AC;
+    /* muted/faint were #989690 (2.66:1) and #B4B2AC (1.91:1) - both far below
+     * the 4.5:1 AA floor for body text, and faint carries the macro labels,
+     * the date eyebrow and the arc scale. Both now clear AA against the
+     * canvas, the card and --muted. They sit closer together than before,
+     * so the secondary/tertiary distinction leans on weight and size rather
+     * than on lightness alone. src/lib/contrast.test.ts enforces this. */
+    --color-text-muted:   #605D55;
+    --color-text-faint:   #6F6C63;
     --color-accent:       #BF9248;
     --color-accent-deep:  #8C6A30;
     --color-border:       #E6E3DC;
@@ -78,7 +84,7 @@
     --secondary-foreground: 40 15% 93%;
 
     --muted: 40 6% 15%;
-    --muted-foreground: 40 7% 50%;
+    --muted-foreground: 40 8% 62%;  /* was 40 7% 50% - below AA on --card */
 
     --accent: 40 20% 18%;
     --accent-foreground: 41 60% 70%;
@@ -93,8 +99,10 @@
     /* Stone & Amber dark tokens */
     --color-bg:           #161513;
     --color-text:         #F0EDE6;
-    --color-text-muted:   #7A7468;
-    --color-text-faint:   #524E44;
+    /* were #7A7468 (3.93:1) and #524E44 (2.20:1) against the dark canvas.
+     * Both now clear 4.5:1 against --color-bg and the (lighter) --card. */
+    --color-text-muted:   #A6A197;
+    --color-text-faint:   #8E8A7E;
     --color-accent:       #D4AA50;
     --color-accent-deep:  #B8902E;
     --color-border:       #2E2B22;

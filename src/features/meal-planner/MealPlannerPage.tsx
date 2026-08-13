@@ -14,6 +14,7 @@ import {
 import { Button } from '@/components/ui/Button';
 import { Input, LabeledInput } from '@/components/ui/Input';
 import { toast } from '@/components/ui/toast';
+import { aiUnavailableReason } from '@/features/settings/aiAvailability';
 import { formatKcal } from '@/lib/macros';
 import {
   requestMealPlan,
@@ -65,6 +66,13 @@ export function MealPlannerPage() {
   };
 
   const handleGenerate = async () => {
+    // Check before the request, not after: without a sync code this would
+    // spin through a loading phase only to fail with the same message.
+    const reason = aiUnavailableReason('use the AI meal planner');
+    if (reason) {
+      setError(reason);
+      return;
+    }
     setPhase('loading');
     setError(null);
     const request: MealPlanRequest = {

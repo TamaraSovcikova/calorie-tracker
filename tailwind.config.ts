@@ -45,8 +45,12 @@ const config: Config = {
         md: 'calc(var(--radius) - 2px)',
         sm: 'calc(var(--radius) - 4px)',
       },
+      // Must lead with Hanken Grotesk to match `body` in index.css. Without
+      // it, anything using Tailwind's `font-sans` utility silently fell back
+      // to system UI while the rest of the app rendered in the real typeface.
       fontFamily: {
         sans: [
+          'Hanken Grotesk',
           'system-ui',
           '-apple-system',
           'BlinkMacSystemFont',

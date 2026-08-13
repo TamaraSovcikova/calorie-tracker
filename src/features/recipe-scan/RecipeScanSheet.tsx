@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Loader2, RotateCcw, ScanLine } from 'lucide-react';
 import { Sheet } from '@/components/ui/Sheet';
 import { Button } from '@/components/ui/Button';
+import { AiFeatureGate } from '@/features/settings/AiFeatureGate';
 import { analyzeRecipePhoto, resolveScannedRecipe } from './recipeScan';
 
 interface RecipeScanSheetProps {
@@ -71,6 +72,7 @@ export function RecipeScanSheet({ open, onClose }: RecipeScanSheetProps) {
       />
 
       {phase === 'pick' && (
+        <AiFeatureGate feature="scan recipes">
         <div className="flex flex-col items-center gap-3 p-8 text-center">
           <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary/10">
             <ScanLine className="h-7 w-7 text-primary" />
@@ -88,6 +90,7 @@ export function RecipeScanSheet({ open, onClose }: RecipeScanSheetProps) {
             Free, on Cloudflare AI. Macros are estimates - edit anything.
           </p>
         </div>
+        </AiFeatureGate>
       )}
 
       {phase === 'analyzing' && (

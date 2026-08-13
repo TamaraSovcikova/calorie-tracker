@@ -6,6 +6,8 @@ import { FoodSearchPanel } from './FoodSearchPanel';
 import { QuantityStep } from './QuantityStep';
 import { ManualEntryForm } from './ManualEntryForm';
 import { LabelCaptureOverlay } from './LabelCaptureOverlay';
+import { AiFeatureGate } from '@/features/settings/AiFeatureGate';
+import { aiUnavailableReason } from '@/features/settings/aiAvailability';
 import { analyzeLabel, type ScannedLabel } from './photoLabel';
 import { QuickAddForm, type QuickAddValues } from './QuickAddForm';
 import { formatKcal } from '@/lib/macros';
@@ -312,13 +314,23 @@ export function AddFoodSheet({
             >
               <BarcodeScanner
                 onCode={handleBarcode}
-                onScanLabel={() => setLabelCaptureOpen(true)}
+                onScanLabel={() => {
+                  // Check before the camera, not after the upload.
+                  const reason = aiUnavailableReason('scan nutrition labels');
+                  if (reason) {
+                    setScanError(reason);
+                    return;
+                  }
+                  setLabelCaptureOpen(true);
+                }}
               />
             </Suspense>
           </>
         )}
         {tab === 'photo' && (
-          <PhotoFoodStep date={date} section={section} onDone={handleClose} />
+          <AiFeatureGate feature="log meals from a photo">
+            <PhotoFoodStep date={date} section={section} onDone={handleClose} />
+          </AiFeatureGate>
         )}
         {tab === 'meals' && <MealPicker onPick={handlePickMeal} />}
         {tab === 'quick' && <QuickAddForm onSave={handleQuickAdd} />}
