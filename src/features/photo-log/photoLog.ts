@@ -6,9 +6,10 @@
 import { getSyncConfig, syncBaseUrl } from '@/db/sync/config';
 import { computeMacros, type ResolvedMacros } from '@/features/food-search/foodMath';
 import {
-  lookupIngredientFood,
+  rankIngredientCandidates,
   resetPlannerCaches,
 } from '@/features/meal-planner/mealPlanner';
+import type { IngredientCandidate } from '@/features/food-search/ingredientMatch';
 import type { Food } from '@/db/types';
 
 export interface PhotoFood {
@@ -28,6 +29,15 @@ export interface ResolvedPhotoFood {
   food: Food | null;
   /** Macros at `grams`, or null when unresolved. */
   macros: ResolvedMacros | null;
+  /**
+   * Everything that plausibly matched, best first, so the user can correct
+   * a wrong pick. Photo logging writes straight to the diary, so until this
+   * existed it was the AI path with the least oversight: you could include
+   * or exclude a row, but not fix one.
+   */
+  candidates: IngredientCandidate[];
+  /** Index into `candidates`, or -1 when nothing matched. */
+  chosen: number;
 }
 
 /** Shrink an image to a small JPEG so uploads (and the AI call) stay fast. */
@@ -103,11 +113,35 @@ export async function resolvePhotoFoods(
   resetPlannerCaches();
   return Promise.all(
     foods.map(async (f) => {
-      const food = await lookupIngredientFood(f.name);
+      const candidates = await rankIngredientCandidates(f.name);
+      const food = candidates[0]?.food ?? null;
       const macros = food
         ? computeMacros(food, { mode: 'g', qty: f.grams })
         : null;
-      return { name: f.name, grams: f.grams, food, macros };
+      return {
+        name: f.name,
+        grams: f.grams,
+        food,
+        macros,
+        candidates,
+        chosen: candidates.length > 0 ? 0 : -1,
+      };
     }),
   );
+}
+
+/** Re-point a resolved row at a different candidate, recomputing macros. */
+export function repickPhotoFood(
+  row: ResolvedPhotoFood,
+  chosen: number,
+  grams = row.grams,
+): ResolvedPhotoFood {
+  const food = chosen >= 0 ? (row.candidates[chosen]?.food ?? null) : null;
+  return {
+    ...row,
+    grams,
+    chosen,
+    food,
+    macros: food ? computeMacros(food, { mode: 'g', qty: grams }) : null,
+  };
 }

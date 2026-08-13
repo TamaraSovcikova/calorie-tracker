@@ -5,8 +5,11 @@ import {
   nameMatchScore,
   prepStates,
   rankCandidates,
+  rankLibraryCandidates,
+  resolveTier,
   sigWords,
   statePenalty,
+  TIER_BONUS,
   wordsMatch,
   type IngredientCandidate,
   type MatchTier,
@@ -245,5 +248,100 @@ describe('isConfident', () => {
         isConfident([cand('Bell pepper', 'curated', 1.6)], { hasPersonalHistory: true }),
       ).toBe(false);
     });
+  });
+});
+
+describe('resolveTier', () => {
+  const history = (frequent: string[] = [], recent: string[] = []) => ({
+    frequentIds: new Set(frequent),
+    recentIds: new Set(recent),
+  });
+
+  it('ranks frequent above recent for the same food', () => {
+    const f = food('Beef mince');
+    expect(resolveTier(f, history([f.id], [f.id]))).toBe('frequent');
+  });
+
+  it('falls to recent when only logged lately', () => {
+    const f = food('Beef mince');
+    expect(resolveTier(f, history([], [f.id]))).toBe('recent');
+  });
+
+  it('reads source when the food has never been logged', () => {
+    expect(resolveTier(food('X', { source: 'custom' }), history())).toBe('custom');
+    expect(resolveTier(food('X', { source: 'curated' }), history())).toBe('curated');
+  });
+
+  it('puts the shared pool in the library tier, below curated', () => {
+    // 'Pepp', 'BEEF' and 'BLACK BEANS' came from source: 'shared'.
+    expect(resolveTier(food('BEEF', { source: 'shared' }), history())).toBe('library');
+    expect(TIER_BONUS.library).toBeLessThan(TIER_BONUS.curated);
+  });
+
+  it('lets logging history override a weak source', () => {
+    // A shared-pool food the user actually logs IS one they use.
+    const f = food('BEEF', { source: 'shared' });
+    expect(resolveTier(f, history([f.id]))).toBe('frequent');
+  });
+});
+
+describe('rankLibraryCandidates — the ordering the feature rests on', () => {
+  const mine = food('Beef mince 5%', { id: 'mine', source: 'shared' });
+  const once = food('Beef mince value', { id: 'once', source: 'shared' });
+  const builtIn = food('Beef mince, cooked', { id: 'curated', source: 'curated' });
+  const stranger = food('BEEF MINCE', { id: 'shared', source: 'shared' });
+  const library = [mine, once, builtIn, stranger];
+
+  it('picks the food I buy weekly over an identical stranger entry', () => {
+    const ranked = rankLibraryCandidates(library, 'beef mince', {
+      frequentIds: new Set(['mine']),
+      recentIds: new Set(),
+    });
+    expect(ranked[0].food.id).toBe('mine');
+    expect(ranked[0].tier).toBe('frequent');
+  });
+
+  it('prefers something logged once over something never logged', () => {
+    const ranked = rankLibraryCandidates(library, 'beef mince', {
+      frequentIds: new Set(),
+      recentIds: new Set(['once']),
+    });
+    expect(ranked[0].food.id).toBe('once');
+  });
+
+  it('falls back to the built-in before a stranger when I have no history', () => {
+    const ranked = rankLibraryCandidates(library, 'beef mince', {
+      frequentIds: new Set(),
+      recentIds: new Set(),
+    });
+    const curatedAt = ranked.findIndex((c) => c.food.id === 'curated');
+    const sharedAt = ranked.findIndex((c) => c.food.id === 'shared');
+    expect(curatedAt).toBeLessThan(sharedAt);
+  });
+
+  it('reproduces the shipped bug and shows it is fixed', () => {
+    // The exact library that produced "Pepp 400g, 1,857 kcal": a junk
+    // shared-pool fragment against a proper curated entry.
+    const pepperLibrary = [
+      food('Pepp', { id: 'junk', source: 'shared', kcal_100: 464 }),
+      food('Bell pepper', { id: 'bell', source: 'curated', kcal_100: 26 }),
+    ];
+    const ranked = rankLibraryCandidates(pepperLibrary, 'peppers', {
+      frequentIds: new Set(),
+      recentIds: new Set(),
+    });
+    expect(ranked.map((c) => c.food.id)).toEqual(['bell']);
+  });
+
+  it('keeps dry beans out when the recipe asked for cooked', () => {
+    const beans = [
+      food('Black beans, dried', { id: 'dry', source: 'shared', kcal_100: 341 }),
+      food('Black beans, canned', { id: 'wet', source: 'curated', kcal_100: 91 }),
+    ];
+    const ranked = rankLibraryCandidates(beans, 'cooked black beans', {
+      frequentIds: new Set(),
+      recentIds: new Set(),
+    });
+    expect(ranked[0].food.id).toBe('wet');
   });
 });

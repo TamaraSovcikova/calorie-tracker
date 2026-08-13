@@ -17,8 +17,8 @@ import { frequentFoods, recentFoods, type DayTotals } from '@/db/repos/diary';
 import { computeMacros } from '@/features/food-search/foodMath';
 import {
   rankCandidates,
+  rankLibraryCandidates,
   type IngredientCandidate,
-  type MatchTier,
 } from '@/features/food-search/ingredientMatch';
 import { getUsdaApiKey, searchUsda } from '@/lib/usda-api';
 import type { Food } from '@/db/types';
@@ -228,17 +228,11 @@ export async function rankIngredientCandidates(
       loadAllFoods(),
       loadFrequentIds(),
     ]);
-    const recentIds = new Set(recents.map((f) => f.id));
-
-    const tierOf = (f: Food): MatchTier => {
-      if (frequentIds.has(f.id)) return 'frequent';
-      if (recentIds.has(f.id)) return 'recent';
-      if (f.source === 'custom') return 'custom';
-      if (f.source === 'curated') return 'curated';
-      return 'library';
+    const history = {
+      frequentIds,
+      recentIds: new Set(recents.map((f) => f.id)),
     };
-
-    const local = rankCandidates(all, key, tierOf);
+    const local = rankLibraryCandidates(all, key, history);
     if (local.length > 0) return local;
 
     // Nothing of the user's matches - reach out for a generic value. Marked

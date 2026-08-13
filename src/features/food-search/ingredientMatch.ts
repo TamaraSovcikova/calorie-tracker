@@ -33,13 +33,31 @@ export type MatchTier =
   | 'curated' // bundled with the app
   | 'external'; // USDA / shared pool
 
+/**
+ * The gap between `curated` and `library` is deliberately wide. `library`
+ * includes the shared pool - foods contributed by other people - which is
+ * where "Pepp", "BEEF" and "BLACK BEANS" came from. At the original 0.15 vs
+ * 0.10 a terse stranger entry could out-score a sanity-checked built-in by
+ * hundredths, purely because the built-in's more descriptive name paid the
+ * extra-word penalty. A test caught it.
+ */
 export const TIER_BONUS: Record<MatchTier, number> = {
   frequent: 0.6,
   recent: 0.45,
-  custom: 0.3,
-  library: 0.1,
-  curated: 0.15,
+  custom: 0.3, // the user's own label scan beats a built-in
+  curated: 0.25,
+  library: 0.08,
   external: 0,
+};
+
+/** How a tier is described to the user, on the review row and the picker. */
+export const TIER_LABEL: Record<MatchTier, string> = {
+  frequent: 'You use often',
+  recent: 'You used recently',
+  custom: 'Your food',
+  library: 'In your library',
+  curated: 'Built-in estimate',
+  external: 'Generic estimate',
 };
 
 /** Tiers that represent "a food this user actually uses". */
@@ -216,6 +234,43 @@ export function rankCandidates(
     out.push({ food, tier, nameScore: nameMatchScore(food.name, query), score });
   }
   return out.sort((a, b) => b.score - a.score);
+}
+
+/** What the user has logged, for tier resolution. Ids, not foods. */
+export interface PersonalHistory {
+  /** Logged often, decay-weighted. */
+  frequentIds: ReadonlySet<string>;
+  /** Logged or scanned lately. */
+  recentIds: ReadonlySet<string>;
+}
+
+/**
+ * Which tier a food belongs to. Pure and exported so the ordering that the
+ * whole feature rests on ("prefer what I actually buy") is testable without
+ * a database - it used to live as an inline closure and was the one part of
+ * the pipeline with no coverage.
+ *
+ * Frequent beats recent deliberately: a mince bought weekly should outrank
+ * a barcode scanned once in a shop.
+ */
+export function resolveTier(food: Food, history: PersonalHistory): MatchTier {
+  if (history.frequentIds.has(food.id)) return 'frequent';
+  if (history.recentIds.has(food.id)) return 'recent';
+  if (food.source === 'custom') return 'custom';
+  if (food.source === 'curated') return 'curated';
+  return 'library';
+}
+
+/**
+ * Rank a library against an ingredient name. The whole local matching
+ * pipeline in one pure call; the Dexie side only has to supply the rows.
+ */
+export function rankLibraryCandidates(
+  foods: Food[],
+  query: string,
+  history: PersonalHistory,
+): IngredientCandidate[] {
+  return rankCandidates(foods, query, (f) => resolveTier(f, history));
 }
 
 /** How far ahead the winner must be before we stop asking the user. */

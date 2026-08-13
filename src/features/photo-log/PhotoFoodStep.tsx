@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { Camera, Check, Loader2, RotateCcw } from 'lucide-react';
+import { Camera, Check, ChevronRight, Loader2, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { createDiaryEntry } from '@/db/repos/diary';
 import { toast } from '@/components/ui/toast';
@@ -7,9 +7,11 @@ import { formatKcal } from '@/lib/macros';
 import { cn } from '@/lib/cn';
 import {
   analyzePhoto,
+  repickPhotoFood,
   resolvePhotoFoods,
   type ResolvedPhotoFood,
 } from './photoLog';
+import { IngredientCandidateSheet } from '@/features/food-search/IngredientCandidateSheet';
 import type { LocalDate } from '@/lib/dates';
 import type { MealSection } from '@/db/types';
 
@@ -32,7 +34,19 @@ export function PhotoFoodStep({ date, section, onDone }: PhotoFoodStepProps) {
   const [rows, setRows] = useState<Row[]>([]);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [picking, setPicking] = useState<number | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  /** Apply a candidate or amount change, recomputing that row's macros. */
+  const repick = (index: number, chosen: number, grams?: number) => {
+    setRows((rs) =>
+      rs.map((x, i) =>
+        i === index
+          ? { ...repickPhotoFood(x, chosen, grams ?? x.grams), included: chosen >= 0 }
+          : x,
+      ),
+    );
+  };
 
   const handleFile = async (file: File) => {
     setImageUrl(URL.createObjectURL(file));
@@ -169,9 +183,15 @@ export function PhotoFoodStep({ date, section, onDone }: PhotoFoodStepProps) {
             <ul className="divide-y divide-border rounded-xl border border-border">
               {rows.map((r, i) => (
                 <li key={`${r.name}-${i}`}>
-                  {r.food ? (
+                  <div className="flex items-center">
+                    {/* Checkbox includes or excludes; the row body opens the
+                        candidates. Before this, a wrong match could only be
+                        excluded, never corrected - and this path writes
+                        straight to the diary. */}
                     <button
                       type="button"
+                      disabled={!r.food}
+                      aria-label={r.included ? `Exclude ${r.name}` : `Include ${r.name}`}
                       onClick={() =>
                         setRows((rs) =>
                           rs.map((x, idx) =>
@@ -179,11 +199,11 @@ export function PhotoFoodStep({ date, section, onDone }: PhotoFoodStepProps) {
                           ),
                         )
                       }
-                      className="flex w-full items-center gap-3 px-3 py-2.5 text-left"
+                      className="tap-target flex shrink-0 items-center pl-3 pr-1 disabled:opacity-40"
                     >
                       <span
                         className={cn(
-                          'flex h-5 w-5 shrink-0 items-center justify-center rounded-md border',
+                          'flex h-5 w-5 items-center justify-center rounded-md border',
                           r.included
                             ? 'border-primary bg-primary text-primary-foreground'
                             : 'border-border',
@@ -191,32 +211,50 @@ export function PhotoFoodStep({ date, section, onDone }: PhotoFoodStepProps) {
                       >
                         {r.included && <Check className="h-3.5 w-3.5" />}
                       </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPicking(i)}
+                      className="flex min-w-0 flex-1 items-center gap-2 py-2.5 pl-2 pr-3 text-left"
+                    >
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-sm font-medium capitalize">
                           {r.name}
+                        </span>
+                        <span className="block truncate text-xs text-muted-foreground">
+                          {r.food ? r.food.name : 'Not recognised - tap to pick'}
                         </span>
                         <span className="block text-xs text-muted-foreground tabular-nums">
                           {r.grams} g · {formatKcal(r.macros?.kcal ?? 0)} kcal
                         </span>
                       </span>
+                      <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
                     </button>
-                  ) : (
-                    <div className="flex items-center gap-3 px-3 py-2.5 opacity-60">
-                      <span className="h-5 w-5 shrink-0" />
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-medium capitalize">
-                          {r.name}
-                        </span>
-                        <span className="block text-xs text-muted-foreground">
-                          Not recognised - add it from the Search tab.
-                        </span>
-                      </span>
-                    </div>
-                  )}
+                  </div>
                 </li>
               ))}
             </ul>
           </div>
+          {picking !== null && rows[picking] && (
+            <IngredientCandidateSheet
+              name={rows[picking].name}
+              grams={rows[picking].grams}
+              candidates={rows[picking].candidates}
+              chosen={rows[picking].chosen}
+              onPick={(chosen) => {
+                repick(picking, chosen);
+                setPicking(null);
+              }}
+              onGramsChange={(grams) =>
+                repick(picking, rows[picking].chosen, grams)
+              }
+              // A blank food here would log zero calories straight into the
+              // diary, unlike the recipe editor where it can be filled in.
+              allowBlank={false}
+              onClose={() => setPicking(null)}
+            />
+          )}
+
           <div className="flex gap-2 border-t border-border bg-card p-4">
             <Button type="button" variant="ghost" onClick={restart} className="shrink-0">
               <RotateCcw className="h-4 w-4" />

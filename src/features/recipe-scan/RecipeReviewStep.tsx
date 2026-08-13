@@ -1,9 +1,12 @@
 import { useState } from 'react';
-import { AlertTriangle, Check, ChevronRight, Plus } from 'lucide-react';
+import { AlertTriangle, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
-import { Sheet } from '@/components/ui/Sheet';
 import { computeMacros } from '@/features/food-search/foodMath';
-import { PERSONAL_TIERS, type MatchTier } from '@/features/food-search/ingredientMatch';
+import {
+  PERSONAL_TIERS,
+  TIER_LABEL,
+} from '@/features/food-search/ingredientMatch';
+import { IngredientCandidateSheet } from '@/features/food-search/IngredientCandidateSheet';
 import { formatKcal } from '@/lib/macros';
 import { cn } from '@/lib/cn';
 import type { ResolvedRecipe, RecipeIngredientDraft } from './recipeScan';
@@ -14,15 +17,6 @@ interface RecipeReviewStepProps {
   onConfirm: () => void;
   saving: boolean;
 }
-
-const TIER_LABEL: Record<MatchTier, string> = {
-  frequent: 'You use often',
-  recent: 'You used recently',
-  custom: 'Your food',
-  library: 'In your library',
-  curated: 'Built-in estimate',
-  external: 'Generic estimate',
-};
 
 /** kcal for the scanned amount of a given candidate. */
 function kcalFor(ing: RecipeIngredientDraft, index: number): number | null {
@@ -45,11 +39,16 @@ export function RecipeReviewStep({
 }: RecipeReviewStepProps) {
   const [picking, setPicking] = useState<number | null>(null);
 
-  const setChosen = (ingIndex: number, chosen: number) => {
+  const patch = (ingIndex: number, next: Partial<RecipeIngredientDraft>) => {
     const ingredients = recipe.ingredients.map((ing, i) =>
-      i === ingIndex ? { ...ing, chosen, confident: true } : ing,
+      i === ingIndex ? { ...ing, ...next } : ing,
     );
     onChange({ ...recipe, ingredients });
+  };
+
+  const setChosen = (ingIndex: number, chosen: number) => {
+    // Once the user has picked, it is confirmed by definition.
+    patch(ingIndex, { chosen, confident: true });
     setPicking(null);
   };
 
@@ -132,9 +131,13 @@ export function RecipeReviewStep({
       </div>
 
       {picking !== null && (
-        <CandidatePicker
-          ingredient={recipe.ingredients[picking]}
+        <IngredientCandidateSheet
+          name={recipe.ingredients[picking].name}
+          grams={recipe.ingredients[picking].grams}
+          candidates={recipe.ingredients[picking].candidates}
+          chosen={recipe.ingredients[picking].chosen}
           onPick={(chosen) => setChosen(picking, chosen)}
+          onGramsChange={(grams) => patch(picking, { grams })}
           onClose={() => setPicking(null)}
         />
       )}
@@ -142,74 +145,3 @@ export function RecipeReviewStep({
   );
 }
 
-/** The choice the AI was making, shown rather than made silently. */
-function CandidatePicker({
-  ingredient,
-  onPick,
-  onClose,
-}: {
-  ingredient: RecipeIngredientDraft;
-  onPick: (chosen: number) => void;
-  onClose: () => void;
-}) {
-  return (
-    <Sheet open onClose={onClose} title={ingredient.name} fullScreenMobile={false}>
-      <div className="p-4">
-        <p className="text-xs text-muted-foreground">
-          {ingredient.candidates.length > 0
-            ? `Which food is this? Amounts use ${ingredient.grams} g.`
-            : 'Nothing in your library matches this. It will be added as a blank food you can fill in.'}
-        </p>
-      </div>
-      <ul className="divide-y divide-border">
-        {ingredient.candidates.map((cand, i) => {
-          const kcal = computeMacros(cand.food, {
-            mode: 'g',
-            qty: ingredient.grams,
-          }).kcal;
-          const active = i === ingredient.chosen;
-          return (
-            <li key={cand.food.id}>
-              <button
-                type="button"
-                onClick={() => onPick(i)}
-                className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-muted/50"
-              >
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-medium">
-                    {cand.food.name}
-                  </span>
-                  <span className="mt-0.5 block text-xs text-muted-foreground tabular-nums">
-                    {formatKcal(kcal)} kcal · {Math.round(cand.food.kcal_100)}{' '}
-                    kcal/100g · {TIER_LABEL[cand.tier]}
-                  </span>
-                </span>
-                {active && <Check className="h-4 w-4 shrink-0 text-primary" />}
-              </button>
-            </li>
-          );
-        })}
-        <li>
-          <button
-            type="button"
-            onClick={() => onPick(-1)}
-            className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-muted/50"
-          >
-            <Plus className="h-4 w-4 shrink-0 text-muted-foreground" />
-            <span className="min-w-0 flex-1">
-              <span className="block text-sm font-medium">
-                None of these - add blank
-              </span>
-              <span className="mt-0.5 block text-xs text-muted-foreground">
-                Creates "{ingredient.name}" with no macros for you to fill in.
-              </span>
-            </span>
-            {ingredient.chosen === -1 && (
-              <Check className="h-4 w-4 shrink-0 text-primary" />
-            )}
-          </button>
-        </li>
-      </ul>
-    </Sheet>
-  );
-}
