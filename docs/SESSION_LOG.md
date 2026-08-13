@@ -6,10 +6,108 @@ How to use:
 - Start of session: read only the top entry, announce the chat number.
 - End of session: prepend a new entry, bump `Session count`.
 
-Session count: 5
+Session count: 6
 Last updated: 2026-08-13
 
 ---
+
+## Chat #4d - 2026-08-13 (recipe-scan ingredient matching rebuilt; deployed)
+
+Triggered by a scanned stuffed-pepper recipe reading ~3,600 kcal against the
+recipe's own 1,324, with an ingredient called "Pepp" at 464 kcal/100g. Three
+independent causes, all now fixed and tested.
+
+- **The scoring bug (root cause).** `localMatchScore` measured quality as
+  `shared / foodNameWords.length` - coverage of the FOOD's name, not the
+  query's. A food called `Pepp` scored **1.0** against "peppers" because its
+  single word matched, while the curated `Peppers, sweet, red, raw` scored
+  **0.25** and was rejected outright by the 0.6 floor. Terse junk names beat
+  accurate descriptive ones structurally. That one line explains `Pepp`,
+  `BEEF` and `BLACK BEANS` all three. Matching now lives in
+  `src/features/food-search/ingredientMatch.ts`, measures coverage against the
+  QUERY, and penalises extra food-name words mildly instead of disqualifying.
+  Prefix matching additionally requires the shorter word to cover 70% of the
+  longer, so `pepper`/`peppers` matches and `pepp`/`peppers` does not.
+- **Dry vs cooked (~700 kcal of the error on one ingredient).** Dry black
+  beans are 341 kcal/100g, cooked 132, and the scan applied dry macros to a
+  cooked weight. Prep-state words are extracted from both sides and mismatches
+  penalised. The worker prompt keeps state IN the ingredient name and prefers
+  the cooked weight when a recipe gives both.
+- **Counts flattened.** "4 large peppers" -> 400g. Worker prompt now carries
+  realistic per-item weights and is told not to round to flat numbers.
+- **Tiering (the feature Tamara actually asked for).** Candidates are ranked
+  `frequent > recent > custom > curated > library > external`, weighted into
+  the score, so a mince logged weekly beats a generic entry with the same
+  name. Uses the existing decay-weighted `frequentFoods`.
+  `lookupIngredientFood` is now a thin wrapper over `rankIngredientCandidates`,
+  so the AI meal planner and the photo food log inherit all of it.
+- **The review step.** The scan used to resolve everything and go straight to
+  the meal editor, so a wrong match arrived looking like a real ingredient. It
+  now stops at a review screen: each ingredient, what it resolved to, which
+  tier that came from, and its kcal for the scanned amount. Anything not
+  confidently matched is flagged. Tapping a row opens the candidates the
+  matcher was choosing between.
+- Resolving no longer creates a zero-macro custom food as a side effect of
+  LOOKING - that littered the library with stubs from abandoned scans. Foods
+  are created at commit time only.
+
+### Gaps found reviewing the above, then fixed
+
+- **The contrast guard from #4c had a hole.** It only checked text on PAGE
+  backgrounds. Behind that sat white-on-amber at **2.83:1** - the label on
+  every Add, Save and Log button. Chose option B: keep the amber, take a
+  near-black label (6.24:1), which is what dark mode was already doing.
+  Destructive went the other way, deepening the fill so it keeps the
+  conventional white-on-red read (3.45 -> 5.44 light, 3.73 -> 4.90 dark).
+  `--color-accent-deep` was a hair under at 4.48:1 and carries the active nav
+  label: `#8C6A30` -> `#866430`, 4.87:1. **Filled surfaces are now in the
+  enforced list; 22 pairs across both themes.**
+- **Nested sheets.** `Sheet` binds Escape and the Tab trap to `window`, so
+  with the new candidate picker open inside the recipe review BOTH fired and
+  one Escape closed the picker AND the review under it. Sheets now keep a
+  stack; only the topmost reacts.
+- **Fresh installs were all warnings.** `isConfident` required a personal
+  tier, so a user with no logging history could never have a confident match
+  and a 12-ingredient recipe opened as 12 flags. With no history a strong
+  CURATED match is accepted; `external` (USDA / shared pool) is still never
+  confident.
+- Photo log was the only AI path not calling `resetPlannerCaches()`, so
+  logging a food then photo-logging in the same session used a stale library.
+
+### The tests found a live bug - worth remembering
+
+Extracting `resolveTier` / `rankLibraryCandidates` as pure functions (the
+tiering was an inline closure inside a Dexie call, so it had zero coverage)
+and writing 18 cases immediately failed one: a shared-pool `BEEF MINCE` beat
+the curated `Beef mince, cooked` **by 0.01**, because the curated entry's
+descriptive name paid a 0.06 extra-word penalty while the tier gap only gave
+back 0.05. `curated` 0.15 -> 0.25, `library` 0.10 -> 0.08. `custom` stays
+above `curated` deliberately: the user's own label scan should beat a built-in.
+The suite now contains reproductions of both original bugs.
+
+### Also
+
+- Photo log can now CORRECT a match, not just include/exclude it - it writes
+  straight to the diary and was the path with the least oversight. Blank-food
+  is deliberately NOT offered there (no later editor to fill it in; it would
+  log zero calories silently).
+- Amounts are editable in the candidate sheet, so a wrong quantity is fixed
+  where it is visible rather than on a later screen.
+- Picker shared between recipe review and photo log; `TIER_LABEL` moved next
+  to the tiers it describes.
+
+- **State:** deployed, Version `45d6c651`. Commits `0c741fe` (matching +
+  review), `cf36452` (contrast, sheets, confidence), `7c9344c` (tests, photo
+  correction, amounts). **287 tests**, up from 237 at the start of the chat.
+  Typecheck + build clean, lint back to the 2 pre-existing issues. **No schema
+  change in this chat.**
+- **Next - all device work, none of it verified by eye:** re-scan the same
+  stuffed-pepper recipe and read the review screen; it now shows what was
+  chosen per row and what it was choosing between, which is the only way to
+  tell whether the tiering behaves against a real library rather than test
+  fixtures. Also unverified on hardware: the near-black primary button (the
+  most visible change of the day), four labels in the nav bar on a narrow
+  phone, the rebuilt Progress page, and the live camera from #4.
 
 ## Chat #4c - 2026-08-13 (whole-app design review + the entire task list; deployed)
 

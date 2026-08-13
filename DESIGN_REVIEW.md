@@ -178,6 +178,23 @@ default rather than by choice.
 text-on-background token pair and fails the build below 4.5:1, so it cannot
 regress.
 
+### 6.1b Addendum - the guard had a hole (found later the same day)
+
+The first version of the guard only checked text on PAGE backgrounds. Text on
+FILLED surfaces was uncovered, and behind that sat:
+
+| Pair | Where | Was | Now |
+|---|---|---|---|
+| `--primary-foreground` on `--primary` | every Add / Save / Log button | **2.83:1** | 6.24:1 |
+| `--destructive-foreground` on `--destructive` (light) | delete, sync banner | **3.45:1** | 5.44:1 |
+| same, dark | " | **3.73:1** | 4.90:1 |
+| `--color-accent-deep` on `--color-bg` | active nav label | **4.48:1** | 4.87:1 |
+
+Primary keeps its amber and takes a near-black label - the smaller change, and
+what dark mode already did. Destructive deepens the fill instead, keeping the
+conventional white-on-red read. All are now enforced: 22 pairs across the two
+themes. **"Background" means any surface text sits on, not just the page.**
+
 ---
 
 ## 7. Unresolved design decisions
