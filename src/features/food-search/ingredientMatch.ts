@@ -26,6 +26,7 @@ import type { Food } from '@/db/types';
  * they actually buy, so what they log outranks anything generic.
  */
 export type MatchTier =
+  | 'alias' // the user already told us this is the one
   | 'frequent' // logged often (decay-weighted)
   | 'recent' // logged or scanned lately
   | 'custom' // they created it, usually off a label scan
@@ -42,6 +43,7 @@ export type MatchTier =
  * extra-word penalty. A test caught it.
  */
 export const TIER_BONUS: Record<MatchTier, number> = {
+  alias: 1, // an explicit answer from the user, not a guess
   frequent: 0.6,
   recent: 0.45,
   custom: 0.3, // the user's own label scan beats a built-in
@@ -52,6 +54,7 @@ export const TIER_BONUS: Record<MatchTier, number> = {
 
 /** How a tier is described to the user, on the review row and the picker. */
 export const TIER_LABEL: Record<MatchTier, string> = {
+  alias: 'You chose this before',
   frequent: 'You use often',
   recent: 'You used recently',
   custom: 'Your food',
@@ -62,6 +65,7 @@ export const TIER_LABEL: Record<MatchTier, string> = {
 
 /** Tiers that represent "a food this user actually uses". */
 export const PERSONAL_TIERS: ReadonlySet<MatchTier> = new Set<MatchTier>([
+  'alias',
   'frequent',
   'recent',
   'custom',
@@ -76,9 +80,120 @@ export interface IngredientCandidate {
   score: number;
 }
 
-/** Significant (3+ char) words, punctuation stripped. */
+/**
+ * French and Dutch food words, mapped to the English the recipe scanner
+ * produces. Brussels supermarket products are labelled in both.
+ *
+ * "beef mince" and "haché de boeuf" share no characters, so no amount of
+ * scoring tuning connects them - the words have to be normalised to a common
+ * language first. This covers generic ingredient words only; branded product
+ * names are handled by the learned aliases instead, since no word list will
+ * ever contain "Carrefour Haché Pur Boeuf".
+ *
+ * Keys are lowercase and de-accented. A value may be several words.
+ */
+const FOOD_WORD_TRANSLATIONS: Readonly<Record<string, string>> = {
+  // ---- French: meat & fish ----
+  boeuf: 'beef', veau: 'veal', porc: 'pork', agneau: 'lamb',
+  poulet: 'chicken', dinde: 'turkey', canard: 'duck', jambon: 'ham',
+  hache: 'mince', hachee: 'mince', viande: 'meat', poitrine: 'breast',
+  cuisse: 'thigh', saucisse: 'sausage', lardons: 'bacon', bacon: 'bacon',
+  saumon: 'salmon', thon: 'tuna', cabillaud: 'cod', crevettes: 'prawns',
+  poisson: 'fish', oeuf: 'egg', oeufs: 'egg',
+  // ---- French: dairy ----
+  lait: 'milk', fromage: 'cheese', beurre: 'butter', creme: 'cream',
+  yaourt: 'yogurt', yaourts: 'yogurt',
+  // ---- French: veg & fruit ----
+  tomate: 'tomato', tomates: 'tomato', oignon: 'onion', oignons: 'onion',
+  ail: 'garlic', carotte: 'carrot', carottes: 'carrot',
+  poivron: 'pepper', poivrons: 'pepper', pomme: 'apple', pommes: 'apple',
+  patate: 'potato', patates: 'potato', epinards: 'spinach',
+  haricots: 'beans', pois: 'peas', chou: 'cabbage', courgette: 'courgette',
+  champignon: 'mushroom', champignons: 'mushroom', salade: 'lettuce',
+  banane: 'banana', fraise: 'strawberry', fraises: 'strawberry',
+  citron: 'lemon', orange: 'orange', concombre: 'cucumber',
+  // ---- French: staples ----
+  pain: 'bread', riz: 'rice', pates: 'pasta', farine: 'flour',
+  huile: 'oil', sucre: 'sugar', sel: 'salt', poivre: 'pepper',
+  lentilles: 'lentils', avoine: 'oats', miel: 'honey',
+  // ---- Dutch ----
+  rund: 'beef', rundvlees: 'beef', gehakt: 'mince', rundergehakt: 'beef mince',
+  kip: 'chicken', kipfilet: 'chicken breast', varken: 'pork',
+  varkensvlees: 'pork', zalm: 'salmon', tonijn: 'tuna', vis: 'fish',
+  eieren: 'egg', ei: 'egg',
+  kaas: 'cheese', melk: 'milk', boter: 'butter', room: 'cream',
+  yoghurt: 'yogurt',
+  ui: 'onion', uien: 'onion', knoflook: 'garlic', tomaat: 'tomato',
+  tomaten: 'tomato', wortel: 'carrot', wortelen: 'carrot',
+  spinazie: 'spinach', bonen: 'beans', erwten: 'peas', kool: 'cabbage',
+  aardappel: 'potato', aardappelen: 'potato', sla: 'lettuce',
+  komkommer: 'cucumber', appel: 'apple', banaan: 'banana',
+  brood: 'bread', rijst: 'rice', bloem: 'flour', olie: 'oil',
+  suiker: 'sugar', zout: 'salt', havermout: 'oats', honing: 'honey',
+};
+
+/**
+ * Words that describe the AMOUNT, not the food. A recipe says "4 large
+ * peppers"; the food is a pepper.
+ *
+ * These used to count as significant, which halved coverage on a two-word
+ * query and rejected the match outright: "large pepper" scored 0 against the
+ * curated "Bell pepper" while a bare "pepper" scored 0.94. Two staples in a
+ * seven-ingredient recipe came back as "no match" because of it.
+ *
+ * Deliberately NOT here: whole, half, fresh, ripe, baby, fillet. "Whole milk"
+ * is a different food from skimmed, and dropping the qualifier would make
+ * them interchangeable.
+ */
+const QUALIFIER_WORDS: ReadonlySet<string> = new Set([
+  // size
+  'large', 'medium', 'small', 'big', 'extra', 'jumbo', 'mini',
+  // count and measure
+  'clove', 'cloves', 'slice', 'slices', 'piece', 'pieces', 'portion',
+  'tbsp', 'tsp', 'tablespoon', 'tablespoons', 'teaspoon', 'teaspoons',
+  'cup', 'cups', 'handful', 'pinch', 'bunch', 'sprig', 'sprigs',
+  'stick', 'sticks', 'can', 'cans', 'tin', 'tins', 'packet', 'pack',
+  'jar', 'bag', 'head', 'heads',
+  // knife work - changes the shape, not the macros
+  'grated', 'chopped', 'diced', 'sliced', 'crushed', 'finely', 'roughly',
+  'peeled', 'trimmed',
+]);
+// Deliberately NOT knife work: minced and ground, which identify the cut of
+// meat; dried and smoked, which change the food.
+
+/**
+ * Strip diacritics so "haché" and "hache" are the same token.
+ *
+ * Ligatures are expanded by hand first: NFD does not decompose "œ", so
+ * "bœuf" was tokenising to "b" and "uf" and losing the word entirely.
+ */
+function deaccent(s: string): string {
+  return s
+    .replace(/œ/g, 'oe')
+    .replace(/æ/g, 'ae')
+    .replace(/ß/g, 'ss')
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '');
+}
+
+/**
+ * Significant (3+ char) words: lowercased, de-accented, translated out of
+ * French/Dutch where known, and with amount qualifiers removed.
+ *
+ * Translation runs BEFORE the length filter so two-letter Dutch words like
+ * "ui" (onion) and "ei" (egg) survive.
+ */
 export function sigWords(s: string): string[] {
-  return (s.toLowerCase().match(/[a-z0-9]+/g) ?? []).filter((w) => w.length >= 3);
+  const raw = deaccent(s.toLowerCase()).match(/[a-z0-9]+/g) ?? [];
+  const translated = raw.flatMap((w) => {
+    const mapped = FOOD_WORD_TRANSLATIONS[w];
+    return mapped ? mapped.split(' ') : [w];
+  });
+  const kept = translated.filter(
+    (w) => w.length >= 3 && !QUALIFIER_WORDS.has(w),
+  );
+  // Never strip everything away: "1 large" alone should still be something.
+  return kept.length > 0 ? kept : translated.filter((w) => w.length >= 3);
 }
 
 /**
@@ -193,14 +308,61 @@ export function nameMatchScore(foodName: string, query: string): number {
 /** Floor a name has to clear, after the extra-word penalty, to be offered. */
 const MIN_NAME_SCORE = 0.5;
 
+/** Score for a food the user explicitly chose for this phrase before. Above
+ *  anything the scorer can produce, because it is an answer, not a guess. */
+export const ALIAS_SCORE = 2;
+
+/**
+ * Words naming a processed FORM of an ingredient. Tomato puree is ~80
+ * kcal/100g against a fresh tomato's 18, so matching "tomato puree" to
+ * "Tomato" is a wrong answer dressed as a near one - it reported 5 kcal for
+ * 30 g when the truth is nearer 24. Peanut butter vs peanut, almond flour vs
+ * almonds and coconut milk vs coconut are the same trap.
+ */
+const FORM_WORDS: ReadonlySet<string> = new Set([
+  'puree', 'paste', 'powder', 'powdered', 'concentrate', 'sauce', 'juice',
+  'oil', 'syrup', 'extract', 'flour', 'butter', 'milk', 'cream', 'stock',
+  'broth', 'dressing', 'spread',
+]);
+
+function formsIn(s: string): Set<string> {
+  const words = new Set(deaccent(s.toLowerCase()).match(/[a-z]+/g) ?? []);
+  return new Set([...FORM_WORDS].filter((f) => words.has(f)));
+}
+
+/**
+ * Penalty when one side names a processed form the other does not. Asking
+ * for the form and getting the raw ingredient is the worse error, so it
+ * costs more than the reverse. Returns 0..0.45.
+ */
+export function formPenalty(query: string, foodName: string): number {
+  const q = formsIn(query);
+  const f = formsIn(foodName);
+  if (q.size === 0 && f.size === 0) return 0;
+  const shared = [...q].some((w) => f.has(w));
+  if (shared) return 0;
+  if (q.size > 0 && f.size === 0) return 0.45; // asked for puree, got tomato
+  if (f.size > 0 && q.size === 0) return 0.2; // asked for tomato, got puree
+  return 0.45; // both name a form, and they disagree
+}
+
 /** Small nudges that break ties between similarly-named foods. */
 function qualityBonus(food: Food): number {
   let b = 0;
-  if (food.kcal_100 > 0) b += 0.05; // a real food beats an empty stub
   if (food.usda_data_type === 'foundation') b += 0.04;
   else if (food.usda_data_type === 'sr_legacy') b += 0.02;
   return b;
 }
+
+/**
+ * A food with no calories carries no information. These are almost always
+ * blank stubs - the old recipe scanner created one for every ingredient it
+ * could not match, so libraries are littered with them. One such stub
+ * ("Garlic", 0 kcal) outranked the real curated Garlic at 149 kcal/100g,
+ * because the custom-tier bonus exactly cancelled the old +0.05 for having
+ * macros. A stub should lose to anything real, so it is a penalty now.
+ */
+const BLANK_FOOD_PENALTY = 0.5;
 
 /**
  * Score one candidate. Exported so the tier weighting is testable on its own.
@@ -213,7 +375,12 @@ export function candidateScore(
   const nameScore = nameMatchScore(food.name, query);
   if (nameScore === 0) return 0;
   const score =
-    nameScore + TIER_BONUS[tier] + qualityBonus(food) - statePenalty(query, food.name);
+    nameScore +
+    TIER_BONUS[tier] +
+    qualityBonus(food) -
+    statePenalty(query, food.name) -
+    formPenalty(query, food.name) -
+    (food.kcal_100 > 0 ? 0 : BLANK_FOOD_PENALTY);
   return Math.max(0, score);
 }
 
@@ -306,9 +473,14 @@ export function isConfident(
 ): boolean {
   const top = candidates[0];
   if (!top) return false;
-  const trusted = ctx.hasPersonalHistory
-    ? PERSONAL_TIERS.has(top.tier)
-    : PERSONAL_TIERS.has(top.tier) || top.tier === 'curated';
+  // An exact name match to a sanity-checked built-in is not uncertainty.
+  // Flagging "large onion" -> "Onion" alongside genuine ambiguity trains the
+  // user to tap past the warning, which defeats it.
+  const exactCurated = top.tier === 'curated' && top.nameScore >= 1;
+  const trusted =
+    PERSONAL_TIERS.has(top.tier) ||
+    exactCurated ||
+    (!ctx.hasPersonalHistory && top.tier === 'curated');
   if (!trusted) return false;
   if (top.score < CONFIDENT_MIN_SCORE) return false;
   const runnerUp = candidates[1];

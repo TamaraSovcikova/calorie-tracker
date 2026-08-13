@@ -14,10 +14,12 @@ import { currentUserId } from '@/db/userId';
 import { getSyncConfig, syncBaseUrl } from '@/db/sync/config';
 import { createMeal, type MealItemInput } from '@/db/repos/meals';
 import { frequentFoods, recentFoods, type DayTotals } from '@/db/repos/diary';
+import { getAliasFood } from '@/db/repos/ingredientAliases';
 import { computeMacros } from '@/features/food-search/foodMath';
 import {
   rankCandidates,
   rankLibraryCandidates,
+  ALIAS_SCORE,
   type IngredientCandidate,
 } from '@/features/food-search/ingredientMatch';
 import { getUsdaApiKey, searchUsda } from '@/lib/usda-api';
@@ -233,6 +235,25 @@ export async function rankIngredientCandidates(
       recentIds: new Set(recents.map((f) => f.id)),
     };
     const local = rankLibraryCandidates(all, key, history);
+
+    // A food the user has already chosen for this exact phrase wins outright.
+    // This is what makes a product no word list could contain - a French
+    // supermarket mince against "beef mince" - resolve from the second scan
+    // on. Kept at the head of the list rather than replacing it, so the
+    // picker still offers the alternatives.
+    const aliased = await getAliasFood(key);
+    if (aliased) {
+      const rest = local.filter((c) => c.food.id !== aliased.id);
+      return [
+        {
+          food: aliased,
+          tier: 'alias' as const,
+          nameScore: 1,
+          score: ALIAS_SCORE,
+        },
+        ...rest,
+      ];
+    }
     if (local.length > 0) return local;
 
     // Nothing of the user's matches - reach out for a generic value. Marked

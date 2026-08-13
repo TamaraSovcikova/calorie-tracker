@@ -8,6 +8,7 @@ import {
   rankLibraryCandidates,
   resolveTier,
   sigWords,
+  formPenalty,
   statePenalty,
   TIER_BONUS,
   wordsMatch,
@@ -207,9 +208,14 @@ describe('isConfident', () => {
     ).toBe(false);
   });
 
-  it('is never confident about a food the user does not use', () => {
+  it('is never confident about a generic estimate', () => {
     expect(isConfident([cand('BEEF', 'external', 1.6)])).toBe(false);
-    expect(isConfident([cand('Bell pepper', 'curated', 1.6)])).toBe(false);
+  });
+
+  it('is not confident about a PARTIAL built-in match', () => {
+    // An exact built-in match is accepted (see below); a partial one is
+    // exactly the ambiguity the flag exists for.
+    expect(isConfident([cand('Bell pepper', 'curated', 0.95)])).toBe(false);
   });
 
   it('is not confident about a weak match even if it is personal', () => {
@@ -243,9 +249,9 @@ describe('isConfident', () => {
       ).toBe(false);
     });
 
-    it('does not loosen anything for a user who does have history', () => {
+    it('does not loosen a PARTIAL built-in match for a user with history', () => {
       expect(
-        isConfident([cand('Bell pepper', 'curated', 1.6)], { hasPersonalHistory: true }),
+        isConfident([cand('Bell pepper', 'curated', 0.95)], { hasPersonalHistory: true }),
       ).toBe(false);
     });
   });
@@ -343,5 +349,112 @@ describe('rankLibraryCandidates — the ordering the feature rests on', () => {
       recentIds: new Set(),
     });
     expect(ranked[0].food.id).toBe('wet');
+  });
+});
+
+describe('the stuffed-pepper scan, second run', () => {
+  // Every case below came back wrong on a real scan. Size and unit words
+  // were counting as significant, which halved coverage on a two-word query
+  // and rejected the match outright.
+  it('finds the curated pepper behind a size word', () => {
+    expect(nameMatchScore('Bell pepper', 'large pepper')).toBeGreaterThan(0.9);
+    expect(nameMatchScore('Peppers, sweet, red, raw', 'large pepper')).toBeGreaterThan(0.5);
+  });
+
+  it('finds onion and garlic behind size and unit words', () => {
+    expect(nameMatchScore('Onion', 'large onion')).toBe(1);
+    expect(nameMatchScore('Garlic', 'garlic clove')).toBe(1);
+  });
+
+  it('ignores knife work', () => {
+    expect(nameMatchScore('Cheddar', 'grated cheddar')).toBe(1);
+    expect(nameMatchScore('Onion', 'finely chopped onion')).toBe(1);
+  });
+
+  it('does NOT strip words that identify a different food', () => {
+    // "whole" separates whole milk from skimmed; stripping it would make
+    // them interchangeable.
+    expect(nameMatchScore('Milk, whole', 'whole milk')).toBe(1);
+    expect(nameMatchScore('Milk, skimmed', 'whole milk')).toBe(0);
+  });
+});
+
+describe('formPenalty — a processed form is a different food', () => {
+  it('penalises asking for a form and getting the raw ingredient', () => {
+    // Reported 5 kcal for 30 g of tomato puree; the truth is nearer 24.
+    expect(formPenalty('tomato puree', 'Tomato')).toBe(0.45);
+    expect(formPenalty('peanut butter', 'Peanuts')).toBe(0.45);
+    expect(formPenalty('almond flour', 'Almonds')).toBe(0.45);
+  });
+
+  it('penalises the reverse more gently', () => {
+    expect(formPenalty('tomato', 'Tomato puree')).toBe(0.2);
+  });
+
+  it('is neutral when both agree, or neither says anything', () => {
+    expect(formPenalty('tomato puree', 'Tomato puree')).toBe(0);
+    expect(formPenalty('tomato', 'Tomato')).toBe(0);
+  });
+
+  it('lets the right food win once both exist', () => {
+    const raw = candidateScore(food('Tomato', { source: 'curated' }), 'curated', 'tomato puree');
+    const right = candidateScore(food('Tomato puree', { source: 'curated' }), 'curated', 'tomato puree');
+    expect(right).toBeGreaterThan(raw);
+  });
+});
+
+describe('blank stubs never win', () => {
+  it('loses to a real food even from a better tier', () => {
+    // A 0 kcal "Garlic" stub, left behind by an abandoned scan, outranked
+    // the real curated Garlic at 149 kcal/100g.
+    const stub = candidateScore(food('Garlic', { kcal_100: 0 }), 'custom', 'garlic');
+    const real = candidateScore(food('Garlic', { source: 'curated', kcal_100: 149 }), 'curated', 'garlic');
+    expect(real).toBeGreaterThan(stub);
+  });
+});
+
+describe('French and Dutch product names', () => {
+  it('matches a French mince to an English ingredient name', () => {
+    expect(nameMatchScore('Hache de boeuf 5% MG', 'beef mince')).toBe(1);
+  });
+
+  it('handles accents', () => {
+    expect(nameMatchScore('Haché de bœuf', 'beef mince')).toBeGreaterThan(0.9);
+  });
+
+  it('matches Dutch too', () => {
+    expect(nameMatchScore('Rundergehakt 5%', 'beef mince')).toBe(1);
+    expect(nameMatchScore('Kipfilet', 'chicken breast')).toBe(1);
+  });
+
+  it('survives the 3-character floor for short Dutch words', () => {
+    // "ui" is onion and "ei" is egg; both are shorter than the word floor.
+    expect(sigWords('ui')).toEqual(['onion']);
+    expect(nameMatchScore('Ui', 'onion')).toBe(1);
+  });
+
+  it('does not translate English words that happen to look foreign', () => {
+    expect(sigWords('orange juice')).toEqual(['orange', 'juice']);
+  });
+});
+
+describe('exact curated matches stop nagging', () => {
+  const cand = (name: string, tier: MatchTier, nameScore: number): IngredientCandidate => ({
+    food: food(name),
+    tier,
+    nameScore,
+    score: nameScore + TIER_BONUS[tier],
+  });
+
+  it('accepts an exact built-in match', () => {
+    expect(isConfident([cand('Onion', 'curated', 1)])).toBe(true);
+  });
+
+  it('still asks about a partial built-in match', () => {
+    expect(isConfident([cand('Bell pepper', 'curated', 0.94)])).toBe(false);
+  });
+
+  it('still never accepts a generic estimate', () => {
+    expect(isConfident([cand('BEEF', 'external', 1)])).toBe(false);
   });
 });

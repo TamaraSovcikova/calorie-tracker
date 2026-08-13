@@ -5,6 +5,7 @@ import type {
   FitbitTokens,
   Food,
   FoodRecent,
+  IngredientAlias,
   Meal,
   MealItem,
   Pet,
@@ -32,6 +33,7 @@ class CalorieDB extends Dexie {
   fitbit_tokens!: EntityTable<FitbitTokens, 'user_id'>;
   pet!: EntityTable<Pet, 'user_id'>;
   food_recents!: EntityTable<FoodRecent, 'id'>;
+  ingredient_aliases!: EntityTable<IngredientAlias, 'id'>;
 
   constructor() {
     super('calorie-tracker');
@@ -61,6 +63,13 @@ class CalorieDB extends Dexie {
     // logged, so they still surface in the recent list. Additive.
     this.version(4).stores({
       food_recents: '&id, user_id, food_id, at',
+    });
+
+    // Learned ingredient aliases: "beef mince" -> the French-named mince the
+    // user actually buys. No word list will ever contain a supermarket brand,
+    // so the app remembers what was picked instead.
+    this.version(5).stores({
+      ingredient_aliases: '&id, user_id, [user_id+phrase], food_id, updated_at',
     });
   }
 }

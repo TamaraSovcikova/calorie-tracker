@@ -195,6 +195,27 @@ export interface FoodRecent {
   at: ISOTimestamp;
 }
 
+/**
+ * A remembered answer to "which food is this ingredient?".
+ *
+ * Written when the user picks a food in the recipe-scan review, read first on
+ * every later scan. This is what makes a product the app could never have
+ * guessed - a French-named Brussels mince against the ingredient "beef
+ * mince" - resolve correctly from the second scan onward.
+ *
+ * `id` is deterministic (`ia:{user}:{phrase}`) so the same pick made on two
+ * devices produces one row rather than a sync conflict.
+ */
+export interface IngredientAlias {
+  id: ID; // `ia:${user_id}:${phrase}`
+  user_id: ID;
+  /** Normalised ingredient phrase, e.g. "beef mince". */
+  phrase: string;
+  food_id: ID;
+  created_at: ISOTimestamp;
+  updated_at: ISOTimestamp;
+}
+
 /** Coarse meal-type used for filtering the library. */
 export type MealCategory = 'breakfast' | 'lunch' | 'dinner' | 'snack' | 'other';
 

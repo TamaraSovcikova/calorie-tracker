@@ -16,7 +16,7 @@
  * re-seed on next load.
  */
 
-export const CURATED_VERSION = 3;
+export const CURATED_VERSION = 4;
 
 export interface CuratedUnit {
   label: string;
@@ -837,4 +837,40 @@ export const CURATED_FOODS: CuratedFood[] = [
     units: [{ label: 'stick', grams: 5 }, { label: 'pack', grams: 25 }] },
   { slug: 'croutons', name: 'Croutons', kcal: 407, protein: 12, carbs: 74, fat: 6.6,
     units: [{ label: 'handful', grams: 15 }] },
+
+  // ---- Processed forms the scanner kept having to guess at ----
+  // A recipe asking for tomato puree was resolving to a fresh tomato: 18
+  // kcal/100g against puree's ~80, so 2 tbsp read as 5 kcal instead of ~24.
+  { slug: 'tomato-puree', name: 'Tomato puree', kcal: 82, protein: 4.3, carbs: 15, fat: 0.5,
+    units: [{ label: 'tbsp', grams: 15 }, { label: 'tsp', grams: 5 }] },
+  { slug: 'passata', name: 'Passata', kcal: 35, protein: 1.4, carbs: 6.5, fat: 0.3,
+    units: [{ label: 'carton', grams: 500 }, { label: 'serving', grams: 125 }] },
+  { slug: 'tomato-sauce-jar', name: 'Tomato pasta sauce', kcal: 55, protein: 1.6, carbs: 8, fat: 1.8,
+    units: [{ label: 'jar', grams: 350 }, { label: 'serving', grams: 125 }] },
+  { slug: 'stock-cube', name: 'Stock cube', kcal: 259, protein: 11, carbs: 21, fat: 14,
+    units: [{ label: 'cube', grams: 10 }] },
+  { slug: 'coconut-milk', name: 'Coconut milk, tinned', kcal: 197, protein: 2, carbs: 3, fat: 20,
+    units: [{ label: 'tin', grams: 400 }, { label: 'serving', grams: 100 }] },
+  { slug: 'almond-flour', name: 'Almond flour', kcal: 611, protein: 21, carbs: 8, fat: 53,
+    units: [{ label: 'tbsp', grams: 10 }, { label: 'cup', grams: 96 }] },
+  { slug: 'plain-flour', name: 'Plain flour', kcal: 341, protein: 10, carbs: 71, fat: 1.2,
+    units: [{ label: 'tbsp', grams: 8 }, { label: 'cup', grams: 125 }] },
+  { slug: 'cornflour', name: 'Cornflour', kcal: 381, protein: 0.3, carbs: 91, fat: 0.1,
+    units: [{ label: 'tbsp', grams: 8 }] },
+  { slug: 'balsamic-vinegar', name: 'Balsamic vinegar', kcal: 88, protein: 0.5, carbs: 17, fat: 0,
+    units: [{ label: 'tbsp', grams: 16 }] },
+  { slug: 'worcestershire', name: 'Worcestershire sauce', kcal: 78, protein: 0, carbs: 19, fat: 0,
+    units: [{ label: 'tbsp', grams: 17 }, { label: 'tsp', grams: 6 }] },
+  { slug: 'mustard', name: 'Mustard', kcal: 66, protein: 4, carbs: 5, fat: 3.5,
+    units: [{ label: 'tsp', grams: 5 }, { label: 'tbsp', grams: 15 }] },
+  { slug: 'sriracha', name: 'Sriracha / chilli sauce', kcal: 93, protein: 1.9, carbs: 19, fat: 0.9,
+    units: [{ label: 'tsp', grams: 5 }, { label: 'tbsp', grams: 15 }] },
+  { slug: 'coconut-oil', name: 'Coconut oil', kcal: 862, protein: 0, carbs: 0, fat: 100,
+    units: [{ label: 'tbsp', grams: 14 }, { label: 'tsp', grams: 4.5 }] },
+  { slug: 'vegetable-oil', name: 'Vegetable oil', kcal: 884, protein: 0, carbs: 0, fat: 100,
+    units: [{ label: 'tbsp', grams: 14 }, { label: 'tsp', grams: 4.5 }] },
+  { slug: 'tahini', name: 'Tahini', kcal: 595, protein: 17, carbs: 21, fat: 54,
+    units: [{ label: 'tbsp', grams: 15 }] },
+  { slug: 'vinegar', name: 'Vinegar', kcal: 21, protein: 0, carbs: 0.9, fat: 0,
+    units: [{ label: 'tbsp', grams: 15 }] },
 ];

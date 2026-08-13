@@ -7,6 +7,7 @@ import {
   TIER_LABEL,
 } from '@/features/food-search/ingredientMatch';
 import { IngredientCandidateSheet } from '@/features/food-search/IngredientCandidateSheet';
+import { rememberAlias } from '@/db/repos/ingredientAliases';
 import { formatKcal } from '@/lib/macros';
 import { cn } from '@/lib/cn';
 import type { ResolvedRecipe, RecipeIngredientDraft } from './recipeScan';
@@ -47,8 +48,14 @@ export function RecipeReviewStep({
   };
 
   const setChosen = (ingIndex: number, chosen: number) => {
+    const ing = recipe.ingredients[ingIndex];
     // Once the user has picked, it is confirmed by definition.
     patch(ingIndex, { chosen, confident: true });
+    // Remember it, so this ingredient resolves straight to their product next
+    // time. This is the only thing that can connect "beef mince" to a
+    // French-named supermarket product - no word list would contain it.
+    const picked = chosen >= 0 ? ing.candidates[chosen] : undefined;
+    if (picked) void rememberAlias(ing.name, picked.food.id);
     setPicking(null);
   };
 
