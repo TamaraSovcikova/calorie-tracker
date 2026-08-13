@@ -77,7 +77,23 @@ const PROMPT =
   '{"name":"<recipe name>","servings":<how many servings the recipe ' +
   'makes, default 1>,"ingredients":[{"name":"<plain ingredient name>",' +
   '"grams":<total grams for the whole recipe>}],"steps":["<method step>"]}. ' +
-  'Convert ingredient quantities to grams. Include "steps" only if the ' +
+  'Convert ingredient quantities to grams. ' +
+  // Counts were being flattened to round numbers - "4 large peppers" came
+  // back as 400g when four large peppers are nearer 700g.
+  'For items given as a COUNT, multiply the count by a realistic weight for ' +
+  'that item at that size: large pepper 170g, medium onion 150g, large onion ' +
+  '200g, garlic clove 3g, medium egg 50g, medium potato 170g, medium carrot ' +
+  '60g, medium tomato 120g, tbsp of a paste or oil 15g, tsp of a dried spice ' +
+  '2g. Never round a count-based amount to a suspiciously flat number. ' +
+  // Dry vs cooked is the single biggest macro error: dry black beans are
+  // 341 kcal/100g and cooked ones 132, so the state has to survive into the
+  // name or the lookup picks the wrong food.
+  'Keep the preparation state IN the ingredient name whenever the recipe ' +
+  'gives one - write "cooked black beans", "dried lentils", "raw spinach", ' +
+  'not just "black beans". If the recipe gives both a dry and a cooked ' +
+  'weight for the same item, use the COOKED weight and say "cooked" in the ' +
+  'name. ' +
+  'Include "steps" only if the ' +
   'image shows a method, otherwise use []. If the image is not a recipe, ' +
   'reply {"name":""}.';
 

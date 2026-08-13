@@ -4,14 +4,20 @@ import { Loader2, RotateCcw, ScanLine } from 'lucide-react';
 import { Sheet } from '@/components/ui/Sheet';
 import { Button } from '@/components/ui/Button';
 import { AiFeatureGate } from '@/features/settings/AiFeatureGate';
-import { analyzeRecipePhoto, resolveScannedRecipe } from './recipeScan';
+import { RecipeReviewStep } from './RecipeReviewStep';
+import {
+  analyzeRecipePhoto,
+  commitResolvedRecipe,
+  resolveScannedRecipe,
+  type ResolvedRecipe,
+} from './recipeScan';
 
 interface RecipeScanSheetProps {
   open: boolean;
   onClose: () => void;
 }
 
-type Phase = 'pick' | 'analyzing' | 'error';
+type Phase = 'pick' | 'analyzing' | 'review' | 'error';
 
 /**
  * Fast-lane meal insert: pick a screenshot of a recipe, AI reads the
@@ -23,12 +29,16 @@ export function RecipeScanSheet({ open, onClose }: RecipeScanSheetProps) {
   const [phase, setPhase] = useState<Phase>('pick');
   const [error, setError] = useState<string | null>(null);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [resolved, setResolved] = useState<ResolvedRecipe | null>(null);
+  const [saving, setSaving] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const reset = () => {
     setPhase('pick');
     setError(null);
     setImageUrl(null);
+    setResolved(null);
+    setSaving(false);
   };
   const handleClose = () => {
     onClose();
@@ -45,16 +55,30 @@ export function RecipeScanSheet({ open, onClose }: RecipeScanSheetProps) {
       setPhase('error');
       return;
     }
-    const resolved = await resolveScannedRecipe(recipe);
-    handleClose();
-    navigate('/meals/new', {
-      state: {
-        prefillItems: resolved.items,
-        prefillName: resolved.name,
-        prefillNotes: resolved.notes,
-        prefillServings: resolved.servings,
-      },
-    });
+    // Resolve to candidates and STOP. Everything used to be committed here,
+    // sight unseen, which is how a wrong match reached the editor looking
+    // exactly like a real ingredient.
+    setResolved(await resolveScannedRecipe(recipe));
+    setPhase('review');
+  };
+
+  const handleConfirm = async () => {
+    if (!resolved) return;
+    setSaving(true);
+    try {
+      const items = await commitResolvedRecipe(resolved);
+      handleClose();
+      navigate('/meals/new', {
+        state: {
+          prefillItems: items,
+          prefillName: resolved.name,
+          prefillNotes: resolved.notes,
+          prefillServings: resolved.servings,
+        },
+      });
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -107,6 +131,15 @@ export function RecipeScanSheet({ open, onClose }: RecipeScanSheetProps) {
             Reading the recipe…
           </div>
         </div>
+      )}
+
+      {phase === 'review' && resolved && (
+        <RecipeReviewStep
+          recipe={resolved}
+          onChange={setResolved}
+          onConfirm={() => void handleConfirm()}
+          saving={saving}
+        />
       )}
 
       {phase === 'error' && (

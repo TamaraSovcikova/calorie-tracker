@@ -1,0 +1,219 @@
+import { describe, expect, it } from 'vitest';
+import {
+  candidateScore,
+  isConfident,
+  nameMatchScore,
+  prepStates,
+  rankCandidates,
+  sigWords,
+  statePenalty,
+  wordsMatch,
+  type IngredientCandidate,
+  type MatchTier,
+} from './ingredientMatch';
+import type { Food } from '@/db/types';
+
+function food(name: string, patch: Partial<Food> = {}): Food {
+  return {
+    id: `f:${name}`,
+    user_id: 'u',
+    source: 'custom',
+    name,
+    kcal_100: 100,
+    protein_100: 5,
+    carbs_100: 10,
+    fat_100: 2,
+    created_at: '2026-01-01T00:00:00Z',
+    updated_at: '2026-01-01T00:00:00Z',
+    ...patch,
+  } as Food;
+}
+
+describe('wordsMatch', () => {
+  it('matches plurals and stems', () => {
+    expect(wordsMatch('pepper', 'peppers')).toBe(true);
+    expect(wordsMatch('tomato', 'tomatoes')).toBe(true);
+    expect(wordsMatch('wrap', 'wraps')).toBe(true);
+    expect(wordsMatch('beans', 'beans')).toBe(true);
+  });
+
+  it('rejects a short fragment of a longer word', () => {
+    // The regression: "Pepp" used to match "peppers" and win the whole
+    // ingredient, bringing 464 kcal/100g into a stuffed pepper recipe.
+    expect(wordsMatch('pepp', 'peppers')).toBe(false);
+    expect(wordsMatch('bean', 'beansprouts')).toBe(false);
+  });
+
+  it('still needs 4 characters to prefix-match at all', () => {
+    expect(wordsMatch('oat', 'oats')).toBe(false);
+  });
+
+  it('is order-independent', () => {
+    expect(wordsMatch('peppers', 'pepper')).toBe(wordsMatch('pepper', 'peppers'));
+  });
+});
+
+describe('sigWords', () => {
+  it('drops short words and punctuation', () => {
+    expect(sigWords('Black beans, canned')).toEqual(['black', 'beans', 'canned']);
+    expect(sigWords('5% fat beef mince')).toEqual(['fat', 'beef', 'mince']);
+  });
+});
+
+describe('nameMatchScore', () => {
+  it('scores an exact name 1', () => {
+    expect(nameMatchScore('Bell pepper', 'bell pepper')).toBe(1);
+  });
+
+  it('does NOT reward a terse name over a descriptive one', () => {
+    // The core bug. Both should beat the junk fragment.
+    const junk = nameMatchScore('Pepp', 'peppers');
+    const curated = nameMatchScore('Bell pepper', 'peppers');
+    const descriptive = nameMatchScore('Peppers, sweet, red, raw', 'peppers');
+    expect(junk).toBe(0);
+    expect(curated).toBeGreaterThan(0);
+    expect(descriptive).toBeGreaterThan(0);
+  });
+
+  it('does not reject a descriptive name for having extra words', () => {
+    // Old code: recall = 1/4 = 0.25, below the 0.6 floor, rejected outright.
+    expect(nameMatchScore('Peppers, sweet, red, raw', 'peppers')).toBeGreaterThan(0.5);
+  });
+
+  it('prefers the tighter name when both cover the query', () => {
+    const tight = nameMatchScore('Beef mince, 5% fat', 'beef mince');
+    const loose = nameMatchScore('Beef mince and onion casserole bake', 'beef mince');
+    expect(tight).toBeGreaterThan(loose);
+  });
+
+  it('requires at least half the query to be present', () => {
+    expect(nameMatchScore('Black beans, canned', 'black beans')).toBeGreaterThan(0);
+    expect(nameMatchScore('Coconut oil', 'black beans')).toBe(0);
+  });
+
+  it('returns 0 for empty input', () => {
+    expect(nameMatchScore('', 'beans')).toBe(0);
+    expect(nameMatchScore('Beans', '')).toBe(0);
+  });
+});
+
+describe('prepStates / statePenalty', () => {
+  it('finds states in either string', () => {
+    expect(prepStates('cooked black beans')).toEqual(['cooked']);
+    expect(prepStates('Black beans, dried')).toEqual(['dried']);
+  });
+
+  it('penalises dry-vs-cooked, the 700 kcal mistake', () => {
+    expect(statePenalty('cooked black beans', 'Black beans, dried')).toBe(0.5);
+  });
+
+  it('does not penalise equivalent states', () => {
+    expect(statePenalty('cooked black beans', 'Black beans, canned')).toBe(0);
+    expect(statePenalty('cooked rice', 'Rice, boiled')).toBe(0);
+  });
+
+  it('stays neutral when either side says nothing about state', () => {
+    expect(statePenalty('black beans', 'Black beans, dried')).toBe(0);
+    expect(statePenalty('cooked black beans', 'BLACK BEANS')).toBe(0);
+  });
+});
+
+describe('candidateScore and tiers', () => {
+  it('puts a frequent personal food above an identical external one', () => {
+    const mine = candidateScore(food('Beef mince'), 'frequent', 'beef mince');
+    const theirs = candidateScore(food('Beef mince'), 'external', 'beef mince');
+    expect(mine).toBeGreaterThan(theirs);
+  });
+
+  it('lets a much better name beat a weaker tier', () => {
+    // Tier is a thumb on the scale, not an override.
+    const exact = candidateScore(food('Black beans, canned'), 'curated', 'black beans canned');
+    const vague = candidateScore(food('Beans'), 'frequent', 'black beans canned');
+    expect(exact).toBeGreaterThan(vague);
+  });
+
+  it('is 0 when the name does not match at all', () => {
+    expect(candidateScore(food('Olive oil'), 'frequent', 'black beans')).toBe(0);
+  });
+});
+
+describe('rankCandidates', () => {
+  const tier = (map: Record<string, MatchTier>) => (f: Food) => map[f.name] ?? 'external';
+
+  it('ranks the user\'s own food first and drops non-matches', () => {
+    const foods = [
+      food('Pepp', { kcal_100: 464 }),
+      food('Bell pepper', { source: 'curated', kcal_100: 26 }),
+      food('Olive oil'),
+    ];
+    const ranked = rankCandidates(foods, 'peppers', tier({ 'Bell pepper': 'curated' }));
+    expect(ranked.map((c) => c.food.name)).toEqual(['Bell pepper']);
+  });
+
+  it('returns several candidates when several genuinely match', () => {
+    const foods = [
+      food('Beef mince, 5% fat'),
+      food('Beef mince, 20% fat'),
+      // Shares only "beef" of "beef mince" - a half-match, so it is dropped
+      // rather than cluttering the picker with something always rejected.
+      food('Beef steak'),
+    ];
+    const ranked = rankCandidates(
+      foods,
+      'beef mince',
+      tier({ 'Beef mince, 5% fat': 'frequent', 'Beef mince, 20% fat': 'recent' }),
+    );
+    expect(ranked.map((c) => c.food.name)).toEqual([
+      'Beef mince, 5% fat',
+      'Beef mince, 20% fat',
+    ]);
+  });
+
+  it('keeps a single-word query matching a descriptive food', () => {
+    const ranked = rankCandidates(
+      [food('Peppers, sweet, red, raw', { source: 'curated' })],
+      'peppers',
+      tier({ 'Peppers, sweet, red, raw': 'curated' }),
+    );
+    expect(ranked).toHaveLength(1);
+  });
+});
+
+describe('isConfident', () => {
+  const cand = (
+    name: string,
+    tier: MatchTier,
+    score: number,
+  ): IngredientCandidate => ({
+    food: food(name),
+    tier,
+    nameScore: score,
+    score,
+  });
+
+  it('is confident about a clear win among the user\'s own foods', () => {
+    expect(isConfident([cand('Beef mince', 'frequent', 1.6)])).toBe(true);
+  });
+
+  it('is not confident when a runner-up is close', () => {
+    expect(
+      isConfident([
+        cand('Beef mince, 5%', 'frequent', 1.6),
+        cand('Beef mince, 20%', 'recent', 1.45),
+      ]),
+    ).toBe(false);
+  });
+
+  it('is never confident about a food the user does not use', () => {
+    expect(isConfident([cand('BEEF', 'external', 1.6)])).toBe(false);
+    expect(isConfident([cand('Bell pepper', 'curated', 1.6)])).toBe(false);
+  });
+
+  it('is not confident about a weak match even if it is personal', () => {
+    expect(isConfident([cand('Beans', 'frequent', 0.7)])).toBe(false);
+  });
+
+  it('is not confident with nothing to go on', () => {
+    expect(isConfident([])).toBe(false);
+  });
+});

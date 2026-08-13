@@ -13,8 +13,13 @@ import { db } from '@/db/dexie';
 import { currentUserId } from '@/db/userId';
 import { getSyncConfig, syncBaseUrl } from '@/db/sync/config';
 import { createMeal, type MealItemInput } from '@/db/repos/meals';
-import { recentFoods, type DayTotals } from '@/db/repos/diary';
+import { frequentFoods, recentFoods, type DayTotals } from '@/db/repos/diary';
 import { computeMacros } from '@/features/food-search/foodMath';
+import {
+  rankCandidates,
+  type IngredientCandidate,
+  type MatchTier,
+} from '@/features/food-search/ingredientMatch';
 import { getUsdaApiKey, searchUsda } from '@/lib/usda-api';
 import type { Food } from '@/db/types';
 
@@ -124,27 +129,8 @@ export async function requestMealPlan(
 
 // ------------------------------------------------ ingredient resolution
 
-/** Score a candidate food against an ingredient name - higher is better. */
-function scoreFood(food: Food, query: string): number {
-  const name = food.name.toLowerCase();
-  let score = 0;
-  if (name === query) score += 1000;
-  else if (name.startsWith(query)) score += 500;
-  else if (name.includes(query) || query.includes(name)) score += 250;
-  else {
-    const words = name.split(/[^a-z0-9]+/).filter(Boolean);
-    if (words.some((w) => query.includes(w))) score += 120;
-  }
-  if (food.source === 'curated') score += 400;
-  else if (food.source === 'custom') score += 250;
-  else if (food.usda_data_type === 'foundation') score += 220;
-  else if (food.usda_data_type === 'sr_legacy') score += 180;
-  else if (food.usda_data_type === 'survey') score += 60;
-  return score;
-}
-
 // Dedupe lookups across all meal cards for the lifetime of the page.
-const lookupCache = new Map<string, Promise<Food | null>>();
+const candidateCache = new Map<string, Promise<IngredientCandidate[]>>();
 let recentsCache: Promise<Food[]> | null = null;
 
 /** The foods the user has logged recently - what they actually buy. */
@@ -182,111 +168,96 @@ function loadAllFoods(): Promise<Food[]> {
 /** Clear per-session caches - call when the planner page opens so recents
  *  and lookups are fresh. */
 export function resetPlannerCaches(): void {
-  lookupCache.clear();
+  candidateCache.clear();
   recentsCache = null;
   allFoodsCache = null;
+  frequentCache = null;
 }
 
-/** Significant (3+ char) words of a name. */
-function sigWords(s: string): string[] {
-  return (s.toLowerCase().match(/[a-z0-9]+/g) ?? []).filter((w) => w.length >= 3);
-}
+let frequentCache: Promise<Set<string>> | null = null;
 
-/** Two words match if equal, or one is a prefix of the other (shorter
- *  ≥ 4 chars) - so "wrap"/"wraps", "tomato"/"tomatoes" match. */
-function wordsMatch(a: string, b: string): boolean {
-  if (a === b) return true;
-  const [short, long] = a.length <= b.length ? [a, b] : [b, a];
-  return short.length >= 4 && long.startsWith(short);
+/** Ids of the foods the user logs OFTEN (decay-weighted), not just lately.
+ *  A weekly staple should beat something scanned once in a shop. */
+function loadFrequentIds(): Promise<Set<string>> {
+  if (!frequentCache) {
+    frequentCache = (async () => {
+      const ids = await frequentFoods(40).catch(() => [] as string[]);
+      return new Set(ids);
+    })();
+  }
+  return frequentCache;
 }
 
 /**
- * Score how well a library food matches a free-text ingredient name.
- * Returns 0 when it doesn't qualify.
+ * Rank every plausible food for an ingredient name, best first.
  *
- * Tolerant of the AI producing a *more verbose* name than the stored
- * product - e.g. "Lidl Rowan Hill Bakery 6 High Protein Tortilla Wraps"
- * vs a stored "High Protein Tortilla Wraps": the match is driven by how
- * much of the FOOD's name the query covers (recall), not the reverse, so
- * extra brand words in the AI name don't break it. Recently-logged foods
- * match more leniently - "use what you actually buy".
+ * Tiering is the point: the user asked for the ingredients they actually
+ * buy, so what they log often outranks what they logged once, which
+ * outranks the bundled curated list, which outranks anything from USDA or
+ * the shared pool. Scoring lives in `ingredientMatch.ts` and is tested
+ * there.
+ *
+ * Falls out to USDA only when the local library has nothing, and marks
+ * those hits `external` so the review screen can flag them as estimates.
  */
-function localMatchScore(
-  food: Food,
-  query: string,
-  queryWords: string[],
-  isRecent: boolean,
-): number {
-  const fname = food.name.trim().toLowerCase();
-  let base: number;
-  if (fname === query) {
-    base = 1.5;
-  } else {
-    const foodWords = sigWords(fname);
-    if (queryWords.length === 0 || foodWords.length === 0) return 0;
-    let shared = 0;
-    for (const fw of foodWords) {
-      if (queryWords.some((qw) => wordsMatch(qw, fw))) shared += 1;
-    }
-    const recall = shared / foodWords.length; // food name covered by query
-    const precision = shared / queryWords.length; // query covered by food
-    const minShared = isRecent ? 1 : Math.min(2, foodWords.length);
-    const minRecall = isRecent ? 0.34 : 0.6;
-    if (shared < minShared || recall < minRecall || precision < 0.2) return 0;
-    base = recall + precision * 0.15;
-  }
-  if (isRecent) base += 0.3; // prefer the brands the user actually logs
-  if (food.kcal_100 > 0) base += 0.05; // a real food beats an empty stub
-  if (food.source === 'curated' || food.source === 'custom') base += 0.03;
-  return base;
-}
-
-/** Resolve a free-text food name to a real Food (library fuzzy match,
- *  recents-weighted → USDA), or null. Shared by the meal planner, photo
- *  logging and recipe scanning. */
-export async function lookupIngredientFood(name: string): Promise<Food | null> {
+export async function rankIngredientCandidates(
+  name: string,
+): Promise<IngredientCandidate[]> {
   const key = name.trim().toLowerCase();
-  if (!key) return null;
-  const cached = lookupCache.get(key);
+  if (!key) return [];
+  const cached = candidateCache.get(key);
   if (cached) return cached;
 
-  const promise = (async (): Promise<Food | null> => {
-    const queryWords = sigWords(key);
-    const [recents, all] = await Promise.all([
+  const promise = (async (): Promise<IngredientCandidate[]> => {
+    const [recents, all, frequentIds] = await Promise.all([
       loadRecentFoods(),
       loadAllFoods(),
+      loadFrequentIds(),
     ]);
     const recentIds = new Set(recents.map((f) => f.id));
 
-    // 1. Best fuzzy match across the whole library.
-    let best: Food | null = null;
-    let bestScore = 0;
-    for (const f of all) {
-      const s = localMatchScore(f, key, queryWords, recentIds.has(f.id));
-      if (s > bestScore) {
-        bestScore = s;
-        best = f;
-      }
-    }
-    if (best) return best;
+    const tierOf = (f: Food): MatchTier => {
+      if (frequentIds.has(f.id)) return 'frequent';
+      if (recentIds.has(f.id)) return 'recent';
+      if (f.source === 'custom') return 'custom';
+      if (f.source === 'curated') return 'curated';
+      return 'library';
+    };
 
-    // 2. USDA FoodData Central - for generic ingredients not in the library.
+    const local = rankCandidates(all, key, tierOf);
+    if (local.length > 0) return local;
+
+    // Nothing of the user's matches - reach out for a generic value. Marked
+    // `external` so the UI can say plainly that this is an estimate.
     const apiKey = getUsdaApiKey();
-    if (!apiKey) return null;
+    if (!apiKey) return [];
     try {
       const hits = await searchUsda(key, apiKey, { genericOnly: true });
-      if (hits.length === 0) return null;
-      const top = [...hits].sort((a, b) => scoreFood(b, key) - scoreFood(a, key))[0];
-      // Cache into Dexie so a saved meal can reference it by id.
-      await db.foods.put(top).catch(() => undefined);
-      return top;
+      if (hits.length === 0) return [];
+      const ranked = rankCandidates(hits, key, () => 'external');
+      const keep = ranked.slice(0, 5);
+      // Cache into Dexie so a saved meal can reference them by id.
+      await Promise.all(
+        keep.map((c) => db.foods.put(c.food).catch(() => undefined)),
+      );
+      return keep;
     } catch {
-      return null; // rate-limited / offline / no match - fail soft
+      return []; // rate-limited / offline / no match - fail soft
     }
   })();
 
-  lookupCache.set(key, promise);
+  candidateCache.set(key, promise);
   return promise;
+}
+
+/**
+ * The single best food for an ingredient name, or null.
+ * Thin wrapper over the ranking above, so the meal planner and the photo
+ * food log inherit the same tiering without their own copy of it.
+ */
+export async function lookupIngredientFood(name: string): Promise<Food | null> {
+  const ranked = await rankIngredientCandidates(name);
+  return ranked[0]?.food ?? null;
 }
 
 /** Per-gram macros for a food (zeros when the food is unknown). */
