@@ -6,10 +6,74 @@ How to use:
 - Start of session: read only the top entry, announce the chat number.
 - End of session: prepend a new entry, bump `Session count`.
 
-Session count: 6
+Session count: 7
 Last updated: 2026-08-13
 
 ---
+
+## Chat #4e - 2026-08-13 (second device test of the recipe scan; matching reworked again; deployed)
+
+Tamara re-scanned the same stuffed-pepper recipe on the Pixel. Much closer -
+284 kcal/portion against the recipe's 331, and 680g for four large peppers
+proved the count-weights prompt fix from #4d worked. But two staples came back
+as "no match" and 5 of 7 ingredients were flagged.
+
+- **Size and unit words were the cause, and it was the same class of bug as
+  #4d.** They counted as significant query words, so a two-word query with one
+  match scored 0.5 coverage, and any extra word in the food name pushed it
+  under `MIN_NAME_SCORE` and rejected it OUTRIGHT. Measured: `large pepper` vs
+  the curated `Bell pepper` = **0**, while a bare `pepper` = **0.94**. `large
+  onion` and `garlic clove` scored exactly 0.50 and only survived because
+  their curated names happen to be single words with no extra to penalise.
+  Qualifiers (size, count, measure, knife work) are now stripped from the
+  query before scoring. All four now score 0.94-1.0.
+- **Deliberately NOT stripped:** whole, half, fresh, ripe, minced, ground,
+  dried, smoked. "Whole milk" is a different food from skimmed; there is a
+  test asserting `whole milk` still scores 0 against `Milk, skimmed`.
+- **A processed form is a different food.** `tomato puree` was resolving to a
+  fresh tomato: 18 kcal/100g against puree's ~80, so 30g read as 5 kcal
+  instead of ~24. `formPenalty` covers puree, paste, powder, flour, butter,
+  milk, oil, sauce, juice and friends - 0.45 when the form was asked for and
+  the raw ingredient came back, 0.2 for the reverse. Curated gained tomato
+  puree, passata, pasta sauce, coconut milk, plain/almond flour, cornflour,
+  stock cube, tahini, oils and condiments. `CURATED_VERSION` 3 -> 4.
+- **Blank stubs now lose.** A 0 kcal "Garlic" (litter from an abandoned scan
+  under the pre-#4d code) outranked the real curated Garlic at 149 kcal/100g,
+  because the custom-tier bonus (0.3) exactly cancelled the old +0.05 for
+  having macros. Missing macros is a 0.5 PENALTY now, not a missed bonus.
+  **Old stubs are still in her library and want deleting by hand.**
+- **French and Dutch names.** Her actual minces are Brussels products labelled
+  in French; "beef mince" and "hache de boeuf" share no characters, so scoring
+  can never connect them. Names are de-accented and run through a bundled
+  FR/NL food-word map before comparison. `Hache de boeuf 5% MG` and
+  `Rundergehakt 5%` both score 1.0. **Gotcha worth remembering: `œ` does NOT
+  decompose under NFD**, so `bœuf` was tokenising to "b" and "uf" and losing
+  the word - ligatures are expanded by hand before normalising.
+- **Learned aliases** (`src/db/repos/ingredientAliases.ts`, Dexie v5,
+  `ingredient_aliases`). Picking a food in the review remembers that phrase ->
+  that food, and later scans resolve to it at a new `alias` tier above
+  everything. This is the only mechanism that can connect a supermarket brand
+  to a generic ingredient name. Deterministic id `ia:{user}:{phrase}` so two
+  devices produce one row. **Local-only, matching the `food_recents`
+  precedent - NOT synced, so no D1 change. Syncing it is a clean follow-up if
+  she wants aliases to survive a device change or a local wipe.**
+- **Exact built-in matches stop nagging** (her call). An exact name match to a
+  curated food is confident; partial matches and anything external still ask.
+  Five flags on that recipe should become one or two.
+
+- **State:** deployed, Version `80607dfe`, commit `5731990`. **309 tests**, up
+  from 287. Typecheck + build clean, lint at the 2 pre-existing issues. No
+  schema change on D1 (Dexie v5 is local only).
+- **Open, unexplained:** on that scan `beef mince` was UNFLAGGED at `library`
+  tier while `grated cheddar` at the same tier WAS flagged. `isConfident`
+  says neither should pass. Either a faint icon was misread in the screenshot
+  or there is a bug - the next scan settles it. Check this first.
+- **Next:** re-scan the same recipe. The review screen now shows the chosen
+  food, its tier and its kcal per row, and the picker shows what it was
+  choosing between - that is the only way to tell whether the tiering behaves
+  against a real library rather than test fixtures. Also still unverified on
+  hardware from #4/#4c: the near-black primary button, four labels in the nav
+  bar, the rebuilt Progress page, the live label camera.
 
 ## Chat #4d - 2026-08-13 (recipe-scan ingredient matching rebuilt; deployed)
 
