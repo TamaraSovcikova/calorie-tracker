@@ -45,6 +45,14 @@ export async function downscaleImage(file: Blob, maxDim = 1024): Promise<Blob> {
   try {
     const bitmap = await createImageBitmap(file);
     const scale = Math.min(1, maxDim / Math.max(bitmap.width, bitmap.height));
+    // Already small enough: hand back the original rather than re-encoding
+    // it. This used to redraw and re-compress every time, so an image that
+    // needed no resizing still lost quality to a second JPEG pass - and
+    // camera shots, which arrive pre-sized now, would have paid it twice.
+    if (scale >= 1) {
+      bitmap.close?.();
+      return file;
+    }
     const w = Math.max(1, Math.round(bitmap.width * scale));
     const h = Math.max(1, Math.round(bitmap.height * scale));
     const canvas = document.createElement('canvas');

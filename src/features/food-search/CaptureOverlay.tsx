@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/cn';
+import { downscaleImage } from '@/features/photo-log/photoLog';
 
 interface CaptureOverlayProps {
   open: boolean;
@@ -25,6 +26,13 @@ interface CaptureOverlayProps {
    * food or a recipe page is not. 'none' leaves the frame clear.
    */
   guide?: 'portrait' | 'landscape' | 'none';
+  /**
+   * Longest edge of the delivered image. The overlay does the resizing so a
+   * camera shot is encoded ONCE - it used to be written at 0.95, then
+   * decoded and re-encoded at 0.82 by the caller, compounding two rounds of
+   * JPEG artefacts on exactly the small print the AI has to read.
+   */
+  maxDim?: number;
 }
 
 type CamStatus = 'starting' | 'live' | 'denied' | 'error';
@@ -56,6 +64,7 @@ export function CaptureOverlay({
   title = 'Scan a nutrition label',
   hint = 'Fill the frame with the nutrition table, then tap the shutter.',
   guide = 'portrait',
+  maxDim = 1600,
 }: CaptureOverlayProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -114,9 +123,18 @@ export function CaptureOverlay({
         // the field, so both are probed rather than assumed.
         const track = stream.getVideoTracks()[0];
         const caps = track?.getCapabilities?.() as
-          | { torch?: boolean }
+          | { torch?: boolean; focusMode?: string[] }
           | undefined;
         setTorchAvailable(!!caps?.torch);
+        // Continuous autofocus where it exists: a nutrition table held close
+        // is exactly the case a fixed focus gets wrong.
+        if (caps?.focusMode?.includes('continuous')) {
+          await track
+            .applyConstraints({
+              advanced: [{ focusMode: 'continuous' }],
+            } as unknown as MediaTrackConstraints)
+            .catch(() => undefined);
+        }
         setStatus('live');
       } catch (err) {
         if (cancelled) return;
@@ -161,26 +179,57 @@ export function CaptureOverlay({
     const video = videoRef.current;
     if (!video || !video.videoWidth) return;
     setBusy(true);
+    // Scale during the draw, so the frame is resized and encoded in one
+    // step instead of full-size-encode then decode-resize-re-encode.
+    const scale = Math.min(
+      1,
+      maxDim / Math.max(video.videoWidth, video.videoHeight),
+    );
     const canvas = document.createElement('canvas');
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
+    canvas.width = Math.round(video.videoWidth * scale);
+    canvas.height = Math.round(video.videoHeight * scale);
     const ctx = canvas.getContext('2d');
     if (!ctx) {
       setBusy(false);
       return;
     }
-    ctx.drawImage(video, 0, 0);
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
     canvas.toBlob(
       (blob) => {
         setBusy(false);
-        // Hold it for confirmation rather than sending it. The caller
-        // downscales and re-encodes, so this stays near-lossless to avoid
-        // compounding two rounds of JPEG artefacts on small print.
+        // Held for confirmation rather than sent.
         if (blob) setShot({ blob, url: URL.createObjectURL(blob) });
       },
       'image/jpeg',
-      0.95,
+      0.88,
     );
+  };
+
+  /**
+   * Tap the preview to focus there. Support is patchy, so a device that
+   * cannot do it simply does nothing rather than showing a broken control.
+   */
+  const focusAt = async (e: React.PointerEvent<HTMLVideoElement>) => {
+    const track = streamRef.current?.getVideoTracks()[0];
+    const caps = track?.getCapabilities?.() as
+      | { focusMode?: string[]; pointsOfInterest?: unknown }
+      | undefined;
+    if (!track || !caps?.pointsOfInterest) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = (e.clientX - rect.left) / rect.width;
+    const y = (e.clientY - rect.top) / rect.height;
+    await track
+      .applyConstraints({
+        advanced: [
+          {
+            pointsOfInterest: [{ x, y }],
+            ...(caps.focusMode?.includes('single-shot')
+              ? { focusMode: 'single-shot' }
+              : {}),
+          },
+        ],
+      } as unknown as MediaTrackConstraints)
+      .catch(() => undefined);
   };
 
   const discardShot = () => {
@@ -196,10 +245,14 @@ export function CaptureOverlay({
     finish(blob);
   };
 
-  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = ''; // allow re-picking the same file
-    if (file) finish(file);
+    if (!file) return;
+    // Sized here too, so both paths hand the caller the same thing and a
+    // 12 MP gallery photo is not shipped whole. No confirmation step: the
+    // gallery picker already showed the user the image.
+    finish(await downscaleImage(file, maxDim));
   };
 
   const handleClose = useCallback(() => {
@@ -258,6 +311,7 @@ export function CaptureOverlay({
           className="h-full w-full object-cover"
           playsInline
           muted
+          onPointerDown={(e) => void focusAt(e)}
         />
         {shot && (
           // `contain`, not `cover`: the point of this step is checking the

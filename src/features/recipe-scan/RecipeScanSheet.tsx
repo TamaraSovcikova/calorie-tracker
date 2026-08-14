@@ -94,6 +94,7 @@ export function RecipeScanSheet({ open, onClose }: RecipeScanSheetProps) {
           setCameraOpen(false);
           void handleFile(image);
         }}
+        maxDim={1600}
         title="Scan a recipe"
         hint="Fit the ingredients list in frame, then tap the shutter."
         guide="landscape"

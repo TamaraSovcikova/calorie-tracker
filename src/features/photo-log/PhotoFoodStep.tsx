@@ -119,6 +119,7 @@ export function PhotoFoodStep({ date, section, onDone }: PhotoFoodStepProps) {
           setCameraOpen(false);
           void handleFile(image);
         }}
+        maxDim={1024}
         title="Photograph your meal"
         hint="Get the whole plate in frame, then tap the shutter."
         guide="none"

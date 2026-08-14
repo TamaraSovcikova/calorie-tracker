@@ -5,7 +5,7 @@ import {
   DecodeHintType,
   type Result,
 } from '@zxing/library';
-import { Camera, Loader2, RotateCcw, Upload } from 'lucide-react';
+import { Camera, Loader2, RotateCcw, Upload, Zap, ZapOff } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 
@@ -41,6 +41,24 @@ const HINTS = new Map<DecodeHintType, unknown>([
  */
 export function BarcodeScanner({ onCode, onScanLabel }: BarcodeScannerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const [torchOn, setTorchOn] = useState(false);
+  const [torchAvailable, setTorchAvailable] = useState(false);
+
+  const toggleTorch = async () => {
+    const stream = videoRef.current?.srcObject as MediaStream | null;
+    const track = stream?.getVideoTracks?.()[0];
+    if (!track) return;
+    const next = !torchOn;
+    try {
+      await track.applyConstraints({
+        advanced: [{ torch: next }],
+      } as unknown as MediaTrackConstraints);
+      setTorchOn(next);
+    } catch {
+      setTorchAvailable(false);
+    }
+  };
+
   const [status, setStatus] = useState<'starting' | 'scanning' | 'denied' | 'error'>(
     'starting',
   );
@@ -94,6 +112,18 @@ export function BarcodeScanner({ onCode, onScanLabel }: BarcodeScannerProps) {
             }
           },
         );
+        // ZXing acquires its own stream, but attaches it to our element -
+        // so torch is reachable without taking the stream over. Worth it:
+        // a barcode read in a dim shop aisle is the common case.
+        // Resolution is deliberately left to ZXing. 640x480 is ample for a
+        // close-up EAN-13, and pushing it higher slows continuous decoding,
+        // so this is NOT the same problem the label scanner had.
+        const stream = videoRef.current?.srcObject as MediaStream | null;
+        const track = stream?.getVideoTracks?.()[0];
+        const caps = track?.getCapabilities?.() as
+          | { torch?: boolean }
+          | undefined;
+        if (!cancelled) setTorchAvailable(!!caps?.torch);
         if (!cancelled) setStatus('scanning');
       } catch (err) {
         if (cancelled) return;
@@ -160,6 +190,19 @@ export function BarcodeScanner({ onCode, onScanLabel }: BarcodeScannerProps) {
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
             <div className="h-1/2 w-3/4 rounded-md border-2 border-white/80 shadow-[0_0_0_9999px_rgba(0,0,0,0.35)]" />
           </div>
+        )}
+        {torchAvailable && status === 'scanning' && (
+          <button
+            type="button"
+            onClick={() => void toggleTorch()}
+            aria-label={torchOn ? 'Turn off the light' : 'Turn on the light'}
+            aria-pressed={torchOn}
+            className={`tap-target absolute right-1 top-1 rounded-md p-2 ${
+              torchOn ? 'text-amber-300' : 'text-white/80'
+            }`}
+          >
+            {torchOn ? <Zap className="h-5 w-5" /> : <ZapOff className="h-5 w-5" />}
+          </button>
         )}
         {status !== 'scanning' && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 p-6 text-center text-sm text-white">

@@ -443,6 +443,7 @@ export function MealEditor({ mode }: MealEditorProps) {
               setCameraOpen(false);
               void handlePickPhoto(image);
             }}
+            maxDim={640}
             title="Photo for this meal"
             hint="Frame the dish, then tap the shutter."
             guide="none"
