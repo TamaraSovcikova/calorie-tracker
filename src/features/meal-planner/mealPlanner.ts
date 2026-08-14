@@ -141,6 +141,14 @@ export interface ResolvedIngredient {
   food: Food | null;
   /** This ingredient's macros for ONE portion. */
   perPortion: DayTotals;
+  /**
+   * Everything that plausibly matched, best first, so a wrong pick can be
+   * corrected. The planner used to take the top candidate silently and save
+   * the meal - the same failure the recipe scanner had.
+   */
+  candidates: IngredientCandidate[];
+  /** Index into `candidates`, or -1 when nothing matched. */
+  chosen: number;
 }
 export interface ResolvedMeal {
   meal: PlannedMeal;
@@ -407,11 +415,32 @@ function totalsFor(grams: number[], perG: DayTotals[]): DayTotals {
  */
 export async function resolveAndFitMeal(
   meal: PlannedMeal,
-  req: { portions: number; kcalMax?: number; proteinMin?: number },
+  req: {
+    portions: number;
+    kcalMax?: number;
+    proteinMin?: number;
+    /**
+     * Ingredient name -> food id the user picked instead of the top match.
+     * Re-running the whole fit with the override (rather than patching one
+     * row) keeps the protein-anchor and calorie-cap scaling correct.
+     */
+    overrides?: Record<string, string>;
+  },
 ): Promise<ResolvedMeal> {
   const portions = req.portions > 0 ? req.portions : 1;
-  const foods = await Promise.all(
-    meal.ingredients.map((i) => lookupIngredientFood(i.name)),
+  const candidateLists = await Promise.all(
+    meal.ingredients.map((i) => rankIngredientCandidates(i.name)),
+  );
+  const chosenIdx = meal.ingredients.map((ing, i) => {
+    const wanted = req.overrides?.[ing.name];
+    if (wanted) {
+      const at = candidateLists[i].findIndex((c) => c.food.id === wanted);
+      if (at >= 0) return at;
+    }
+    return candidateLists[i].length > 0 ? 0 : -1;
+  });
+  const foods = candidateLists.map((list, i) =>
+    chosenIdx[i] >= 0 ? list[chosenIdx[i]].food : null,
   );
   const perG = foods.map(perGram);
   const grams = meal.ingredients.map((i) => i.grams);
@@ -469,6 +498,8 @@ export async function resolveAndFitMeal(
       name: ing.name,
       grams: grams[i],
       food,
+      candidates: candidateLists[i],
+      chosen: chosenIdx[i],
       perPortion: {
         kcal: (macros?.kcal ?? 0) / portions,
         protein: (macros?.protein ?? 0) / portions,

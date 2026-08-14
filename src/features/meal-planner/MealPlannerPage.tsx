@@ -5,6 +5,7 @@ import {
   ArrowLeft,
   Check,
   ChevronDown,
+  ChevronRight,
   Loader2,
   Plus,
   RefreshCw,
@@ -16,6 +17,10 @@ import { Input, LabeledInput } from '@/components/ui/Input';
 import { toast } from '@/components/ui/toast';
 import { aiUnavailableReason } from '@/features/settings/aiAvailability';
 import { useProfile } from '@/db/repos/profile';
+import { rememberAlias } from '@/db/repos/ingredientAliases';
+import { IngredientCandidateSheet } from '@/features/food-search/IngredientCandidateSheet';
+import { TIER_LABEL } from '@/features/food-search/ingredientMatch';
+import type { Food } from '@/db/types';
 import { formatKcal } from '@/lib/macros';
 import {
   requestMealPlan,
@@ -426,6 +431,20 @@ function MealCard({
   const [resolved, setResolved] = useState<ResolvedMeal | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [picking, setPicking] = useState<number | null>(null);
+  /** Ingredient name -> the food the user chose over the top match. */
+  const [overrides, setOverrides] = useState<Record<string, string>>({});
+
+  /**
+   * Re-fit the whole meal with the new food rather than patching one row:
+   * the protein anchor and the calorie cap scale the amounts, so a swap can
+   * legitimately change every quantity. Also teaches the alias, so this
+   * ingredient resolves to their food everywhere from now on.
+   */
+  const applyOverride = (ingredientName: string, food: Food) => {
+    setOverrides((o) => ({ ...o, [ingredientName]: food.id }));
+    void rememberAlias(ingredientName, food.id);
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -433,13 +452,14 @@ function MealCard({
       portions: req.portions,
       kcalMax: req.kcalMax,
       proteinMin: req.proteinMin,
+      overrides,
     }).then((r) => {
       if (!cancelled) setResolved(r);
     });
     return () => {
       cancelled = true;
     };
-  }, [meal, req]);
+  }, [meal, req, overrides]);
 
   const handleSave = async () => {
     if (!resolved) return;
@@ -533,26 +553,57 @@ function MealCard({
                 <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                   Shopping list · whole batch ({resolved.portions} portions)
                 </div>
+                {/* Which food each ingredient resolved to, and the ability to
+                    change it. The planner used to take the top match silently
+                    and save the meal, so wrong macros were invisible. */}
                 <ul className="mt-1 divide-y divide-border text-sm">
                   {resolved.ingredients.map((ing, i) => (
-                    <li
-                      key={`${ing.name}-${i}`}
-                      className="flex justify-between gap-3 py-1.5"
-                    >
-                      <span className="truncate">
-                        {ing.name}
-                        {!ing.food && (
-                          <span className="ml-1 text-[10px] text-amber-600 dark:text-amber-400">
-                            (no nutrition data)
+                    <li key={`${ing.name}-${i}`}>
+                      <button
+                        type="button"
+                        onClick={() => setPicking(i)}
+                        className="flex w-full items-center gap-3 py-2 text-left"
+                      >
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate">{ing.name}</span>
+                          <span className="mt-0.5 block truncate text-[11px] text-muted-foreground">
+                            {ing.food ? ing.food.name : 'No match - no nutrition data'}
+                            {ing.food && ing.candidates[ing.chosen] && (
+                              <> · {TIER_LABEL[ing.candidates[ing.chosen].tier]}</>
+                            )}
                           </span>
-                        )}
-                      </span>
-                      <span className="shrink-0 text-muted-foreground tabular-nums">
-                        {ing.grams} g
-                      </span>
+                        </span>
+                        <span className="shrink-0 text-right text-muted-foreground tabular-nums">
+                          <span className="block">{Math.round(ing.grams)} g</span>
+                          <span className="block text-[11px]">
+                            {formatKcal(ing.perPortion.kcal * resolved.portions)} kcal
+                          </span>
+                        </span>
+                        <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      </button>
                     </li>
                   ))}
                 </ul>
+                {picking !== null && resolved.ingredients[picking] && (
+                  <IngredientCandidateSheet
+                    name={resolved.ingredients[picking].name}
+                    grams={resolved.ingredients[picking].grams}
+                    candidates={resolved.ingredients[picking].candidates}
+                    chosen={resolved.ingredients[picking].chosen}
+                    allowBlank={false}
+                    onPick={(chosen) => {
+                      const ing = resolved.ingredients[picking];
+                      const food = chosen >= 0 ? ing.candidates[chosen]?.food : undefined;
+                      if (food) applyOverride(ing.name, food);
+                      setPicking(null);
+                    }}
+                    onPickFood={(food) => {
+                      applyOverride(resolved.ingredients[picking].name, food);
+                      setPicking(null);
+                    }}
+                    onClose={() => setPicking(null)}
+                  />
+                )}
               </div>
 
               {meal.steps.length > 0 && (
