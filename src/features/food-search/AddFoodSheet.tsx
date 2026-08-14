@@ -1,11 +1,13 @@
 import { lazy, Suspense, useCallback, useState } from 'react';
-import { Loader2 } from 'lucide-react';
+import { ArrowLeft, Loader2 } from 'lucide-react';
 import { Sheet } from '@/components/ui/Sheet';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { FoodSearchPanel } from './FoodSearchPanel';
 import { QuantityStep } from './QuantityStep';
 import { ManualEntryForm } from './ManualEntryForm';
-import { LabelCaptureOverlay } from './LabelCaptureOverlay';
+import { CaptureOverlay } from './CaptureOverlay';
+import { CaptureChooser, type CaptureKind } from './CaptureChooser';
+import { RecipeScanSheet } from '@/features/recipe-scan/RecipeScanSheet';
 import { AiFeatureGate } from '@/features/settings/AiFeatureGate';
 import { aiUnavailableReason } from '@/features/settings/aiAvailability';
 import { analyzeLabel, type ScannedLabel } from './photoLabel';
@@ -63,6 +65,20 @@ type Step =
       presetLabel?: ScannedLabel;
     };
 
+/** Back out of a capture flow to the list of what the camera can do. */
+function BackToCapture({ onBack }: { onBack: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onBack}
+      className="tap-target flex items-center gap-1 px-4 text-sm text-muted-foreground hover:text-foreground"
+    >
+      <ArrowLeft className="h-4 w-4" />
+      All capture options
+    </button>
+  );
+}
+
 /** Re-use the last logged quantity for a food, validated against the food's
  *  current units; falls back to a sensible default otherwise. */
 function rememberedQuantity(
@@ -80,8 +96,20 @@ function rememberedQuantity(
   return state;
 }
 
-export type AddFoodTab = 'search' | 'scan' | 'photo' | 'meals' | 'quick';
-type Tab = AddFoodTab;
+/** 'scan' and 'photo' are kept as accepted values because the installed
+ *  app's icon shortcuts point at them; both land on Capture. */
+export type AddFoodTab = 'search' | 'capture' | 'scan' | 'photo' | 'meals' | 'quick';
+type Tab = 'search' | 'capture' | 'meals' | 'quick';
+
+/** Where a legacy tab name lands now. */
+function normaliseTab(tab: AddFoodTab): {
+  tab: Tab;
+  capture?: CaptureKind;
+} {
+  if (tab === 'scan') return { tab: 'capture', capture: 'barcode' };
+  if (tab === 'photo') return { tab: 'capture', capture: 'meal' };
+  return { tab };
+}
 
 const SECTION_LABEL: Record<MealSection, string> = {
   breakfast: 'Breakfast',
@@ -98,16 +126,41 @@ export function AddFoodSheet({
   onSectionChange,
   initialTab = 'search',
 }: AddFoodSheetProps) {
-  const [tab, setTab] = useState<Tab>(initialTab);
+  const initial = normaliseTab(initialTab);
+  const [tab, setTab] = useState<Tab>(initial.tab);
   const [step, setStep] = useState<Step>({ kind: 'pick' });
   const [scanError, setScanError] = useState<string | null>(null);
   const [labelScanning, setLabelScanning] = useState(false);
   const [labelCaptureOpen, setLabelCaptureOpen] = useState(false);
+  /** Which capture flow is open, or null for the chooser. */
+  const [capture, setCapture] = useState<CaptureKind | null>(
+    initial.capture ?? null,
+  );
+  const [recipeOpen, setRecipeOpen] = useState(false);
 
   const reset = () => {
     setStep({ kind: 'pick' });
-    setTab(initialTab);
+    setTab(initial.tab);
+    setCapture(initial.capture ?? null);
     setScanError(null);
+  };
+
+  const pickCapture = (kind: CaptureKind) => {
+    if (kind === 'recipe') {
+      setRecipeOpen(true);
+      return;
+    }
+    if (kind === 'label') {
+      const reason = aiUnavailableReason('scan nutrition labels');
+      if (reason) {
+        setScanError(reason);
+        return;
+      }
+      setLabelCaptureOpen(true);
+      return;
+    }
+    setScanError(null);
+    setCapture(kind);
   };
 
   const handleClose = () => {
@@ -273,8 +326,7 @@ export function AddFoodSheet({
             onChange={setTab}
             options={[
               { value: 'search', label: 'Search' },
-              { value: 'scan', label: 'Scan' },
-              { value: 'photo', label: 'Photo' },
+              { value: 'capture', label: 'Capture' },
               { value: 'meals', label: 'Meals' },
               { value: 'quick', label: 'Quick' },
             ]}
@@ -287,7 +339,7 @@ export function AddFoodSheet({
             onManualEntry={handleManualEntry}
           />
         )}
-        {tab === 'scan' && (
+        {tab === 'capture' && (
           <>
             {scanError && (
               <div className="mx-4 mt-3 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
@@ -300,37 +352,45 @@ export function AddFoodSheet({
                 Reading label…
               </div>
             )}
-            <LabelCaptureOverlay
+            <CaptureOverlay
               open={labelCaptureOpen}
               onClose={() => setLabelCaptureOpen(false)}
               onCapture={(image) => void handleLabelImage(image)}
             />
-            <Suspense
-              fallback={
-                <div className="flex flex-1 items-center justify-center p-12">
-                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                </div>
-              }
-            >
-              <BarcodeScanner
-                onCode={handleBarcode}
-                onScanLabel={() => {
-                  // Check before the camera, not after the upload.
-                  const reason = aiUnavailableReason('scan nutrition labels');
-                  if (reason) {
-                    setScanError(reason);
-                    return;
+            <RecipeScanSheet
+              open={recipeOpen}
+              onClose={() => setRecipeOpen(false)}
+            />
+
+            {capture === null && <CaptureChooser onPick={pickCapture} />}
+
+            {capture === 'barcode' && (
+              <>
+                <BackToCapture onBack={() => setCapture(null)} />
+                <Suspense
+                  fallback={
+                    <div className="flex flex-1 items-center justify-center p-12">
+                      <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                    </div>
                   }
-                  setLabelCaptureOpen(true);
-                }}
-              />
-            </Suspense>
+                >
+                  <BarcodeScanner
+                    onCode={handleBarcode}
+                    onScanLabel={() => pickCapture('label')}
+                  />
+                </Suspense>
+              </>
+            )}
+
+            {capture === 'meal' && (
+              <>
+                <BackToCapture onBack={() => setCapture(null)} />
+                <AiFeatureGate feature="log meals from a photo">
+                  <PhotoFoodStep date={date} section={section} onDone={handleClose} />
+                </AiFeatureGate>
+              </>
+            )}
           </>
-        )}
-        {tab === 'photo' && (
-          <AiFeatureGate feature="log meals from a photo">
-            <PhotoFoodStep date={date} section={section} onDone={handleClose} />
-          </AiFeatureGate>
         )}
         {tab === 'meals' && <MealPicker onPick={handlePickMeal} />}
         {tab === 'quick' && <QuickAddForm onSave={handleQuickAdd} />}

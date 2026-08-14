@@ -1,9 +1,10 @@
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Loader2, RotateCcw, ScanLine } from 'lucide-react';
 import { Sheet } from '@/components/ui/Sheet';
 import { Button } from '@/components/ui/Button';
 import { AiFeatureGate } from '@/features/settings/AiFeatureGate';
+import { CaptureOverlay } from '@/features/food-search/CaptureOverlay';
 import { RecipeReviewStep } from './RecipeReviewStep';
 import {
   analyzeRecipePhoto,
@@ -31,7 +32,7 @@ export function RecipeScanSheet({ open, onClose }: RecipeScanSheetProps) {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [resolved, setResolved] = useState<ResolvedRecipe | null>(null);
   const [saving, setSaving] = useState(false);
-  const fileRef = useRef<HTMLInputElement>(null);
+  const [cameraOpen, setCameraOpen] = useState(false);
 
   const reset = () => {
     setPhase('pick');
@@ -45,7 +46,7 @@ export function RecipeScanSheet({ open, onClose }: RecipeScanSheetProps) {
     reset();
   };
 
-  const handleFile = async (file: File) => {
+  const handleFile = async (file: Blob) => {
     setImageUrl(URL.createObjectURL(file));
     setPhase('analyzing');
     setError(null);
@@ -83,16 +84,19 @@ export function RecipeScanSheet({ open, onClose }: RecipeScanSheetProps) {
 
   return (
     <Sheet open={open} onClose={handleClose} title="Scan a recipe">
-      <input
-        ref={fileRef}
-        type="file"
-        accept="image/*"
-        hidden
-        onChange={(e) => {
-          const file = e.target.files?.[0];
-          if (file) void handleFile(file);
-          e.target.value = '';
+      {/* Was gallery-only, so a cookbook or a magazine page could not be
+          scanned at all - only a screenshot you already had. The shared
+          overlay gives it a camera AND the gallery. */}
+      <CaptureOverlay
+        open={cameraOpen}
+        onClose={() => setCameraOpen(false)}
+        onCapture={(image) => {
+          setCameraOpen(false);
+          void handleFile(image);
         }}
+        title="Scan a recipe"
+        hint="Fit the ingredients list in frame, then tap the shutter."
+        guide="landscape"
       />
 
       {phase === 'pick' && (
@@ -102,13 +106,13 @@ export function RecipeScanSheet({ open, onClose }: RecipeScanSheetProps) {
             <ScanLine className="h-7 w-7 text-primary" />
           </div>
           <p className="text-sm text-muted-foreground">
-            Choose a screenshot of a recipe - its ingredients (and method,
-            if shown). AI reads it and opens a draft meal with estimated
-            macros for you to review and save.
+            Photograph a recipe page, or pick a screenshot of one. AI reads the
+            ingredients (and the method, if shown) and opens a draft meal with
+            estimated macros for you to review and save.
           </p>
-          <Button type="button" variant="primary" onClick={() => fileRef.current?.click()}>
+          <Button type="button" variant="primary" onClick={() => setCameraOpen(true)}>
             <ScanLine className="h-4 w-4" />
-            Choose a screenshot
+            Scan a recipe
           </Button>
           <p className="text-[11px] text-muted-foreground">
             Free, on Cloudflare AI. Macros are estimates - edit anything.
@@ -147,7 +151,7 @@ export function RecipeScanSheet({ open, onClose }: RecipeScanSheetProps) {
           <p className="text-sm text-destructive">{error}</p>
           <Button type="button" variant="secondary" onClick={reset}>
             <RotateCcw className="h-4 w-4" />
-            Try another screenshot
+            Try another
           </Button>
         </div>
       )}

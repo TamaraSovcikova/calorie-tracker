@@ -5,6 +5,10 @@ import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { FoodSearchPanel } from '@/features/food-search/FoodSearchPanel';
 import { QuantityStep } from '@/features/food-search/QuantityStep';
 import { ManualEntryForm } from '@/features/food-search/ManualEntryForm';
+import { CaptureOverlay } from '@/features/food-search/CaptureOverlay';
+import { CaptureChooser, type CaptureKind } from '@/features/food-search/CaptureChooser';
+import { aiUnavailableReason } from '@/features/settings/aiAvailability';
+import { analyzeLabel, type ScannedLabel } from '@/features/food-search/photoLabel';
 import type { QuantityState, ResolvedMacros } from '@/features/food-search/foodMath';
 import { lookupBarcode, OffRateLimitError } from '@/lib/off-api';
 import { db } from '@/db/dexie';
@@ -30,9 +34,14 @@ type Step =
   | { kind: 'pick' }
   | { kind: 'looking-up'; barcode: string }
   | { kind: 'quantity'; food: Food }
-  | { kind: 'manual'; presetName?: string; presetBarcode?: string };
+  | {
+      kind: 'manual';
+      presetName?: string;
+      presetBarcode?: string;
+      presetLabel?: ScannedLabel;
+    };
 
-type Tab = 'search' | 'scan';
+type Tab = 'search' | 'capture';
 
 export function IngredientPickerSheet({
   open,
@@ -42,11 +51,47 @@ export function IngredientPickerSheet({
   const [tab, setTab] = useState<Tab>('search');
   const [step, setStep] = useState<Step>({ kind: 'pick' });
   const [scanError, setScanError] = useState<string | null>(null);
+  const [capture, setCapture] = useState<CaptureKind | null>(null);
+  const [labelOpen, setLabelOpen] = useState(false);
+  const [labelScanning, setLabelScanning] = useState(false);
 
   const reset = () => {
     setStep({ kind: 'pick' });
     setTab('search');
+    setCapture(null);
     setScanError(null);
+  };
+
+  // Building a meal, so only the two that produce ONE ingredient are on
+  // offer: a meal photo logs to the diary and a recipe makes a whole meal.
+  const pickCapture = (kind: CaptureKind) => {
+    if (kind === 'label') {
+      const reason = aiUnavailableReason('scan nutrition labels');
+      if (reason) {
+        setScanError(reason);
+        return;
+      }
+      setLabelOpen(true);
+      return;
+    }
+    setScanError(null);
+    setCapture(kind);
+  };
+
+  const handleLabelImage = async (image: Blob) => {
+    setLabelOpen(false);
+    setScanError(null);
+    setLabelScanning(true);
+    try {
+      const { label, error } = await analyzeLabel(image);
+      if (!label) {
+        setScanError(error ?? "Couldn't read that label. Try again or add it manually.");
+        return;
+      }
+      setStep({ kind: 'manual', presetLabel: label });
+    } finally {
+      setLabelScanning(false);
+    }
   };
   const handleClose = () => {
     onClose();
@@ -121,7 +166,7 @@ export function IngredientPickerSheet({
             onChange={setTab}
             options={[
               { value: 'search', label: 'Search' },
-              { value: 'scan', label: 'Scan' },
+              { value: 'capture', label: 'Capture' },
             ]}
           />
         </div>
@@ -132,22 +177,41 @@ export function IngredientPickerSheet({
             onManualEntry={handleManualEntry}
           />
         )}
-        {tab === 'scan' && (
+        {tab === 'capture' && (
           <>
             {scanError && (
               <div className="mx-4 mt-3 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
                 {scanError}
               </div>
             )}
-            <Suspense
-              fallback={
-                <div className="flex flex-1 items-center justify-center p-12">
-                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                </div>
-              }
-            >
-              <BarcodeScanner onCode={handleBarcode} />
-            </Suspense>
+            {labelScanning && (
+              <div className="mx-4 mt-3 flex items-center gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Reading label…
+              </div>
+            )}
+            <CaptureOverlay
+              open={labelOpen}
+              onClose={() => setLabelOpen(false)}
+              onCapture={(image) => void handleLabelImage(image)}
+            />
+            {capture === null && (
+              <CaptureChooser onPick={pickCapture} omit={['meal', 'recipe']} />
+            )}
+            {capture === 'barcode' && (
+              <Suspense
+                fallback={
+                  <div className="flex flex-1 items-center justify-center p-12">
+                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                  </div>
+                }
+              >
+                <BarcodeScanner
+                  onCode={handleBarcode}
+                  onScanLabel={() => pickCapture('label')}
+                />
+              </Suspense>
+            )}
           </>
         )}
       </div>
@@ -179,6 +243,7 @@ export function IngredientPickerSheet({
       <ManualEntryForm
         initialName={step.presetName}
         initialBarcode={step.presetBarcode}
+        initialLabel={step.presetLabel}
         onBack={() => setStep({ kind: 'pick' })}
         onCreated={handleManualCreated}
       />

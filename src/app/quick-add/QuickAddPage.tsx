@@ -5,7 +5,7 @@ import { defaultMealSection } from '@/lib/mealTime';
 import { todayLocal } from '@/lib/dates';
 import type { MealSection } from '@/db/types';
 
-const TABS: readonly AddFoodTab[] = ['search', 'scan', 'photo', 'meals', 'quick'];
+const TABS: readonly AddFoodTab[] = ['search', 'capture', 'scan', 'photo', 'meals', 'quick'];
 
 /**
  * Fast-logging entry point, reached from the installed app's icon shortcuts

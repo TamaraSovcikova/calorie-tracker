@@ -142,6 +142,31 @@ Building a new one when these exist is how the system fragmented.
 | Transient feedback | `ui/toast` (supports undo) | A custom banner |
 | One-time hint | `ui/CoachTip` | Permanent explanatory copy |
 | Gate an AI feature | `AiFeatureGate` / `aiUnavailableReason` | Letting it fail after the upload |
+| Get an image from the user | `CaptureOverlay` | `<input type="file">`, with or without `capture` |
+| Offer the camera's capabilities | `CaptureChooser` | A new tab per capability |
+
+### Capture
+
+**Every image comes in through `CaptureOverlay`.** Live camera, shutter,
+Gallery always beside it, a framing guide sized for what is being shot.
+
+There used to be four mechanisms: this overlay, `<input capture>` (hands off
+to the OS camera app), a bare `<input>` (gallery only), and a pair of the two.
+So "take a photo" behaved differently depending on the screen, the meal photo
+had no gallery at all on some Android builds, and the recipe scan could not
+use the camera. Never reach for a file input again: `<input capture>` silently
+falls back to the gallery picker on some Android builds, which is the
+"I can only upload, never shoot" bug.
+
+**Every capability is listed in one place.** `CaptureChooser` names the four
+(barcode, nutrition label, meal photo, recipe) with a line each on when to use
+them. It is the Capture tab in the add-food sheet and the ingredient picker,
+where `omit` drops the ones that make no sense for that context. Recipe is
+labelled with its different destination, since it saves a meal rather than
+logging now.
+
+Adding a fifth capability means one entry in `CaptureChooser` - not a new tab,
+not a new button hidden inside another flow.
 
 `SegmentedControl` has two variants: `track` (recessed track, raised active
 segment — for switching between views) and `solid` (bordered row, accent-filled

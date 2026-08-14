@@ -2,40 +2,52 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Camera, Images, Loader2, X } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
+import { cn } from '@/lib/cn';
 
-interface LabelCaptureOverlayProps {
+interface CaptureOverlayProps {
   open: boolean;
   onClose: () => void;
   /** Fired with the chosen image - a live capture or a gallery pick. */
   onCapture: (image: Blob) => void;
   title?: string;
   hint?: string;
+  /**
+   * Framing guide shape. Nutrition tables are taller than wide; a plate of
+   * food or a recipe page is not. 'none' leaves the frame clear.
+   */
+  guide?: 'portrait' | 'landscape' | 'none';
 }
 
 type CamStatus = 'starting' | 'live' | 'denied' | 'error';
 
 /**
- * Full-screen "take a photo or pick one" step for label scanning.
+ * THE way an image gets into this app. Nutrition labels, meal photos, recipe
+ * pages and a meal's own picture all come through here.
  *
- * The live path uses getUserMedia + a canvas grab rather than a file input
- * with `capture`: a bare `<input capture>` hands off to the OS camera app,
- * which on some Android builds silently falls back to the gallery picker -
- * the "I can only upload, never shoot" problem. Owning the stream means the
- * camera always opens, and the framing guide can be sized for a label.
+ * There used to be four mechanisms: this overlay, a bare `<input capture>`
+ * that hands off to the OS camera app, a bare `<input>` that only opens the
+ * gallery, and a pair of the two. So "take a photo" behaved differently
+ * depending on which screen you were on, the meal photo had no gallery at all
+ * on some Android builds, and the recipe scan could not use the camera.
  *
- * Rendered as an overlay (not a step in a parent state machine) so both the
- * Scan tab and the new-product form can use it without restructuring, and
- * portalled to <body>: both call sites live inside a Sheet, whose slide-up
- * transform would otherwise become the containing block for `position:
- * fixed` and pin this to the sheet rather than the viewport.
+ * The live path owns the stream (getUserMedia + a canvas grab) rather than
+ * delegating, because `<input capture>` silently falls back to the gallery
+ * picker on some Android builds - the "I can only upload, never shoot"
+ * problem. Owning it means the camera always opens, Gallery is always beside
+ * the shutter, and the framing guide can suit what is being photographed.
+ *
+ * Portalled to <body>: most call sites live inside a Sheet, whose slide-up
+ * transform would otherwise become the containing block for `position: fixed`
+ * and pin this to the sheet rather than the viewport.
  */
-export function LabelCaptureOverlay({
+export function CaptureOverlay({
   open,
   onClose,
   onCapture,
   title = 'Scan a nutrition label',
   hint = 'Fill the frame with the nutrition table, then tap the shutter.',
-}: LabelCaptureOverlayProps) {
+  guide = 'portrait',
+}: CaptureOverlayProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -164,10 +176,14 @@ export function LabelCaptureOverlay({
           playsInline
           muted
         />
-        {status === 'live' && (
+        {status === 'live' && guide !== 'none' && (
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-            {/* Portrait guide - nutrition tables are taller than they are wide. */}
-            <div className="h-3/5 w-4/5 rounded-lg border-2 border-white/80 shadow-[0_0_0_9999px_rgba(0,0,0,0.35)]" />
+            <div
+              className={cn(
+                'rounded-lg border-2 border-white/80 shadow-[0_0_0_9999px_rgba(0,0,0,0.35)]',
+                guide === 'portrait' ? 'h-3/5 w-4/5' : 'h-2/5 w-[88%]',
+              )}
+            />
           </div>
         )}
         {status !== 'live' && (

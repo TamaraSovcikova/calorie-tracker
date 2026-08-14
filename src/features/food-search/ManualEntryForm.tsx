@@ -3,7 +3,7 @@ import { ArrowLeft, Loader2, Plus, ScanText, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input, LabeledInput } from '@/components/ui/Input';
 import { createFood, updateFood } from '@/db/repos/foods';
-import { LabelCaptureOverlay } from './LabelCaptureOverlay';
+import { CaptureOverlay } from './CaptureOverlay';
 import { aiUnavailableReason } from '@/features/settings/aiAvailability';
 import { analyzeLabel, type ScannedLabel } from './photoLabel';
 import { suggestPortions } from '@/lib/portionSuggestions';
@@ -226,7 +226,7 @@ export function ManualEntryForm({
         {/* Scan a nutrition label to auto-fill the macros below. The overlay
             opens a live camera with a gallery option beside the shutter, so
             shooting the label now and picking one shot earlier both work. */}
-        <LabelCaptureOverlay
+        <CaptureOverlay
           open={captureOpen}
           onClose={() => setCaptureOpen(false)}
           onCapture={(image) => void handleLabelImage(image)}

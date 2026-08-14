@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { Camera, Check, ChevronRight, Loader2, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { createDiaryEntry } from '@/db/repos/diary';
@@ -12,6 +12,7 @@ import {
   type ResolvedPhotoFood,
 } from './photoLog';
 import { IngredientCandidateSheet } from '@/features/food-search/IngredientCandidateSheet';
+import { CaptureOverlay } from '@/features/food-search/CaptureOverlay';
 import { ALIAS_SCORE } from '@/features/food-search/ingredientMatch';
 import { rememberAlias } from '@/db/repos/ingredientAliases';
 import type { LocalDate } from '@/lib/dates';
@@ -37,7 +38,7 @@ export function PhotoFoodStep({ date, section, onDone }: PhotoFoodStepProps) {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [picking, setPicking] = useState<number | null>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
+  const [cameraOpen, setCameraOpen] = useState(false);
 
   /** Apply a candidate or amount change, recomputing that row's macros. */
   const repick = (index: number, chosen: number, grams?: number) => {
@@ -50,7 +51,7 @@ export function PhotoFoodStep({ date, section, onDone }: PhotoFoodStepProps) {
     );
   };
 
-  const handleFile = async (file: File) => {
+  const handleFile = async (file: Blob) => {
     setImageUrl(URL.createObjectURL(file));
     setPhase('analyzing');
     setError(null);
@@ -108,17 +109,19 @@ export function PhotoFoodStep({ date, section, onDone }: PhotoFoodStepProps) {
 
   return (
     <div className="flex flex-col">
-      <input
-        ref={fileRef}
-        type="file"
-        accept="image/*"
-        capture="environment"
-        hidden
-        onChange={(e) => {
-          const file = e.target.files?.[0];
-          if (file) void handleFile(file);
-          e.target.value = '';
+      {/* One camera for the whole app. This used to be `<input capture>`,
+          which hands off to the OS camera app and on some Android builds
+          offers no gallery at all. */}
+      <CaptureOverlay
+        open={cameraOpen}
+        onClose={() => setCameraOpen(false)}
+        onCapture={(image) => {
+          setCameraOpen(false);
+          void handleFile(image);
         }}
+        title="Photograph your meal"
+        hint="Get the whole plate in frame, then tap the shutter."
+        guide="none"
       />
 
       {phase === 'pick' && (
@@ -130,9 +133,9 @@ export function PhotoFoodStep({ date, section, onDone }: PhotoFoodStepProps) {
             Snap a photo of your meal and AI will identify the foods and
             estimate portions - you confirm before anything is logged.
           </p>
-          <Button type="button" variant="primary" onClick={() => fileRef.current?.click()}>
+          <Button type="button" variant="primary" onClick={() => setCameraOpen(true)}>
             <Camera className="h-4 w-4" />
-            Take or choose a photo
+            Photograph your meal
           </Button>
           <p className="text-[11px] text-muted-foreground">
             Free, on Cloudflare AI. Estimates - always check them.
