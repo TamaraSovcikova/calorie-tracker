@@ -42,7 +42,8 @@ export async function analyzeRecipePhoto(file: Blob): Promise<RecipeScanResult> 
       error: 'Connect a sync code in Settings to scan recipes.',
     };
   }
-  const body = await downscaleImage(file, 1280);
+  // Recipe text is small print like a label, not a plate of food.
+  const body = await downscaleImage(file, 1600);
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 60_000);
   try {

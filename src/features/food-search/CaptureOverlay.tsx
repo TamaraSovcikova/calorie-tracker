@@ -1,6 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Camera, Images, Loader2, X } from 'lucide-react';
+import {
+  Camera,
+  Check,
+  Images,
+  Loader2,
+  RotateCcw,
+  X,
+  Zap,
+  ZapOff,
+} from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/cn';
 
@@ -54,6 +63,14 @@ export function CaptureOverlay({
   const [status, setStatus] = useState<CamStatus>('starting');
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  /**
+   * The shot, held for confirmation. Sending straight to the AI meant a
+   * blurry or badly-framed photo cost a full round trip - up to 60 seconds -
+   * before you found out. Every camera app shows you the frame first.
+   */
+  const [shot, setShot] = useState<{ blob: Blob; url: string } | null>(null);
+  const [torchOn, setTorchOn] = useState(false);
+  const [torchAvailable, setTorchAvailable] = useState(false);
 
   const stopStream = useCallback(() => {
     streamRef.current?.getTracks().forEach((t) => t.stop());
@@ -69,8 +86,18 @@ export function CaptureOverlay({
 
     void (async () => {
       try {
+        // Resolution MUST be asked for. Without width/height the browser
+        // hands back its default, which is typically 640x480 - so every
+        // shot was 640px wide and the 1600px downscale ceiling on label
+        // scans did nothing at all, because the source was already smaller.
+        // A nutrition table at 640px is why OCR was dropping digits.
+        // `ideal` degrades gracefully on cameras that cannot manage it.
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { ideal: 'environment' } },
+          video: {
+            facingMode: { ideal: 'environment' },
+            width: { ideal: 2560 },
+            height: { ideal: 1440 },
+          },
           audio: false,
         });
         if (cancelled) {
@@ -82,6 +109,14 @@ export function CaptureOverlay({
           videoRef.current.srcObject = stream;
           await videoRef.current.play().catch(() => undefined);
         }
+        // Torch is a real help for a nutrition label read in a dim shop
+        // aisle. Not every camera exposes it, and TypeScript does not know
+        // the field, so both are probed rather than assumed.
+        const track = stream.getVideoTracks()[0];
+        const caps = track?.getCapabilities?.() as
+          | { torch?: boolean }
+          | undefined;
+        setTorchAvailable(!!caps?.torch);
         setStatus('live');
       } catch (err) {
         if (cancelled) return;
@@ -106,6 +141,22 @@ export function CaptureOverlay({
     onCapture(image);
   };
 
+  const toggleTorch = async () => {
+    const track = streamRef.current?.getVideoTracks()[0];
+    if (!track) return;
+    const next = !torchOn;
+    try {
+      // `torch` is real but absent from the DOM typings, so it has to go
+      // through unknown rather than a direct assertion.
+      await track.applyConstraints({
+        advanced: [{ torch: next }],
+      } as unknown as MediaTrackConstraints);
+      setTorchOn(next);
+    } catch {
+      setTorchAvailable(false); // it lied about supporting it
+    }
+  };
+
   const handleShutter = () => {
     const video = videoRef.current;
     if (!video || !video.videoWidth) return;
@@ -122,11 +173,27 @@ export function CaptureOverlay({
     canvas.toBlob(
       (blob) => {
         setBusy(false);
-        if (blob) finish(blob);
+        // Hold it for confirmation rather than sending it. The caller
+        // downscales and re-encodes, so this stays near-lossless to avoid
+        // compounding two rounds of JPEG artefacts on small print.
+        if (blob) setShot({ blob, url: URL.createObjectURL(blob) });
       },
       'image/jpeg',
       0.95,
     );
+  };
+
+  const discardShot = () => {
+    if (shot) URL.revokeObjectURL(shot.url);
+    setShot(null);
+  };
+
+  const useShot = () => {
+    if (!shot) return;
+    const { blob, url } = shot;
+    URL.revokeObjectURL(url);
+    setShot(null);
+    finish(blob);
   };
 
   const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -158,15 +225,31 @@ export function CaptureOverlay({
   return createPortal(
     <div className="fixed inset-0 z-[120] flex flex-col bg-black">
       <div className="flex items-center justify-between px-4 pb-2 pt-[max(env(safe-area-inset-top),12px)] text-white">
-        <span className="text-sm font-medium">{title}</span>
-        <button
-          type="button"
-          onClick={handleClose}
-          aria-label="Close camera"
-          className="tap-target rounded-md p-2 text-white/80 hover:text-white"
-        >
-          <X className="h-5 w-5" />
-        </button>
+        <span className="text-sm font-medium">{shot ? 'Use this shot?' : title}</span>
+        <div className="flex items-center gap-1">
+          {torchAvailable && !shot && (
+            <button
+              type="button"
+              onClick={() => void toggleTorch()}
+              aria-label={torchOn ? 'Turn off the light' : 'Turn on the light'}
+              aria-pressed={torchOn}
+              className={cn(
+                'tap-target rounded-md p-2',
+                torchOn ? 'text-amber-300' : 'text-white/80 hover:text-white',
+              )}
+            >
+              {torchOn ? <Zap className="h-5 w-5" /> : <ZapOff className="h-5 w-5" />}
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={handleClose}
+            aria-label="Close camera"
+            className="tap-target rounded-md p-2 text-white/80 hover:text-white"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
       </div>
 
       <div className="relative flex-1 overflow-hidden">
@@ -176,7 +259,16 @@ export function CaptureOverlay({
           playsInline
           muted
         />
-        {status === 'live' && guide !== 'none' && (
+        {shot && (
+          // `contain`, not `cover`: the point of this step is checking the
+          // whole frame is sharp and nothing is cropped off.
+          <img
+            src={shot.url}
+            alt="The photo you just took"
+            className="absolute inset-0 h-full w-full bg-black object-contain"
+          />
+        )}
+        {!shot && status === 'live' && guide !== 'none' && (
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
             <div
               className={cn(
@@ -186,7 +278,7 @@ export function CaptureOverlay({
             />
           </div>
         )}
-        {status !== 'live' && (
+        {!shot && status !== 'live' && (
           <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 p-8 text-center text-sm text-white">
             <Camera className="h-8 w-8 opacity-80" />
             {status === 'starting' && <span>Starting camera…</span>}
@@ -210,6 +302,24 @@ export function CaptureOverlay({
       </div>
 
       <div className="space-y-3 px-6 pb-[max(env(safe-area-inset-bottom),20px)] pt-4">
+        {shot ? (
+          <>
+            <p className="text-center text-[11px] text-white/60">
+              Check it is sharp and nothing is cut off.
+            </p>
+            <div className="flex gap-2">
+              <Button type="button" variant="secondary" block onClick={discardShot}>
+                <RotateCcw className="h-4 w-4" />
+                Retake
+              </Button>
+              <Button type="button" variant="primary" block onClick={useShot}>
+                <Check className="h-4 w-4" />
+                Use photo
+              </Button>
+            </div>
+          </>
+        ) : (
+          <>
         {status === 'live' && (
           <p className="text-center text-[11px] text-white/60">{hint}</p>
         )}
@@ -255,6 +365,8 @@ export function CaptureOverlay({
             <Images className="h-4 w-4" />
             Choose from gallery
           </Button>
+        )}
+          </>
         )}
       </div>
     </div>,
