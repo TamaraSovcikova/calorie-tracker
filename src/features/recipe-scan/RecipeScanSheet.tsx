@@ -107,17 +107,13 @@ export function RecipeScanSheet({ open, onClose }: RecipeScanSheetProps) {
             <ScanLine className="h-7 w-7 text-primary" />
           </div>
           <p className="text-sm text-muted-foreground">
-            Photograph a recipe page, or pick a screenshot of one. AI reads the
-            ingredients (and the method, if shown) and opens a draft meal with
-            estimated macros for you to review and save.
+            You review every ingredient before the meal is created. Macros are
+            AI estimates, so check them.
           </p>
           <Button type="button" variant="primary" onClick={() => setCameraOpen(true)}>
             <ScanLine className="h-4 w-4" />
-            Scan a recipe
+            Open the camera
           </Button>
-          <p className="text-[11px] text-muted-foreground">
-            Free, on Cloudflare AI. Macros are estimates - edit anything.
-          </p>
         </div>
         </AiFeatureGate>
       )}

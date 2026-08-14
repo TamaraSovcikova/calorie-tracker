@@ -5,7 +5,16 @@ import {
   DecodeHintType,
   type Result,
 } from '@zxing/library';
-import { Camera, Loader2, RotateCcw, Upload, Zap, ZapOff } from 'lucide-react';
+import {
+  Camera,
+  Images,
+  Keyboard,
+  Loader2,
+  ScanText,
+  Search,
+  Zap,
+  ZapOff,
+} from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 
@@ -64,6 +73,7 @@ export function BarcodeScanner({ onCode, onScanLabel }: BarcodeScannerProps) {
   );
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [manualCode, setManualCode] = useState('');
+  const [manualOpen, setManualOpen] = useState(false);
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -161,9 +171,13 @@ export function BarcodeScanner({ onCode, onScanLabel }: BarcodeScannerProps) {
         onCode(code);
         return;
       }
-      setImportError("No barcode found in that photo. Try another, or type the digits below.");
+      setImportError(
+        'No barcode found in that photo. Try another, or type the digits in.',
+      );
     } catch {
-      setImportError("No barcode found in that photo. Try another, or type the digits below.");
+      setImportError(
+        'No barcode found in that photo. Try another, or type the digits in.',
+      );
     } finally {
       URL.revokeObjectURL(url);
       setImporting(false);
@@ -212,23 +226,28 @@ export function BarcodeScanner({ onCode, onScanLabel }: BarcodeScannerProps) {
               <span>
                 Camera permission denied.
                 <br />
-                Allow camera access in your browser settings, or enter the
-                barcode manually below.
+                Allow camera access in your browser settings, or use one of
+                the options below.
               </span>
             )}
             {status === 'error' && (
               <span>
                 Camera unavailable: {errorMsg}
                 <br />
-                Enter the barcode manually below.
+                Use one of the options below.
               </span>
             )}
           </div>
         )}
       </div>
+      {/*
+        One row of equal-weight alternatives, mirroring the Gallery-and-
+        shutter row in CaptureOverlay. This used to be three stacked blocks -
+        a full-width import button with a two-line explainer, a floating
+        "no barcode?" link, and an always-open manual form - with no
+        hierarchy, so it was never clear which to reach for.
+      */}
       <div className="border-t border-border p-4">
-        {/* Import a barcode from an existing photo. No `capture` attribute, so
-            the OS picker offers both the camera and the photo library. */}
         <input
           ref={fileInputRef}
           type="file"
@@ -236,59 +255,89 @@ export function BarcodeScanner({ onCode, onScanLabel }: BarcodeScannerProps) {
           className="hidden"
           onChange={(e) => void handleImportFile(e)}
         />
-        <Button
-          type="button"
-          variant="secondary"
-          block
-          disabled={importing}
-          onClick={() => fileInputRef.current?.click()}
-        >
-          {importing ? (
-            <>
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Reading barcode…
-            </>
-          ) : (
-            <>
-              <Upload className="h-4 w-4" />
-              Import a barcode photo
-            </>
-          )}
-        </Button>
-        <p className="mt-1 text-center text-[11px] text-muted-foreground">
-          Already have a photo of the barcode? Pick it from your library.
+        <p className="mb-3 text-center text-[11px] text-muted-foreground">
+          {importing ? 'Reading barcode…' : "Won't scan?"}
         </p>
+        <div className="flex items-start justify-center gap-2">
+          <FallbackAction
+            icon={importing ? Loader2 : Images}
+            label="From a photo"
+            spinning={importing}
+            disabled={importing}
+            onClick={() => fileInputRef.current?.click()}
+          />
+          <FallbackAction
+            icon={Keyboard}
+            label="Type it in"
+            active={manualOpen}
+            onClick={() => setManualOpen((v) => !v)}
+          />
+          {onScanLabel && (
+            <FallbackAction
+              icon={ScanText}
+              label="Use the label"
+              onClick={onScanLabel}
+            />
+          )}
+        </div>
         {importError && (
-          <p className="mt-2 text-center text-xs text-destructive">{importError}</p>
+          <p className="mt-3 text-center text-xs text-destructive">{importError}</p>
         )}
-        {onScanLabel && (
-          <button
-            type="button"
-            onClick={onScanLabel}
-            className="mt-3 w-full text-center text-xs font-medium text-primary hover:underline"
-          >
-            No barcode? Scan a nutrition label instead
-          </button>
+
+        {manualOpen && (
+          <form onSubmit={handleManualSubmit} className="mt-3 space-y-2">
+            <Input
+              inputMode="numeric"
+              autoFocus
+              placeholder="e.g. 5012345678901"
+              aria-label="Barcode digits"
+              value={manualCode}
+              onChange={(e) => setManualCode(e.target.value)}
+            />
+            <Button type="submit" variant="primary" block disabled={!manualCode.trim()}>
+              <Search className="h-4 w-4" />
+              Look it up
+            </Button>
+          </form>
         )}
       </div>
-      <form onSubmit={handleManualSubmit} className="space-y-2 p-4">
-        <p className="text-xs text-muted-foreground">
-          Damaged barcode? Type the digits underneath:
-        </p>
-        <div className="flex gap-2">
-          <Input
-            inputMode="numeric"
-            placeholder="e.g. 5012345678901"
-            value={manualCode}
-            onChange={(e) => setManualCode(e.target.value)}
-            className="flex-1"
-          />
-          <Button type="submit" variant="primary" disabled={!manualCode.trim()}>
-            <RotateCcw className="h-4 w-4" />
-            Look up
-          </Button>
-        </div>
-      </form>
     </div>
+  );
+}
+
+/** One of the three ways out when the live scan will not work. */
+function FallbackAction({
+  icon: Icon,
+  label,
+  onClick,
+  disabled,
+  spinning,
+  active,
+}: {
+  icon: typeof Images;
+  label: string;
+  onClick: () => void;
+  disabled?: boolean;
+  spinning?: boolean;
+  active?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="tap-target flex w-24 flex-col items-center gap-1.5 rounded-xl px-1 py-2 text-[11px] font-medium hover:bg-muted/50 disabled:opacity-50"
+      style={{ color: active ? 'var(--color-accent-deep)' : 'var(--color-text-muted)' }}
+    >
+      <span
+        className="flex h-10 w-10 items-center justify-center rounded-full border"
+        style={{
+          borderColor: active ? 'var(--color-accent-deep)' : 'var(--color-border)',
+        }}
+      >
+        <Icon className={`h-[18px] w-[18px] ${spinning ? 'animate-spin' : ''}`} />
+      </span>
+      {label}
+    </button>
   );
 }

@@ -38,7 +38,11 @@ export function PhotoFoodStep({ date, section, onDone }: PhotoFoodStepProps) {
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [picking, setPicking] = useState<number | null>(null);
-  const [cameraOpen, setCameraOpen] = useState(false);
+  // The chooser already said what this does, so open the camera straight
+  // away rather than showing a second explanation and asking for a second
+  // tap. Closing the camera falls back to the panel below, which is then a
+  // way back in rather than a gate.
+  const [cameraOpen, setCameraOpen] = useState(true);
 
   /** Apply a candidate or amount change, recomputing that row's macros. */
   const repick = (index: number, chosen: number, grams?: number) => {
@@ -131,16 +135,13 @@ export function PhotoFoodStep({ date, section, onDone }: PhotoFoodStepProps) {
             <Camera className="h-7 w-7 text-primary" />
           </div>
           <p className="text-sm text-muted-foreground">
-            Snap a photo of your meal and AI will identify the foods and
-            estimate portions - you confirm before anything is logged.
+            You confirm every item before anything is logged. Amounts are AI
+            estimates, so check them.
           </p>
           <Button type="button" variant="primary" onClick={() => setCameraOpen(true)}>
             <Camera className="h-4 w-4" />
-            Photograph your meal
+            Open the camera
           </Button>
-          <p className="text-[11px] text-muted-foreground">
-            Free, on Cloudflare AI. Estimates - always check them.
-          </p>
         </div>
       )}
 
