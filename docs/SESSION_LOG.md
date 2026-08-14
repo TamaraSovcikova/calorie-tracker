@@ -6,12 +6,116 @@ How to use:
 - Start of session: read only the top entry, announce the chat number.
 - End of session: prepend a new entry, bump `Session count`.
 
-Session count: 8
-Last updated: 2026-08-13
+Session count: 9
+Last updated: 2026-08-14
 
 > **This file is the live log.** `Projects/calorie_tracker/docs/SESSION_LOG.md` in
 > the OneDrive vault is a stale copy that stopped at Chat #2 (2026-06-19); the
 > project CLAUDE.md used to point there. Fixed 2026-08-13. Append here.
+
+---
+
+## Chat #4g - 2026-08-14 (meal planner rebuilt on personal history; search unified, typo-tolerant, habit-ranked; deployed)
+
+Two themes, both the same underlying complaint: the app held signals about
+what Tamara eats and then ignored them.
+
+### Round 1 - the meal planner (`5ef56a9`, `5bf93e6`)
+
+Prompt: why does she still default to ChatGPT for meal planning?
+
+- **The finding.** `MealPlannerPage` never imported `useProfile`. Every
+  request threw away every signal the app had about her, so the output could
+  not be better than a generic chatbot's. Fixed: the worker prompt now
+  carries frequent foods, saved meals to avoid repeating, and recent meals.
+- Daily targets are sent as **background context, not constraints**. Her
+  ruling: per-meal protein and kcal must stay settable because the point is
+  often "a 200 kcal meal", not a share of the day. Preset chips fill the
+  fields, the fields stay editable.
+- Refine branch: one recipe in, three variations out.
+- Ingredients resolve against her own foods first via
+  `rankIngredientCandidates`, with `IngredientCandidateSheet` showing which
+  food each line matched and letting it be changed. `ResolvedIngredient` now
+  carries `candidates` + `chosen`.
+
+### Round 2 - the search bars (`ef6ede6`, `6733f9f`, `88ba3f8`)
+
+Trigger: "poudre de cacao" returned nothing, for an ingredient she had
+definitely entered.
+
+- **First cause.** `searchLocalFoods` required every raw token to appear:
+  `tokens.every(t => hay.includes(t))`. The stored name was "Cacao en
+  poudre", so the word "de" alone hid the food completely. Now matches
+  verbatim OR on normalised significant words.
+- **Then the same bug three more times.** The app had FOUR independent
+  free-text filters and only one got the fix. `matchesSearchQuery` in
+  `ingredientMatch.ts` is now the single implementation, used by
+  `searchLocalFoods`, `FoodsLibrary`, `MealsLibrary` and `MealPicker`.
+  `FoodsLibrary` had been the weakest of the four (whole-query substring).
+- **Ranking happened after truncation.** `searchLocalFoods` took the first
+  `limit * 3` rows Dexie walked past, sorted THOSE by source and date, cut to
+  20, and only then let `useFoodSearch` score relevance. With a few thousand
+  cached rows an exact name match could be discarded before it was ever
+  scored. Now scans up to 400 and ranks before slicing.
+- **Meals are searchable from the main food search.** She reported repeatedly
+  expecting her meals to show up there. New "Your meals" group above foods,
+  wired to the existing `handlePickMeal`. Passed only where it makes sense:
+  the ingredient picker inside meal building still searches foods alone.
+- **Typo tolerance as a retry, not a widening.** Strict pass first; only if it
+  returns nothing, match again allowing a Damerau edit (transpositions cost 1,
+  which is the typo phones actually produce). Budget by length: none below 5
+  characters, 1 up to 7, 2 above. Short words get zero because at 4 letters one
+  edit reaches a different food ("oats"/"eats"). A search with real answers is
+  never diluted by near-misses.
+- Writing the tests found a gap: the fuzzy pass compared against the
+  TRANSLATED word, so "yoghrut" was 1 edit from what she typed and 2 from
+  `yogurt`, which is how the dictionary stores it. It now compares against the
+  literal words too.
+- **Ranking by habit.** New `foodFrequencyScores()` exposes the decayed log
+  count as a map (it existed, but only the top-20 id list was reachable).
+  `scoreFoodMatch` now adds a log-compressed frequency bonus, a large bonus
+  when the query has a hand-set ingredient alias, and scores typo-corrected
+  hits at a third weight.
+- The AI ingredient matcher deliberately does NOT use the fuzzy path.
+  Loosening the word test is what produced the "Pepp" ingredient in #4d.
+
+### State
+
+- HEAD `88ba3f8` on `main`, tree clean. **Ahead of `origin/main` by 2**
+  (`6733f9f`, `88ba3f8`) - not pushed, since only commit + deploy were asked.
+- Deployed. Worker version `02fbdc6f`, live returns 200.
+- 336 tests pass, `tsc --noEmit` clean, `npm run build` clean, all verified
+  this session. `npm run lint` reports 26 errors, all pre-existing: node
+  globals in `scripts/*.mjs` and one `no-control-regex` in
+  `portionSuggestions.ts`. None in changed files.
+- No D1 schema change this session, so no migration was needed.
+
+### Next
+
+1. Device-test on the Pixel. Nothing below has been seen by eye: meals
+   appearing in the food search, typo tolerance, whether habit ranking
+   actually reorders results usefully, and the planner's candidate sheet.
+2. The meals group runs a live query over all meals per keystroke. Fine at
+   ~50 meals, worth watching if it grows.
+3. Still unverified from earlier chats: re-scan the stuffed-pepper recipe,
+   scan a nutrition label (first time ever above 640px), the capture chooser
+   and torch, the near-black primary button, the rebuilt Progress page.
+
+### Open
+
+- Unexplained since #4e: `beef mince` was UNFLAGGED at `library` tier while
+  `grated cheddar` at the same tier WAS flagged. `isConfident` says neither
+  should pass.
+- Blank 0 kcal stubs (e.g. "Garlic") left in her library by the pre-fix
+  scanner. Need deleting by hand.
+- Not built, offered and not taken: persisted planner preferences in Settings
+  (diet, dislikes, equipment).
+- Deferred: desktop/tablet layout, an onboarding cut/maintain/gain step,
+  syncing the alias store (currently local-only, matching `food_recents`).
+
+### Skills/conventions
+
+None added.
 
 ---
 
