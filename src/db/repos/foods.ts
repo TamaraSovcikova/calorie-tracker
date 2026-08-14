@@ -121,16 +121,23 @@ export async function searchLocalFoods(query: string, limit = 20): Promise<Food[
   const q = query.trim().toLowerCase();
   if (!q) return [];
   const userId = currentUserId();
-  const matches = await db.foods
-    .where('user_id')
-    .equals(userId)
-    .filter(
-      (f) =>
-        !f.deleted_at &&
-        matchesSearchQuery(`${f.name} ${f.brand ?? ''}`, q),
-    )
-    .limit(SEARCH_SCAN_CAP)
-    .toArray();
+  const scan = (fuzzy: boolean) =>
+    db.foods
+      .where('user_id')
+      .equals(userId)
+      .filter(
+        (f) =>
+          !f.deleted_at &&
+          matchesSearchQuery(`${f.name} ${f.brand ?? ''}`, q, { fuzzy }),
+      )
+      .limit(SEARCH_SCAN_CAP)
+      .toArray();
+
+  let matches = await scan(false);
+  // Only forgive typos when the strict pass found nothing. A search with
+  // real answers should never be diluted by near-misses.
+  if (matches.length === 0) matches = await scan(true);
+
   // relevance, then custom first, then most-recently-updated
   return matches
     .sort((a, b) => {

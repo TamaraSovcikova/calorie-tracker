@@ -352,7 +352,12 @@ const FREQUENCY_MIN_SCORE = 1.5;
  * since stopped decays out while steady recent use ranks highest. Foods below
  * FREQUENCY_MIN_SCORE are dropped.
  */
-export async function frequentFoods(limit = 20): Promise<string[]> {
+/**
+ * Time-decayed log count per food id. A food eaten twice this week outscores
+ * one eaten five times last spring. Exposed as the raw map so search can rank
+ * by it, not just list the top few.
+ */
+export async function foodFrequencyScores(): Promise<Map<string, number>> {
   const userId = currentUserId();
   const today = fromLocalDate(todayLocal());
   const scores = new Map<string, number>();
@@ -368,6 +373,11 @@ export async function frequentFoods(limit = 20): Promise<string[]> {
       const weight = Math.pow(0.5, ageDays / FREQUENCY_HALF_LIFE_DAYS);
       scores.set(e.food_id, (scores.get(e.food_id) ?? 0) + weight);
     });
+  return scores;
+}
+
+export async function frequentFoods(limit = 20): Promise<string[]> {
+  const scores = await foodFrequencyScores();
   return [...scores.entries()]
     .filter(([, s]) => s >= FREQUENCY_MIN_SCORE)
     .sort((a, b) => b[1] - a[1])

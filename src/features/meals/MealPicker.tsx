@@ -3,7 +3,7 @@ import { ChefHat, ChevronRight, Search, Star } from 'lucide-react';
 import { Input } from '@/components/ui/Input';
 import { cn } from '@/lib/cn';
 import { useMealsWithTotals } from './useMealsWithTotals';
-import { matchesMealQuery } from './mealMath';
+import { filterMealsByQuery } from './mealMath';
 import { buildMealFilterChips, mealMatchesFilter } from './mealCategory';
 import { useProfile } from '@/db/repos/profile';
 import type { Meal } from '@/db/types';
@@ -29,9 +29,9 @@ export function MealPicker({ onPick }: MealPickerProps) {
 
   const filtered = useMemo(() => {
     if (!meals) return [];
-    return meals.filter(
-      (m) =>
-        matchesMealQuery(m.haystack, query) && mealMatchesFilter(m.meal, filter),
+    return filterMealsByQuery(
+      meals.filter((m) => mealMatchesFilter(m.meal, filter)),
+      query,
     );
   }, [meals, query, filter]);
 

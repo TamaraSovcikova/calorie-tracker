@@ -23,9 +23,11 @@ export function FoodsLibrary() {
   const filtered = useMemo(() => {
     if (!foods) return [];
     if (!query.trim()) return foods;
-    return foods.filter((f) =>
-      matchesSearchQuery(`${f.name} ${f.brand ?? ''}`, query),
-    );
+    const hay = (f: Food) => `${f.name} ${f.brand ?? ''}`;
+    const strict = foods.filter((f) => matchesSearchQuery(hay(f), query));
+    if (strict.length > 0) return strict;
+    // Nothing matched: forgive a typo rather than showing an empty list.
+    return foods.filter((f) => matchesSearchQuery(hay(f), query, { fuzzy: true }));
   }, [foods, query]);
 
   const handleDelete = async (food: Food) => {

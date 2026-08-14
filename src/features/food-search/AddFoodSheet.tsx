@@ -337,6 +337,7 @@ export function AddFoodSheet({
             section={section}
             onPick={handlePick}
             onManualEntry={handleManualEntry}
+            onPickMeal={handlePickMeal}
           />
         )}
         {tab === 'capture' && (

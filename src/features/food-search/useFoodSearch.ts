@@ -2,8 +2,13 @@ import { useEffect, useMemo, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db/dexie';
 import { searchLocalFoods } from '@/db/repos/foods';
-import { sigWords, wordsMatch } from './ingredientMatch';
-import { frequentFoods, recentFoods } from '@/db/repos/diary';
+import { fuzzyWordsMatch, sigWords, wordsMatch } from './ingredientMatch';
+import { getAliasFood } from '@/db/repos/ingredientAliases';
+import {
+  foodFrequencyScores,
+  frequentFoods,
+  recentFoods,
+} from '@/db/repos/diary';
 import { currentUserId } from '@/db/userId';
 import { OffRateLimitError, searchOff } from '@/lib/off-api';
 import { searchSharedFoods } from '@/lib/shared-foods-api';
@@ -71,7 +76,26 @@ const DEBOUNCE_MS = 350;
  *    ("Egg, whole"), Survey FNDDS includes composite dishes ("Egg
  *    Benedict", "Bagels, egg") which should rank below the generics.
  */
-function scoreFoodMatch(food: Food, q: string): number {
+/**
+ * Signals about this particular user, mixed into ranking so results are
+ * ordered by what SHE eats rather than by dataset alone. Without these the
+ * search treats a food she logs four times a week exactly like one she has
+ * never touched, as long as the names score the same.
+ */
+export interface PersonalRank {
+  /** Time-decayed log count per food id. */
+  frequency: Map<string, number>;
+  /** Food id she has explicitly taught this exact query to mean. */
+  aliasFoodId: string | null;
+}
+
+const NO_PERSONAL: PersonalRank = { frequency: new Map(), aliasFoodId: null };
+
+function scoreFoodMatch(
+  food: Food,
+  q: string,
+  personal: PersonalRank = NO_PERSONAL,
+): number {
   if (!q) return 0;
   const name = food.name.toLowerCase();
   const hay = `${name} ${(food.brand ?? '').toLowerCase()}`.trim();
@@ -113,13 +137,18 @@ function scoreFoodMatch(food: Food, q: string): number {
   if (qWords.length > 0) {
     const fWords = sigWords(`${name} ${food.brand ?? ''}`);
     let normHits = 0;
+    let fuzzyHits = 0;
     for (const qw of qWords) {
       if (fWords.some((fw) => wordsMatch(qw, fw))) normHits++;
+      else if (fWords.some((fw) => fuzzyWordsMatch(qw, fw))) fuzzyHits++;
     }
     if (normHits > 0) {
       score += 60 * normHits;
       if (normHits === qWords.length) score += 140;
     }
+    // A typo-corrected hit counts, but at a third of the weight, so a real
+    // match always outranks a guess at what was meant.
+    score += 20 * fuzzyHits;
   }
 
   // Dataset quality: curated staples + the user's own products rank above
@@ -137,6 +166,16 @@ function scoreFoodMatch(food: Food, q: string): number {
   if (tokens.length <= 2 && nameWords.length > 4) {
     score -= (nameWords.length - 4) * 12;
   }
+
+  // What you actually eat. The decayed log count is compressed with a log
+  // curve so a daily staple clearly wins, without one food eaten thirty
+  // times burying everything else forever.
+  const freq = personal.frequency.get(food.id) ?? 0;
+  if (freq > 0) score += Math.min(320, 110 * Math.log2(1 + freq));
+
+  // An alias is the strongest personal signal there is: she was shown a
+  // list for this exact phrase and picked this food by hand.
+  if (personal.aliasFoodId && food.id === personal.aliasFoodId) score += 900;
 
   return score;
 }
@@ -180,6 +219,25 @@ export function useFoodSearch(query: string): FoodSearchResult {
 
     return { favorites, frequent, recents, recentIdSet };
   }, []);
+
+  // Decayed log counts, live so a food just logged immediately ranks higher.
+  const frequency = useLiveQuery(() => foodFrequencyScores(), [], undefined);
+
+  // Has she already taught this exact phrase to mean a specific food?
+  const [aliasFoodId, setAliasFoodId] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    if (!debouncedQuery) {
+      setAliasFoodId(null);
+      return;
+    }
+    void getAliasFood(debouncedQuery).then((f) => {
+      if (!cancelled) setAliasFoodId(f?.id ?? null);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [debouncedQuery]);
 
   const [local, setLocal] = useState<Food[]>([]);
   const [usda, setUsda] = useState<Food[]>([]);
@@ -349,8 +407,12 @@ export function useFoodSearch(query: string): FoodSearchResult {
     );
 
     const myIds = new Set(myProducts.map((f) => f.id));
+    const personal: PersonalRank = {
+      frequency: frequency ?? new Map(),
+      aliasFoodId,
+    };
     const byRelevance = (a: Food, b: Food) =>
-      scoreFoodMatch(b, q) - scoreFoodMatch(a, q);
+      scoreFoodMatch(b, q, personal) - scoreFoodMatch(a, q, personal);
     const commonNoMine = common.filter((f) => !myIds.has(f.id));
     const libraryNoMine = localPackaged.filter((f) => !myIds.has(f.id));
     const packagedNoMine = livePackaged.filter((f) => !myIds.has(f.id));
@@ -365,7 +427,7 @@ export function useFoodSearch(query: string): FoodSearchResult {
       }
     }
     return {
-      myProducts,
+      myProducts: [...myProducts].sort(byRelevance),
       recentMatches: recentMatches.sort(byRelevance),
       library: libraryNoMine.filter((f) => !seenRecent.has(f.id)).sort(byRelevance),
       common: commonNoMine.filter((f) => !seenRecent.has(f.id)).sort(byRelevance),
@@ -373,7 +435,16 @@ export function useFoodSearch(query: string): FoodSearchResult {
         .filter((f) => !seenRecent.has(f.id))
         .sort(byRelevance),
     };
-  }, [local, usda, off, shared, debouncedQuery, emptyState]);
+  }, [
+    local,
+    usda,
+    off,
+    shared,
+    debouncedQuery,
+    emptyState,
+    frequency,
+    aliasFoodId,
+  ]);
 
   return useMemo(
     () => ({

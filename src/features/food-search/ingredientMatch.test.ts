@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   candidateScore,
+  editDistance,
+  fuzzyWordsMatch,
   isConfident,
   matchesSearchQuery,
   nameMatchScore,
@@ -506,6 +508,10 @@ describe('search-box cases (shared normaliser)', () => {
     expect(covers('Americain naturel Belbeef', 'belbeef')).toBe(true);
   });
 
+  it('does not forgive typos unless asked', () => {
+    expect(covers('Chicken breast', 'chiken')).toBe(false);
+  });
+
   it('works over a meal haystack (name + notes + ingredients)', () => {
     // Meal search shares this, so a meal is findable by an ingredient typed
     // in another language than the one it was saved in.
@@ -513,5 +519,82 @@ describe('search-box cases (shared normaliser)', () => {
     expect(covers(meal, 'beef')).toBe(true);
     expect(covers(meal, 'boeuf tomato')).toBe(true);
     expect(covers(meal, 'salmon')).toBe(false);
+  });
+});
+
+describe('editDistance', () => {
+  it('counts a transposition as one edit, not two', () => {
+    // The typo people actually make on a phone keyboard.
+    expect(editDistance('chicekn', 'chicken')).toBe(1);
+    expect(editDistance('yoghrut', 'yoghurt')).toBe(1);
+  });
+
+  it('counts substitution, insertion and deletion', () => {
+    expect(editDistance('chiken', 'chicken')).toBe(1);
+    expect(editDistance('salmen', 'salmon')).toBe(1);
+    // An insertion and a deletion: two edits, not one.
+    expect(editDistance('brocolli', 'broccoli')).toBe(2);
+  });
+
+  it('gives up past the cap instead of computing the true distance', () => {
+    expect(editDistance('chicken', 'aubergine', 2)).toBeGreaterThan(2);
+  });
+
+  it('is zero for identical words', () => {
+    expect(editDistance('oats', 'oats')).toBe(0);
+  });
+});
+
+describe('typo tolerance', () => {
+  it('forgives a typo in a long-enough word', () => {
+    expect(fuzzyWordsMatch('chiken', 'chicken')).toBe(true);
+    expect(fuzzyWordsMatch('brocolli', 'broccoli')).toBe(true);
+    expect(fuzzyWordsMatch('yoghrut', 'yoghurt')).toBe(true);
+  });
+
+  it('gives short words no slack at all', () => {
+    // At four letters a single edit reaches a genuinely different food, so
+    // the budget is zero rather than one.
+    expect(fuzzyWordsMatch('oats', 'eats')).toBe(false);
+    expect(fuzzyWordsMatch('rice', 'ride')).toBe(false);
+    expect(fuzzyWordsMatch('kale', 'cake')).toBe(false);
+  });
+
+  it('still refuses genuinely different words', () => {
+    expect(fuzzyWordsMatch('chicken', 'chickpea')).toBe(false);
+    expect(fuzzyWordsMatch('almonds', 'avocado')).toBe(false);
+  });
+
+  it('accepts that some real foods are one edit apart', () => {
+    // "butter" and "batter" are both real, and one edit apart at six
+    // letters. This is why fuzzy matching is a retry rather than a widening:
+    // typing "batter" when you own a batter never reaches this code, so the
+    // collision costs nothing, and typing it when you own none is better
+    // served by a near-miss than by an empty list.
+    expect(fuzzyWordsMatch('butter', 'batter')).toBe(true);
+  });
+
+  it('keeps everything wordsMatch already accepted', () => {
+    expect(fuzzyWordsMatch('pepper', 'peppers')).toBe(true);
+    expect(fuzzyWordsMatch('tomato', 'tomatoes')).toBe(true);
+  });
+
+  it('does not resurrect the Pepp bug', () => {
+    // "pepp" is 4 letters, so it gets no typo budget, and the 70% prefix
+    // rule already rejected it. Both gates have to hold.
+    expect(fuzzyWordsMatch('pepp', 'peppers')).toBe(false);
+  });
+
+  it('is opt-in on the search matcher', () => {
+    expect(matchesSearchQuery('Chicken breast', 'chiken breast')).toBe(false);
+    expect(
+      matchesSearchQuery('Chicken breast', 'chiken breast', { fuzzy: true }),
+    ).toBe(true);
+  });
+
+  it('combines with translation, so a typo in an English word finds a French food', () => {
+    expect(
+      matchesSearchQuery('Hache de boeuf 5% MG', 'minse', { fuzzy: true }),
+    ).toBe(true);
   });
 });

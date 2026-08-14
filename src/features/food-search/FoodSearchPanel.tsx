@@ -1,5 +1,13 @@
-import { useState } from 'react';
-import { Loader2, Plus, Search, Settings as SettingsIcon } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import {
+  ChefHat,
+  ChevronRight,
+  Loader2,
+  Plus,
+  Search,
+  Settings as SettingsIcon,
+  Star,
+} from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
@@ -7,12 +15,19 @@ import { CoachTip } from '@/components/ui/CoachTip';
 import { useFoodSearch } from './useFoodSearch';
 import { FoodResultRow } from './FoodResultRow';
 import { toggleFavorite } from '@/db/repos/foods';
-import type { Food, MealSection } from '@/db/types';
+import { useMealsWithTotals } from '@/features/meals/useMealsWithTotals';
+import { matchesMealQuery } from '@/features/meals/mealMath';
+import { formatKcal } from '@/lib/macros';
+import type { Food, Meal, MealSection } from '@/db/types';
 
 interface FoodSearchPanelProps {
   section: MealSection;
   onPick: (food: Food) => void;
   onManualEntry: (presetName: string) => void;
+  /** When provided, saved meals matching the query are offered alongside
+   *  foods. Omitted where logging a whole meal makes no sense, e.g. while
+   *  picking an ingredient for a meal you are building. */
+  onPickMeal?: (meal: Meal) => void;
 }
 
 const SECTION_TITLES: Record<MealSection, string> = {
@@ -44,12 +59,66 @@ function Group({
   );
 }
 
+/** A saved-meal hit in the food search, weighted like a FoodResultRow. */
+function MealResultRow({
+  meal,
+  kcal,
+  itemCount,
+  onClick,
+}: {
+  meal: Meal;
+  kcal: number;
+  itemCount: number;
+  onClick: (meal: Meal) => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => onClick(meal)}
+      className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left hover:bg-muted/60 active:bg-muted"
+    >
+      {meal.image_url ? (
+        <img
+          src={meal.image_url}
+          alt=""
+          loading="lazy"
+          className="h-10 w-10 shrink-0 rounded-lg bg-muted object-cover"
+        />
+      ) : (
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+          <ChefHat className="h-4 w-4 text-primary" />
+        </div>
+      )}
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-1.5">
+          {meal.favorite && (
+            <Star
+              className="h-3 w-3 shrink-0 text-amber-500"
+              fill="currentColor"
+            />
+          )}
+          <span className="truncate text-sm font-medium">{meal.name}</span>
+          <span className="shrink-0 rounded-full bg-primary/15 px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wide text-primary">
+            Meal
+          </span>
+        </div>
+        <div className="mt-0.5 truncate text-xs text-muted-foreground">
+          {formatKcal(kcal)} kcal per portion · {itemCount}{' '}
+          {itemCount === 1 ? 'ingredient' : 'ingredients'}
+        </div>
+      </div>
+      <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+    </button>
+  );
+}
+
 type Category = 'all' | 'favourites' | 'frequent' | 'recent';
 
 export function FoodSearchPanel({
   section,
   onPick,
   onManualEntry,
+  onPickMeal,
 }: FoodSearchPanelProps) {
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState<Category>('all');
@@ -70,6 +139,19 @@ export function FoodSearchPanel({
   } = useFoodSearch(query);
 
   const hasQuery = query.trim().length > 0;
+  const allMeals = useMealsWithTotals();
+
+  // Saved meals matching the query. Strict first, typo-forgiving only if
+  // that found nothing - the same rule the food search follows.
+  const mealMatches = useMemo(() => {
+    if (!onPickMeal || !allMeals || !hasQuery) return [];
+    const strict = allMeals.filter((m) => matchesMealQuery(m.haystack, query));
+    if (strict.length > 0) return strict.slice(0, 6);
+    return allMeals
+      .filter((m) => matchesMealQuery(m.haystack, query, { fuzzy: true }))
+      .slice(0, 6);
+  }, [allMeals, query, hasQuery, onPickMeal]);
+
   const handleFav = (food: Food) => void toggleFavorite(food.id);
   // Reset category filter when user starts typing
   const handleQueryChange = (v: string) => {
@@ -81,6 +163,7 @@ export function FoodSearchPanel({
   const noResults =
     hasQuery &&
     !isSearching &&
+    mealMatches.length === 0 &&
     myProducts.length === 0 &&
     recentMatches.length === 0 &&
     library.length === 0 &&
@@ -93,7 +176,7 @@ export function FoodSearchPanel({
         <div className="relative">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="Search foods…"
+            placeholder={onPickMeal ? 'Search foods and meals…' : 'Search foods…'}
             className="pl-9"
             value={query}
             onChange={(e) => handleQueryChange(e.target.value)}
@@ -208,6 +291,23 @@ export function FoodSearchPanel({
 
         {hasQuery && (
           <>
+            {onPickMeal && mealMatches.length > 0 && (
+              <Group
+                title="Your meals"
+                hint={mealMatches.length > 1 ? `${mealMatches.length}` : undefined}
+              >
+                {mealMatches.map((m) => (
+                  <MealResultRow
+                    key={m.meal.id}
+                    meal={m.meal}
+                    kcal={m.totals.kcal}
+                    itemCount={m.itemCount}
+                    onClick={onPickMeal}
+                  />
+                ))}
+              </Group>
+            )}
+
             {myProducts.length > 0 && (
               <Group title="My Products">
                 {myProducts.map((f) => (

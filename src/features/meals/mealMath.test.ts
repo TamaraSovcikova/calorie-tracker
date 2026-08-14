@@ -4,6 +4,7 @@ import type { DayTotals } from '@/db/repos/diary';
 import {
   compareMealsForList,
   computeMealTotals,
+  filterMealsByQuery,
   formatServings,
   getServings,
   itemToQuantity,
@@ -214,5 +215,37 @@ describe('compareMealsForList', () => {
     expect(
       compareMealsForList(meal(false, '2026-05-20'), meal(false, '2026-05-27')),
     ).toBeGreaterThan(0);
+  });
+});
+
+describe('filterMealsByQuery', () => {
+  const rows = [
+    { haystack: 'bolognese weeknight batch hache de boeuf, tomato puree' },
+    { haystack: 'chicken curry rice, kipfilet, coconut milk' },
+    { haystack: 'overnight oats yoghurt, banana' },
+  ];
+
+  it('finds a meal by an ingredient named in another language', () => {
+    expect(filterMealsByQuery(rows, 'beef')).toHaveLength(1);
+    expect(filterMealsByQuery(rows, 'chicken')).toHaveLength(1);
+  });
+
+  it('ignores word order and filler', () => {
+    expect(filterMealsByQuery(rows, 'puree de tomato')).toHaveLength(1);
+  });
+
+  it('forgives a typo only when nothing matched strictly', () => {
+    expect(filterMealsByQuery(rows, 'yoghrut')).toHaveLength(1);
+    // "chicken" matches one meal outright, so the curry is returned alone
+    // rather than being joined by whatever a typo pass would drag in.
+    expect(filterMealsByQuery(rows, 'chicken')).toHaveLength(1);
+  });
+
+  it('returns everything for an empty query', () => {
+    expect(filterMealsByQuery(rows, '  ')).toHaveLength(3);
+  });
+
+  it('returns nothing for an unrelated query', () => {
+    expect(filterMealsByQuery(rows, 'salmon')).toHaveLength(0);
   });
 });

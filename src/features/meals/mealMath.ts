@@ -90,8 +90,27 @@ export function formatServings(servings: number): string {
  * app-wide matcher, so a meal is findable by an ingredient typed in another
  * language or with different accents, exactly like the food search.
  */
-export function matchesMealQuery(haystack: string, query: string): boolean {
-  return matchesSearchQuery(haystack, query);
+export function matchesMealQuery(
+  haystack: string,
+  query: string,
+  opts: { fuzzy?: boolean } = {},
+): boolean {
+  return matchesSearchQuery(haystack, query, opts);
+}
+
+/**
+ * Apply a free-text query to a list of meals, forgiving a typo only when the
+ * strict pass found nothing. Pass an already category-filtered list, so "no
+ * strict matches in Dinner" retries within Dinner rather than escaping it.
+ */
+export function filterMealsByQuery<T extends { haystack: string }>(
+  rows: T[],
+  query: string,
+): T[] {
+  if (!query.trim()) return rows;
+  const strict = rows.filter((r) => matchesMealQuery(r.haystack, query));
+  if (strict.length > 0) return strict;
+  return rows.filter((r) => matchesMealQuery(r.haystack, query, { fuzzy: true }));
 }
 
 /**

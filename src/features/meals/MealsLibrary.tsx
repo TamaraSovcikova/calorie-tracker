@@ -23,7 +23,7 @@ import { StarredMealsShelf } from './StarredMealsShelf';
 import { RecipeScanSheet } from '@/features/recipe-scan/RecipeScanSheet';
 import { CategoriseSheet } from './CategoriseSheet';
 import { useMealsWithTotals } from './useMealsWithTotals';
-import { formatServings, matchesMealQuery } from './mealMath';
+import { filterMealsByQuery, formatServings } from './mealMath';
 import {
   buildMealFilterChips,
   categoryLabel,
@@ -78,8 +78,9 @@ export function MealsLibrary({ filter, setFilter }: MealsLibraryProps) {
 
   const visible = useMemo(() => {
     if (!meals) return [];
-    const list = meals.filter(
-      (m) => matchesMealQuery(m.haystack, query) && mealMatchesFilter(m.meal, filter),
+    const list = filterMealsByQuery(
+      meals.filter((m) => mealMatchesFilter(m.meal, filter)),
+      query,
     );
     return [...list].sort((a, b) => {
       const fa = a.meal.favorite ? 1 : 0;

@@ -211,6 +211,66 @@ export function wordsMatch(a: string, b: string): boolean {
 }
 
 /**
+ * Damerau-Levenshtein distance, abandoned once it exceeds `max`. The
+ * transposition case matters more than the others here: "chicekn" and
+ * "yoghrut" are the typos people actually make on a phone keyboard, and
+ * plain Levenshtein charges 2 for them.
+ */
+export function editDistance(a: string, b: string, max = 2): number {
+  if (a === b) return 0;
+  if (Math.abs(a.length - b.length) > max) return max + 1;
+  let prev2: number[] = [];
+  let prev = Array.from({ length: b.length + 1 }, (_, j) => j);
+  let curr: number[] = [];
+  for (let i = 1; i <= a.length; i++) {
+    curr = [i];
+    let rowMin = i;
+    for (let j = 1; j <= b.length; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      let d = Math.min(curr[j - 1] + 1, prev[j] + 1, prev[j - 1] + cost);
+      if (
+        i > 1 &&
+        j > 1 &&
+        a[i - 1] === b[j - 2] &&
+        a[i - 2] === b[j - 1]
+      ) {
+        d = Math.min(d, prev2[j - 2] + 1);
+      }
+      curr[j] = d;
+      if (d < rowMin) rowMin = d;
+    }
+    // Every remaining row can only grow, so we can stop early.
+    if (rowMin > max) return max + 1;
+    prev2 = prev;
+    prev = curr;
+  }
+  return prev[b.length];
+}
+
+/**
+ * How far off a word of this length is allowed to be. Short words get no
+ * slack at all, because at 4 letters a single edit reaches a genuinely
+ * different food ("oats" to "oat" to "eats").
+ */
+function typoBudget(len: number): number {
+  if (len <= 4) return 0;
+  if (len <= 7) return 1;
+  return 2;
+}
+
+/**
+ * wordsMatch, plus tolerance for a typo. Kept separate and opt-in: the AI
+ * ingredient matcher must NOT use this, because loosening the word test is
+ * exactly what let a junk ingredient called "Pepp" into a recipe.
+ */
+export function fuzzyWordsMatch(a: string, b: string): boolean {
+  if (wordsMatch(a, b)) return true;
+  const budget = typoBudget(Math.min(a.length, b.length));
+  if (budget === 0) return false;
+  return editDistance(a, b, budget) <= budget;
+}
+
+/**
  * The single free-text filter used by every search box in the app: the add
  * food sheet, the food library, the meal library and the in-diary meal
  * picker. Matches two ways.
@@ -226,8 +286,17 @@ export function wordsMatch(a: string, b: string): boolean {
  * what makes "beef" find "Hache de boeuf" and "creme" find "Crème". Each of
  * these four boxes used to carry its own substring filter, so the same query
  * behaved differently depending on which one you typed it into.
+ *
+ * `fuzzy` additionally forgives a typo per word. It is off by default and
+ * meant as a SECOND pass, run only when the strict pass found nothing: a
+ * search that already has good answers should never dilute them with
+ * near-misses.
  */
-export function matchesSearchQuery(haystack: string, query: string): boolean {
+export function matchesSearchQuery(
+  haystack: string,
+  query: string,
+  opts: { fuzzy?: boolean } = {},
+): boolean {
   const q = query.trim().toLowerCase();
   if (!q) return true;
   const hay = haystack.toLowerCase();
@@ -237,7 +306,22 @@ export function matchesSearchQuery(haystack: string, query: string): boolean {
   if (queryWords.length === 0) return false;
   const hayWords = sigWords(haystack);
   if (hayWords.length === 0) return false;
-  return queryWords.every((qw) => hayWords.some((hw) => wordsMatch(qw, hw)));
+  if (!opts.fuzzy) {
+    return queryWords.every((qw) => hayWords.some((hw) => wordsMatch(qw, hw)));
+  }
+  // Compare against the literal words too, not only the translated ones.
+  // The dictionary rewrites "yoghurt" to "yogurt", so a typo'd "yoghrut" is
+  // one edit from what she wrote and two from what we store it as. Measuring
+  // only against the translation loses the typo she actually made.
+  const pool = [...new Set([...hayWords, ...rawWords(haystack)])];
+  return queryWords.every((qw) => pool.some((hw) => fuzzyWordsMatch(qw, hw)));
+}
+
+/** sigWords without translation or filler-stripping: the words as written. */
+function rawWords(s: string): string[] {
+  return (deaccent(s.toLowerCase()).match(/[a-z0-9]+/g) ?? []).filter(
+    (w) => w.length >= 3,
+  );
 }
 
 /** Preparation states that materially change macros per 100g. */
