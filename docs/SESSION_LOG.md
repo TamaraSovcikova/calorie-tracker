@@ -17,8 +17,9 @@ Last updated: 2026-08-13
 
 ## Chat #4f - 2026-08-13 (capture surfaces unified, then their quality fixed; deployed)
 
-Two rounds, both triggered by Tamara: the capture entry points were scattered
-and confusing, then a check of how well they actually work.
+Three rounds, all triggered by Tamara: the capture entry points were scattered
+and confusing, then a check of how well they actually work, then the pages
+themselves still carrying their old furniture.
 
 ### Round 1 - one capture system (`a398922`)
 
@@ -67,7 +68,21 @@ and the recipe scan **could not use the camera** - screenshots only.
   close-up EAN-13 and higher slows continuous decoding - not the same bug) and
   the meal card image at 640 (a thumbnail that syncs as a data URL).
 
-- **State:** deployed, Version `c01c912c`, HEAD `d809000`, clean tree, 0
+### Round 3 - tidying the pages behind the chooser (`c497d04`)
+
+Unifying the entry left each page carrying furniture from when it was its
+own island. The barcode page had THREE stacked fallback blocks with no
+hierarchy under the viewfinder: a full-width import button with a two-line
+explainer, a floating "No barcode? Scan a nutrition label instead" link, and
+an always-open manual form. Now one row of three equal actions under a single
+"Won't scan?" line (From a photo / Type it in / Use the label), matching the
+Gallery-and-shutter row in CaptureOverlay. Manual entry sits behind its own
+action. Camera-denied and import-failure copy that said "below" was corrected.
+Meal photo and recipe both showed a second explanation and wanted a second tap
+after the chooser had already explained them; meal photo now opens the camera
+on arrival, and both keep only what the chooser does not say.
+
+- **State:** deployed, Version `8a6fb0e3`, HEAD `c497d04`, clean tree, 0
   unpushed. 309 tests, typecheck + build + eslint clean (2 pre-existing lint
   issues remain: `portionSuggestions.ts` control regex, `Dog.tsx` fast-refresh).
   No schema change; Dexie is at v5 (`ingredient_aliases`, local-only).
