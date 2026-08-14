@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   candidateScore,
   isConfident,
+  matchesSearchQuery,
   nameMatchScore,
   prepStates,
   rankCandidates,
@@ -460,12 +461,9 @@ describe('exact curated matches stop nagging', () => {
 });
 
 describe('search-box cases (shared normaliser)', () => {
-  /** What searchLocalFoods and scoreFoodMatch both now do. */
-  const covers = (foodName: string, query: string): boolean => {
-    const q = sigWords(query);
-    const f = sigWords(foodName);
-    return q.length > 0 && q.every((qw) => f.some((fw) => wordsMatch(qw, fw)));
-  };
+  /** The one matcher behind every search box in the app. */
+  const covers = (foodName: string, query: string): boolean =>
+    matchesSearchQuery(foodName, query);
 
   it('finds a food whose words are in a different order', () => {
     // The reported bug: typing the ingredient back returned nothing, because
@@ -490,5 +488,30 @@ describe('search-box cases (shared normaliser)', () => {
 
   it('still refuses an unrelated food', () => {
     expect(covers('Cacao en poudre', 'chicken breast')).toBe(false);
+  });
+
+  it('an empty query matches everything', () => {
+    expect(covers('Cacao en poudre', '')).toBe(true);
+    expect(covers('Cacao en poudre', '   ')).toBe(true);
+  });
+
+  it('keeps the verbatim path for short and partial words', () => {
+    // "ca" is below the 3-char significant-word floor, so only the raw
+    // substring rule can carry it. Typing should narrow from the first key.
+    expect(covers('Cacao en poudre', 'ca')).toBe(true);
+    expect(covers('Cacao en poudre', 'poud')).toBe(true);
+  });
+
+  it('matches on brand as well as name', () => {
+    expect(covers('Americain naturel Belbeef', 'belbeef')).toBe(true);
+  });
+
+  it('works over a meal haystack (name + notes + ingredients)', () => {
+    // Meal search shares this, so a meal is findable by an ingredient typed
+    // in another language than the one it was saved in.
+    const meal = 'Bolognese | weeknight batch | Hache de boeuf, Tomato puree';
+    expect(covers(meal, 'beef')).toBe(true);
+    expect(covers(meal, 'boeuf tomato')).toBe(true);
+    expect(covers(meal, 'salmon')).toBe(false);
   });
 });

@@ -2,7 +2,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { v4 as uuid } from 'uuid';
 import { db } from '../dexie';
 import { currentUserId } from '../userId';
-import { sigWords, wordsMatch } from '@/features/food-search/ingredientMatch';
+import { matchesSearchQuery } from '@/features/food-search/ingredientMatch';
 import { getContributeShared } from '@/features/settings/foodSourceSettings';
 import { contributeSharedFood } from '@/lib/shared-foods-api';
 import type { CustomUnit, Food } from '../types';
@@ -91,47 +91,52 @@ export function useMyProducts(): Food[] | undefined {
 }
 
 /**
- * Search local foods across name + brand, for the add-food sheet.
+ * How much a matched food deserves to survive truncation. Only a coarse
+ * proxy: the real scoring happens in useFoodSearch once the shortlist is
+ * built. This exists so the shortlist is the BEST matches rather than an
+ * arbitrary slice of them.
+ */
+function localRelevance(food: Food, q: string): number {
+  const name = food.name.toLowerCase();
+  if (name === q) return 4;
+  if (name.startsWith(q)) return 3;
+  if (name.includes(q)) return 2;
+  if (`${name} ${food.brand?.toLowerCase() ?? ''}`.includes(q)) return 1;
+  return 0; // matched only after normalisation
+}
+
+/** Ceiling on how many rows we normalise before ranking. */
+const SEARCH_SCAN_CAP = 400;
+
+/**
+ * Search local foods across name + brand, for the add-food sheet. Uses the
+ * app-wide matcher, so accents, word order and French/Dutch names all work.
  *
- * Matches two ways, because raw substrings alone were losing foods the user
- * had definitely added:
- *
- *  1. Every typed token appears verbatim. Fast, and exactly what you want
- *     when you type part of a product name.
- *  2. Every SIGNIFICANT word of the query appears among the food's
- *     significant words, after both sides are de-accented, translated out of
- *     French and Dutch, and stripped of filler.
- *
- * The second rule is why "poudre de cacao" now finds a food stored as
- * "Cacao en poudre": rule 1 fails on the word "de", which is not in the
- * stored name at all, and used to return nothing. It is also what makes
- * "beef" find "Hache de boeuf" and "creme" find "Crème".
+ * Ranks BEFORE truncating. It used to take the first `limit * 3` rows Dexie
+ * happened to walk past, sort those by source and date, and cut to 20 - so
+ * with a few thousand cached foods an exact name match could be dropped
+ * before relevance was ever considered.
  */
 export async function searchLocalFoods(query: string, limit = 20): Promise<Food[]> {
   const q = query.trim().toLowerCase();
   if (!q) return [];
-  const tokens = q.split(/\s+/).filter(Boolean);
-  const queryWords = sigWords(q);
   const userId = currentUserId();
   const matches = await db.foods
     .where('user_id')
     .equals(userId)
-    .filter((f) => {
-      if (f.deleted_at) return false;
-      const hay = `${f.name} ${f.brand ?? ''}`.toLowerCase();
-      if (tokens.every((t) => hay.includes(t))) return true;
-      if (queryWords.length === 0) return false;
-      const foodWords = sigWords(`${f.name} ${f.brand ?? ''}`);
-      if (foodWords.length === 0) return false;
-      return queryWords.every((qw) =>
-        foodWords.some((fw) => wordsMatch(qw, fw)),
-      );
-    })
-    .limit(limit * 3)
+    .filter(
+      (f) =>
+        !f.deleted_at &&
+        matchesSearchQuery(`${f.name} ${f.brand ?? ''}`, q),
+    )
+    .limit(SEARCH_SCAN_CAP)
     .toArray();
-  // custom first, then OFF/USDA, then most-recently-updated
+  // relevance, then custom first, then most-recently-updated
   return matches
     .sort((a, b) => {
+      const ra = localRelevance(a, q);
+      const rb = localRelevance(b, q);
+      if (ra !== rb) return rb - ra;
       if (a.source !== b.source) return a.source === 'custom' ? -1 : 1;
       return a.updated_at < b.updated_at ? 1 : -1;
     })

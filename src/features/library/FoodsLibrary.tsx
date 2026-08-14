@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/Input';
 import { Sheet } from '@/components/ui/Sheet';
 import { toast } from '@/components/ui/toast';
 import { ManualEntryForm } from '@/features/food-search/ManualEntryForm';
+import { matchesSearchQuery } from '@/features/food-search/ingredientMatch';
 import { LogFoodSheet } from './LogFoodSheet';
 import { useMyProducts, restoreFood, softDeleteFood, toggleFavorite } from '@/db/repos/foods';
 import { cn } from '@/lib/cn';
@@ -21,12 +22,9 @@ export function FoodsLibrary() {
 
   const filtered = useMemo(() => {
     if (!foods) return [];
-    const q = query.trim().toLowerCase();
-    if (!q) return foods;
-    return foods.filter(
-      (f) =>
-        f.name.toLowerCase().includes(q) ||
-        (f.brand?.toLowerCase().includes(q) ?? false),
+    if (!query.trim()) return foods;
+    return foods.filter((f) =>
+      matchesSearchQuery(`${f.name} ${f.brand ?? ''}`, query),
     );
   }, [foods, query]);
 

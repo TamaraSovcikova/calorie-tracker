@@ -4,6 +4,7 @@ import {
   type QuantityMode,
   type QuantityState,
 } from '@/features/food-search/foodMath';
+import { matchesSearchQuery } from '@/features/food-search/ingredientMatch';
 import type { DayTotals } from '@/db/repos/diary';
 
 /** Convert a stored MealItem unit + qty into a QuantityState. */
@@ -85,19 +86,12 @@ export function formatServings(servings: number): string {
 }
 
 /**
- * Tokenised AND search: every whitespace-separated query word must appear
- * somewhere in the haystack (name + notes + ingredient names). More natural
- * than a whole-string substring - "chicken rice" matches a meal named "Rice
- * bowl" containing chicken, regardless of word order. Empty query matches.
+ * Free-text meal filter over name + notes + ingredient names. Shares the
+ * app-wide matcher, so a meal is findable by an ingredient typed in another
+ * language or with different accents, exactly like the food search.
  */
 export function matchesMealQuery(haystack: string, query: string): boolean {
-  const q = query.trim().toLowerCase();
-  if (!q) return true;
-  const h = haystack.toLowerCase();
-  return q
-    .split(/\s+/)
-    .filter(Boolean)
-    .every((token) => h.includes(token));
+  return matchesSearchQuery(haystack, query);
 }
 
 /**

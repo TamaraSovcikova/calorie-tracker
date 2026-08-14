@@ -210,6 +210,36 @@ export function wordsMatch(a: string, b: string): boolean {
   return short.length / long.length >= 0.7;
 }
 
+/**
+ * The single free-text filter used by every search box in the app: the add
+ * food sheet, the food library, the meal library and the in-diary meal
+ * picker. Matches two ways.
+ *
+ *  1. Every typed token appears verbatim in the haystack. Fast, and exactly
+ *     what you want while typing part of a product name.
+ *  2. Every SIGNIFICANT word of the query matches a significant word of the
+ *     haystack, once both sides are de-accented, translated out of French
+ *     and Dutch, and stripped of filler.
+ *
+ * Rule 2 is why "poudre de cacao" finds a food stored as "Cacao en poudre":
+ * rule 1 fails on "de", which is not in the stored name at all. It is also
+ * what makes "beef" find "Hache de boeuf" and "creme" find "Crème". Each of
+ * these four boxes used to carry its own substring filter, so the same query
+ * behaved differently depending on which one you typed it into.
+ */
+export function matchesSearchQuery(haystack: string, query: string): boolean {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  const hay = haystack.toLowerCase();
+  const tokens = q.split(/\s+/).filter(Boolean);
+  if (tokens.every((t) => hay.includes(t))) return true;
+  const queryWords = sigWords(q);
+  if (queryWords.length === 0) return false;
+  const hayWords = sigWords(haystack);
+  if (hayWords.length === 0) return false;
+  return queryWords.every((qw) => hayWords.some((hw) => wordsMatch(qw, hw)));
+}
+
 /** Preparation states that materially change macros per 100g. */
 const PREP_STATES = [
   'cooked',
