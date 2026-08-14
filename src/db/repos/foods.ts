@@ -2,6 +2,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { v4 as uuid } from 'uuid';
 import { db } from '../dexie';
 import { currentUserId } from '../userId';
+import { sigWords, wordsMatch } from '@/features/food-search/ingredientMatch';
 import { getContributeShared } from '@/features/settings/foodSourceSettings';
 import { contributeSharedFood } from '@/lib/shared-foods-api';
 import type { CustomUnit, Food } from '../types';
@@ -90,20 +91,27 @@ export function useMyProducts(): Food[] | undefined {
 }
 
 /**
- * Search local foods across name + brand. Tokenised AND match: every
- * whitespace-separated query word must appear somewhere in the food's
- * "name brand" text (case-insensitive substring). More forgiving than a
- * whole-string substring - "whey protein", "protein powder" and "optimum
- * protein" all match a "Gold Standard Whey Protein Powder" by "Optimum
- * Nutrition", regardless of word order.
+ * Search local foods across name + brand, for the add-food sheet.
  *
- * Used by the add-food sheet to surface the user's library + recently-cached
- * Open Food Facts / USDA hits ahead of (and alongside) a fresh remote call.
+ * Matches two ways, because raw substrings alone were losing foods the user
+ * had definitely added:
+ *
+ *  1. Every typed token appears verbatim. Fast, and exactly what you want
+ *     when you type part of a product name.
+ *  2. Every SIGNIFICANT word of the query appears among the food's
+ *     significant words, after both sides are de-accented, translated out of
+ *     French and Dutch, and stripped of filler.
+ *
+ * The second rule is why "poudre de cacao" now finds a food stored as
+ * "Cacao en poudre": rule 1 fails on the word "de", which is not in the
+ * stored name at all, and used to return nothing. It is also what makes
+ * "beef" find "Hache de boeuf" and "creme" find "Crème".
  */
 export async function searchLocalFoods(query: string, limit = 20): Promise<Food[]> {
   const q = query.trim().toLowerCase();
   if (!q) return [];
   const tokens = q.split(/\s+/).filter(Boolean);
+  const queryWords = sigWords(q);
   const userId = currentUserId();
   const matches = await db.foods
     .where('user_id')
@@ -111,7 +119,13 @@ export async function searchLocalFoods(query: string, limit = 20): Promise<Food[
     .filter((f) => {
       if (f.deleted_at) return false;
       const hay = `${f.name} ${f.brand ?? ''}`.toLowerCase();
-      return tokens.every((t) => hay.includes(t));
+      if (tokens.every((t) => hay.includes(t))) return true;
+      if (queryWords.length === 0) return false;
+      const foodWords = sigWords(`${f.name} ${f.brand ?? ''}`);
+      if (foodWords.length === 0) return false;
+      return queryWords.every((qw) =>
+        foodWords.some((fw) => wordsMatch(qw, fw)),
+      );
     })
     .limit(limit * 3)
     .toArray();

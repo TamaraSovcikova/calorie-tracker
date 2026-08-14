@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db/dexie';
 import { searchLocalFoods } from '@/db/repos/foods';
+import { sigWords, wordsMatch } from './ingredientMatch';
 import { frequentFoods, recentFoods } from '@/db/repos/diary';
 import { currentUserId } from '@/db/userId';
 import { OffRateLimitError, searchOff } from '@/lib/off-api';
@@ -100,6 +101,26 @@ function scoreFoodMatch(food: Food, q: string): number {
     }
   }
   if (tokens.length > 0 && tokenHits === tokens.length) score += 150;
+
+  // Cross-language and word-order hits. The raw scoring above compares
+  // characters, so a French-named product scores 0 for an English query even
+  // when searchLocalFoods correctly surfaced it - it would then sort to the
+  // bottom under everything irrelevant. Comparing normalised words (accents
+  // folded, French and Dutch mapped to English, filler dropped) is what lets
+  // "beef" rank a "Hache de boeuf" and "poudre de cacao" rank a food stored
+  // as "Cacao en poudre".
+  const qWords = sigWords(q);
+  if (qWords.length > 0) {
+    const fWords = sigWords(`${name} ${food.brand ?? ''}`);
+    let normHits = 0;
+    for (const qw of qWords) {
+      if (fWords.some((fw) => wordsMatch(qw, fw))) normHits++;
+    }
+    if (normHits > 0) {
+      score += 60 * normHits;
+      if (normHits === qWords.length) score += 140;
+    }
+  }
 
   // Dataset quality: curated staples + the user's own products rank above
   // clean USDA generics, which rank above composite Survey dishes.

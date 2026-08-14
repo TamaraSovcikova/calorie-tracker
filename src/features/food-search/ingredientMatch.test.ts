@@ -458,3 +458,37 @@ describe('exact curated matches stop nagging', () => {
     expect(isConfident([cand('BEEF', 'external', 1)])).toBe(false);
   });
 });
+
+describe('search-box cases (shared normaliser)', () => {
+  /** What searchLocalFoods and scoreFoodMatch both now do. */
+  const covers = (foodName: string, query: string): boolean => {
+    const q = sigWords(query);
+    const f = sigWords(foodName);
+    return q.length > 0 && q.every((qw) => f.some((fw) => wordsMatch(qw, fw)));
+  };
+
+  it('finds a food whose words are in a different order', () => {
+    // The reported bug: typing the ingredient back returned nothing, because
+    // every raw token had to appear and "de" is not in the stored name.
+    expect(covers('Cacao en poudre', 'poudre de cacao')).toBe(true);
+  });
+
+  it('finds it from one word', () => {
+    expect(covers('Cacao en poudre', 'cacao')).toBe(true);
+  });
+
+  it('finds French and Dutch products from an English query', () => {
+    expect(covers('Hache de boeuf 5% MG', 'beef')).toBe(true);
+    expect(covers('Rundergehakt', 'beef')).toBe(true);
+    expect(covers('Kipfilet', 'chicken')).toBe(true);
+  });
+
+  it('is accent-insensitive both ways', () => {
+    expect(covers('Crème fraîche', 'creme fraiche')).toBe(true);
+    expect(covers('Creme fraiche', 'crème')).toBe(true);
+  });
+
+  it('still refuses an unrelated food', () => {
+    expect(covers('Cacao en poudre', 'chicken breast')).toBe(false);
+  });
+});
