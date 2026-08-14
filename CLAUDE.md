@@ -6,13 +6,20 @@ Personal calorie + nutrition tracking PWA (Tamara + sister + ~3 friends). Local-
 
 ## Docs (read on demand)
 
+**In this repo** (the live ones, read these):
+- `docs/SESSION_LOG.md` - read the top entry at start, prepend at end. THE log.
+- `DESIGN.md` - the design system, and the rules that are enforced in tests.
+- `DESIGN_REVIEW.md` - the whole-app design review, its scores and findings.
+
 Narrative at `~/workspace/Projects/calorie_tracker/docs/`:
 - `ARCHITECTURE.md` - design decisions, AI layer, pet logic, sync model.
 - `MISTAKES.md` - project gotchas (read before touching non-obvious code).
-- `SESSION_LOG.md` - read top entry at start, append at end.
 - `EVOLUTION.md` - dated feature story.
 - `AI_FOOD_RESOLUTION.md` - deep dive on the AI matcher.
 - `PURPOSE.md`, `INTERVIEW.md` - product context.
+
+That vault folder also holds a `SESSION_LOG.md`, which is STALE - it stopped at
+Chat #2 (2026-06-19). The live log is `docs/SESSION_LOG.md` in this repo.
 
 Cross-project conventions (commit rules, em-dash, co-author): `~/devhub/conventions.md`.
 

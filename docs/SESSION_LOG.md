@@ -6,10 +6,94 @@ How to use:
 - Start of session: read only the top entry, announce the chat number.
 - End of session: prepend a new entry, bump `Session count`.
 
-Session count: 7
+Session count: 8
 Last updated: 2026-08-13
 
+> **This file is the live log.** `Projects/calorie_tracker/docs/SESSION_LOG.md` in
+> the OneDrive vault is a stale copy that stopped at Chat #2 (2026-06-19); the
+> project CLAUDE.md used to point there. Fixed 2026-08-13. Append here.
+
 ---
+
+## Chat #4f - 2026-08-13 (capture surfaces unified, then their quality fixed; deployed)
+
+Two rounds, both triggered by Tamara: the capture entry points were scattered
+and confusing, then a check of how well they actually work.
+
+### Round 1 - one capture system (`a398922`)
+
+Seven surfaces were getting images in through FOUR mechanisms: this overlay,
+`<input capture>` (hands off to the OS camera app), a bare `<input>` (gallery
+only), and a pair of the two. Consequences: "take a photo" behaved differently
+per screen, the meal photo had **no gallery at all** on some Android builds,
+and the recipe scan **could not use the camera** - screenshots only.
+
+- `LabelCaptureOverlay` -> `CaptureOverlay` with configurable title, hint,
+  framing guide. Every surface uses it. Barcode keeps ZXing (needs continuous
+  decoding) but wears the same chrome.
+- New `CaptureChooser`: one door naming all four capabilities with a line each
+  on when to use them. Label scan had been buried behind a text link INSIDE
+  the barcode scanner; recipe scan lived on a different page.
+- Add food: 5 tabs -> 4 (Search, Capture, Meals, Quick). Ingredient picker:
+  Search + Capture, **gaining the label scan it never had**.
+- Recipe is listed with the rest but labelled "saves a reusable meal instead
+  of logging now" - it is the one whose destination differs (her call).
+- PWA icon shortcuts still work: `normaliseTab` maps `?tab=scan` / `?tab=photo`
+  onto Capture with that flow preselected, so the barcode shortcut is still
+  zero extra taps.
+
+### Round 2 - capture quality (`12b67a7`, `d809000`)
+
+- **The headline bug.** `getUserMedia` was called with only `facingMode`, so
+  browsers returned their default - typically **640x480** - and the canvas was
+  sized from `video.videoWidth`. Which means the 1600px label ceiling added in
+  Chat #4 **had never done anything**: `downscaleImage` computes
+  `min(1, 1600/640) = 1` and returns untouched. Raised the ceiling, never
+  checked the source was below it. A gallery pick was therefore giving BETTER
+  OCR than the camera built to be the primary path. Now asks 2560x1440 ideal.
+- Confirm-before-send. The shutter fired straight into the upload, so a blurry
+  shot cost a 60s round trip before you found out. Retake / Use photo, drawn
+  `object-contain` so the whole frame is checkable. Gallery skips it.
+- Single encode. Was 0.95 at capture then decode-resize-re-encode at 0.82 by
+  the caller - two rounds of artefacts on the small print the AI reads. The
+  overlay now takes `maxDim` and scales during the draw: one encode at 0.88.
+  Labels/recipes 1600, meal photo 1024, meal card image 640.
+- `downscaleImage` returns the ORIGINAL blob when no resize is needed; it used
+  to redraw and recompress regardless.
+- Continuous autofocus + tap-to-focus where the camera reports support; torch
+  on both the overlay and the barcode scanner (reachable because ZXing
+  attaches its stream to our element).
+- **Deliberately NOT changed:** barcode resolution (640x480 is ample for a
+  close-up EAN-13 and higher slows continuous decoding - not the same bug) and
+  the meal card image at 640 (a thumbnail that syncs as a data URL).
+
+- **State:** deployed, Version `c01c912c`, HEAD `d809000`, clean tree, 0
+  unpushed. 309 tests, typecheck + build + eslint clean (2 pre-existing lint
+  issues remain: `portionSuggestions.ts` control regex, `Dog.tsx` fast-refresh).
+  No schema change; Dexie is at v5 (`ingredient_aliases`, local-only).
+- **Next:** all device work on the Pixel, none of it verified by eye.
+  1. Re-scan the stuffed-pepper recipe - the single most informative test. The
+     review screen shows the chosen food, tier and kcal per row, and the picker
+     shows the alternatives.
+  2. Scan a nutrition label. This is the first time it has ever run above
+     640px, so it should be visibly more accurate.
+  3. Capture tab, chooser rows, confirm-shot step, torch.
+  4. Still unverified from earlier today: near-black primary button, four nav
+     labels on a narrow phone, rebuilt Progress page.
+- **Open:**
+  - Unexplained from the #4e scan: `beef mince` UNFLAGGED at `library` tier
+    while `grated cheddar` at the same tier WAS flagged. `isConfident` says
+    neither should pass. Check this first.
+  - Blank 0 kcal stubs (e.g. "Garlic") still sit in her library from the
+    pre-#4d scanner. Scoring no longer picks them; they want deleting by hand.
+  - Alias store is local-only by choice (matches `food_recents`). Syncing it is
+    a clean follow-up if aliases should survive a device change or local wipe.
+  - Deferred design items: desktop/tablet layout, onboarding cut/maintain/gain.
+- **Skills/conventions:** none installed. Note `bun` and `jq` are BOTH missing
+  on this machine, so `gstack-review-log`, `gstack-learnings-log` and the tasks
+  JSONL all fail; review entries go straight into
+  `~/.gstack/projects/calorie-tracker/main-reviews.jsonl`. `SendUserFile`
+  cannot take a `\\wsl.localhost\...` UNC path.
 
 ## Chat #4e - 2026-08-13 (second device test of the recipe scan; matching reworked again; deployed)
 
