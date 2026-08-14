@@ -14,6 +14,8 @@ import { currentUserId } from '@/db/userId';
 import { getSyncConfig, syncBaseUrl } from '@/db/sync/config';
 import { createMeal, type MealItemInput } from '@/db/repos/meals';
 import { frequentFoods, recentFoods, type DayTotals } from '@/db/repos/diary';
+import { addDays } from 'date-fns';
+import { toLocalDate } from '@/lib/dates';
 import { getAliasFood } from '@/db/repos/ingredientAliases';
 import { computeMacros } from '@/features/food-search/foodMath';
 import {
@@ -46,10 +48,88 @@ export interface MealPlanResult {
 export interface MealPlanRequest {
   /** How many meal-prep portions the batch should make. */
   portions: number;
+  /** Ceiling for ONE portion, not the day. A 200 kcal snack is a valid ask,
+   *  so this is never derived from the daily target without the user saying
+   *  so - the profile only supplies the preset chips. */
   kcalMax?: number;
+  /** Floor for ONE portion. Same rule. */
   proteinMin?: number;
   ingredients?: string[];
   notes?: string;
+  /**
+   * What the app knows about this cook, sent as context rather than as
+   * constraints. None of this used to be sent at all: the planner was a
+   * form with no memory, which is the main reason it lost to a chat that
+   * at least remembers the conversation.
+   */
+  context?: PlannerContext;
+  /** Set when refining one earlier suggestion instead of rolling five new. */
+  refine?: {
+    meal: PlannedMeal;
+    /** What the user asked to change, in their own words. */
+    instruction: string;
+  };
+}
+
+export interface PlannerContext {
+  /** Daily targets, so the model knows the person even when the per-meal
+   *  ask is deliberately different. */
+  dailyKcal?: number;
+  dailyProtein?: number;
+  /** Foods they actually cook with, decay-weighted. The single best signal
+   *  the app has and it was being thrown away. */
+  frequentFoods?: string[];
+  /** Meals they already have saved, so it stops re-suggesting them. */
+  savedMeals?: string[];
+  /** Eaten in the last few days, so it does not repeat what they just had. */
+  recentMeals?: string[];
+}
+
+/**
+ * Assemble the planner's view of the user from data the app already holds.
+ * Everything is best-effort: a failure here degrades the suggestions, it
+ * should never block a plan.
+ */
+export async function buildPlannerContext(
+  profile?: { kcal_target?: number; protein_g?: number },
+): Promise<PlannerContext> {
+  const [freqIds, savedMeals, recent] = await Promise.all([
+    frequentFoods(15).catch(() => [] as string[]),
+    db.meals
+      .where('user_id')
+      .equals(currentUserId())
+      .filter((m) => !m.deleted_at)
+      .toArray()
+      .catch(() => []),
+    recentMealNames().catch(() => [] as string[]),
+  ]);
+  const freqFoods: (Food | undefined)[] = await db.foods
+    .bulkGet(freqIds)
+    .catch(() => [] as (Food | undefined)[]);
+  return {
+    dailyKcal: profile?.kcal_target,
+    dailyProtein: profile?.protein_g,
+    frequentFoods: freqFoods
+      .filter((f): f is Food => !!f && !f.deleted_at)
+      .map((f: Food) => f.name)
+      .slice(0, 15),
+    savedMeals: savedMeals.map((m) => m.name).slice(0, 25),
+    recentMeals: recent.slice(0, 10),
+  };
+}
+
+/** Names of meals logged in the last two weeks, newest first. */
+async function recentMealNames(): Promise<string[]> {
+  const uid = currentUserId();
+  const since = toLocalDate(addDays(new Date(), -14));
+  const rows = await db.diary_entries
+    .where('[user_id+date]')
+    .between([uid, since], [uid, '9999-99-99'], true, true)
+    .filter((e) => e.kind === 'meal' && !!e.meal_id && !e.deleted_at)
+    .toArray();
+  const ids = [...new Set(rows.map((e) => e.meal_id as string))];
+  const meals = await db.meals.bulkGet(ids);
+  return meals.filter((m) => !!m && !m.deleted_at).map((m) => m!.name);
 }
 
 /** An ingredient after database lookup + fit-scaling. */

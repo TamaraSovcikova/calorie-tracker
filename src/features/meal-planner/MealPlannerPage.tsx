@@ -15,10 +15,12 @@ import { Button } from '@/components/ui/Button';
 import { Input, LabeledInput } from '@/components/ui/Input';
 import { toast } from '@/components/ui/toast';
 import { aiUnavailableReason } from '@/features/settings/aiAvailability';
+import { useProfile } from '@/db/repos/profile';
 import { formatKcal } from '@/lib/macros';
 import {
   requestMealPlan,
   resetPlannerCaches,
+  buildPlannerContext,
   resolveAndFitMeal,
   savePlanAsMeal,
   type MealPlanRequest,
@@ -42,6 +44,46 @@ export function MealPlannerPage() {
   const [meals, setMeals] = useState<PlannedMeal[]>([]);
   const [req, setReq] = useState<MealPlanRequest | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const profile = useProfile();
+  /** Index of the meal whose refine box is open. */
+  const [refining, setRefining] = useState<number | null>(null);
+  const [refineText, setRefineText] = useState('');
+
+  /**
+   * Per-meal targets suggested from the daily goal. Offered as chips rather
+   * than prefilled, because a per-meal limit is not a daily one - you might
+   * deliberately want a 200 kcal snack.
+   */
+  const kcalPresets = profile?.kcal_target
+    ? [
+        { label: 'Light', value: Math.round(profile.kcal_target * 0.15) },
+        { label: 'Main', value: Math.round(profile.kcal_target / 3) },
+        { label: 'Big', value: Math.round(profile.kcal_target * 0.45) },
+      ]
+    : [];
+  const proteinPreset = profile?.protein_g
+    ? Math.round(profile.protein_g / 3)
+    : null;
+
+  /** Refine one suggestion instead of rerolling all five. */
+  const handleRefine = async (meal: PlannedMeal, instruction: string) => {
+    if (!req || !instruction.trim()) return;
+    setRefining(null);
+    setRefineText('');
+    setPhase('loading');
+    setError(null);
+    const res = await requestMealPlan({
+      ...req,
+      refine: { meal, instruction: instruction.trim() },
+    });
+    if (res.meals.length === 0) {
+      setError(res.error ?? 'Could not refine that one - try again.');
+      setPhase('results');
+      return;
+    }
+    setMeals(res.meals);
+    setPhase('results');
+  };
 
   // Fresh recents + lookups each time the planner is opened.
   useEffect(() => {
@@ -77,8 +119,12 @@ export function MealPlannerPage() {
     setError(null);
     const request: MealPlanRequest = {
       portions: portions > 0 ? portions : 1,
+      // Per-PORTION, never derived from the daily target: a 200 kcal snack
+      // is a perfectly good ask. The profile only supplies the preset chips
+      // and the background context below.
       kcalMax: kcalMax ? parseFloat(kcalMax) : undefined,
       proteinMin: proteinMin ? parseFloat(proteinMin) : undefined,
+      context: await buildPlannerContext(profile),
       ingredients: ingredients.length > 0 ? ingredients : undefined,
       notes: notes.trim() || undefined,
     };
@@ -154,7 +200,61 @@ export function MealPlannerPage() {
             meal to see the recipe, scaled to hit your targets - then save it.
           </p>
           {meals.map((meal, i) => (
-            <MealCard key={`${meal.name}-${i}`} meal={meal} req={req} />
+            <div key={`${meal.name}-${i}`} className="space-y-2">
+              <MealCard meal={meal} req={req} />
+              {/* Refine THIS one. Regenerating re-rolls all five and throws
+                  away the one you liked, which is the difference between a
+                  form and a conversation. */}
+              {refining === i ? (
+                <div className="space-y-2 rounded-xl border border-border bg-muted/30 p-3">
+                  <Input
+                    autoFocus
+                    placeholder="e.g. no mushrooms, make it spicier, no oven"
+                    aria-label={`How should ${meal.name} change?`}
+                    value={refineText}
+                    onChange={(e) => setRefineText(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') void handleRefine(meal, refineText);
+                    }}
+                  />
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => {
+                        setRefining(null);
+                        setRefineText('');
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="primary"
+                      block
+                      disabled={!refineText.trim()}
+                      onClick={() => void handleRefine(meal, refineText)}
+                    >
+                      <Sparkles className="h-4 w-4" />
+                      Redo with that change
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRefining(i);
+                    setRefineText('');
+                  }}
+                  className="tap-target px-2 text-xs font-medium text-primary hover:underline"
+                >
+                  Like this, but change something…
+                </button>
+              )}
+            </div>
           ))}
           <Button
             type="button"
@@ -192,23 +292,52 @@ export function MealPlannerPage() {
               onChange={(e) => setPortions(parseInt(e.target.value, 10))}
             />
             <div />
-            <LabeledInput
-              label="Max kcal / portion"
-              type="number"
-              inputMode="numeric"
-              placeholder="optional"
-              value={kcalMax}
-              onChange={(e) => setKcalMax(e.target.value)}
-            />
-            <LabeledInput
-              label="Min protein / portion"
-              type="number"
-              inputMode="numeric"
-              placeholder="optional"
-              value={proteinMin}
-              onChange={(e) => setProteinMin(e.target.value)}
-              trailing="g"
-            />
+            <div className="space-y-1">
+              <LabeledInput
+                label="Max kcal / portion"
+                type="number"
+                inputMode="numeric"
+                placeholder="optional"
+                value={kcalMax}
+                onChange={(e) => setKcalMax(e.target.value)}
+              />
+              {/* Suggestions from the daily goal, not a prefill: a per-meal
+                  cap is not a daily one, and a 200 kcal snack is a real ask. */}
+              {kcalPresets.length > 0 && (
+                <div className="flex flex-wrap gap-1">
+                  {kcalPresets.map((p) => (
+                    <button
+                      key={p.label}
+                      type="button"
+                      onClick={() => setKcalMax(String(p.value))}
+                      className="rounded-full border border-border px-2 py-0.5 text-[10.5px] font-medium text-muted-foreground hover:bg-muted"
+                    >
+                      {p.label} {p.value}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="space-y-1">
+              <LabeledInput
+                label="Min protein / portion"
+                type="number"
+                inputMode="numeric"
+                placeholder="optional"
+                value={proteinMin}
+                onChange={(e) => setProteinMin(e.target.value)}
+                trailing="g"
+              />
+              {proteinPreset !== null && (
+                <button
+                  type="button"
+                  onClick={() => setProteinMin(String(proteinPreset))}
+                  className="rounded-full border border-border px-2 py-0.5 text-[10.5px] font-medium text-muted-foreground hover:bg-muted"
+                >
+                  A third of your day: {proteinPreset}g
+                </button>
+              )}
+            </div>
           </div>
 
           <div className="space-y-2">

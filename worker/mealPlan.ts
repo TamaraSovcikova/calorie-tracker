@@ -171,13 +171,82 @@ export async function handleMealPlan(req: Request, env: Env): Promise<Response> 
         `may add others.`
       : `I haven't picked ingredients — suggest varied meals for inspiration.`;
 
-  const userPrompt =
-    `${ingredientLine}\n${targetLines.join('\n')}\n\n` +
-    `Suggest exactly 5 distinct, realistic meal-prep recipes. For each: a ` +
-    `short name, a one-line description, an ingredient list (each with a ` +
-    `name and a gram amount for the whole batch — include staples like oil ` +
-    `and salt), and up to 8 short method steps. Do NOT include calories or ` +
-    `macros — only ingredient names and gram amounts.`;
+  // What the app knows about this cook. None of this used to be sent, so the
+  // planner was a stranger every single time - the main reason it lost to a
+  // chat that at least remembers the conversation.
+  const ctx = (body.context ?? {}) as Record<string, unknown>;
+  const strList = (v: unknown, n: number): string[] =>
+    Array.isArray(v)
+      ? (v as unknown[])
+          .filter((x): x is string => typeof x === 'string')
+          .map((x) => x.trim())
+          .filter(Boolean)
+          .slice(0, n)
+      : [];
+  const contextLines: string[] = [];
+  const dailyKcal = posNum(ctx.dailyKcal);
+  const dailyProtein = posNum(ctx.dailyProtein);
+  if (dailyKcal || dailyProtein) {
+    contextLines.push(
+      `For background, their whole-day targets are ` +
+        [
+          dailyKcal ? `${dailyKcal} kcal` : null,
+          dailyProtein ? `${dailyProtein} g protein` : null,
+        ]
+          .filter(Boolean)
+          .join(' and ') +
+        `. Treat that as context about the person, NOT as the target for ` +
+        `these meals - the per-portion limits above are what matter.`,
+    );
+  }
+  const freq = strList(ctx.frequentFoods, 15);
+  if (freq.length > 0) {
+    contextLines.push(
+      `They cook regularly with: ${freq.join(', ')}. Favour these where ` +
+        `they fit, but do not force them and do not use only these.`,
+    );
+  }
+  const saved = strList(ctx.savedMeals, 25);
+  if (saved.length > 0) {
+    contextLines.push(
+      `They already have these saved, so suggest something different: ` +
+        `${saved.join(', ')}.`,
+    );
+  }
+  const recent = strList(ctx.recentMeals, 10);
+  if (recent.length > 0) {
+    contextLines.push(
+      `They ate these in the last two weeks, so avoid repeating them: ` +
+        `${recent.join(', ')}.`,
+    );
+  }
+
+  // Refining ONE suggestion rather than rolling five new ones. Regenerating
+  // used to re-send the identical request, throwing away the meal they liked.
+  const refine = body.refine as
+    | { meal?: { name?: unknown; ingredients?: unknown }; instruction?: unknown }
+    | undefined;
+  const refineInstruction =
+    typeof refine?.instruction === 'string' ? refine.instruction.trim().slice(0, 300) : '';
+  const refineName =
+    typeof refine?.meal?.name === 'string' ? refine.meal.name.slice(0, 80) : '';
+
+  const userPrompt = refineInstruction && refineName
+    ? `${targetLines.join('\n')}\n` +
+      (contextLines.length ? `${contextLines.join('\n')}\n` : '') +
+      `\nHere is a recipe they liked:\n` +
+      `${JSON.stringify(refine?.meal).slice(0, 2000)}\n\n` +
+      `Change it as follows: ${refineInstruction}\n` +
+      `Return exactly 3 variations of THAT recipe with the change applied - ` +
+      `keep what made it good and change only what was asked. Same JSON ` +
+      `shape. Do NOT include calories or macros.`
+    : `${ingredientLine}\n${targetLines.join('\n')}\n` +
+      (contextLines.length ? `${contextLines.join('\n')}\n` : '') +
+      `\nSuggest exactly 5 distinct, realistic meal-prep recipes. For each: a ` +
+      `short name, a one-line description, an ingredient list (each with a ` +
+      `name and a gram amount for the whole batch — include staples like oil ` +
+      `and salt), and up to 8 short method steps. Do NOT include calories or ` +
+      `macros — only ingredient names and gram amounts.`;
 
   let parsed: unknown = null;
   try {
