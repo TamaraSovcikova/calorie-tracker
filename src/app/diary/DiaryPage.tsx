@@ -51,6 +51,8 @@ import {
   useWeeklyBudget,
 } from '@/features/weekly-budget/weeklyBudget';
 import { WeeklyDigestCard } from '@/features/digest/WeeklyDigestCard';
+import { dailyGoalFor, macroTargetsFor } from '@/features/diet-pause/dietPause';
+import { DietPauseBanner } from '@/features/diet-pause/DietPauseBanner';
 import { MEAL_SECTIONS, type DiaryEntry, type MealSection } from '@/db/types';
 
 export function DiaryPage() {
@@ -144,14 +146,26 @@ export function DiaryPage() {
     ? entries.filter((e) => e.kind === 'food' && e.food_id).length
     : 0;
 
-  const baseTarget = weekly ? weekly.adjustedTarget : (profile?.kcal_target ?? 2000);
+  // Without the budget on, the day's target is still date-dependent: a diet
+  // pause replaces the goal for the days it covers.
+  const baseTarget = weekly
+    ? weekly.adjustedTarget
+    : profile
+      ? dailyGoalFor(currentDate, profile)
+      : 2000;
   const effective = profile?.eat_back_burned ? baseTarget + burned : baseTarget;
   const remaining = Math.max(0, Math.round(effective - totals.kcal));
 
+  // Macro targets follow the day's goal: on a paused day protein holds and
+  // the extra calories land on carbs and fat, so the rows don't all read as
+  // wildly under while the target itself has moved up.
+  const macros = profile
+    ? macroTargetsFor(currentDate, profile)
+    : { protein_g: 0, carbs_g: 0, fat_g: 0 };
   const macroRows = [
-    { key: 'protein', label: 'PROTEIN', value: Math.round(totals.protein), target: profile?.protein_g ?? 0 },
-    { key: 'carbs',   label: 'CARBS',   value: Math.round(totals.carbs),   target: profile?.carbs_g ?? 0 },
-    { key: 'fat',     label: 'FAT',     value: Math.round(totals.fat),     target: profile?.fat_g ?? 0 },
+    { key: 'protein', label: 'PROTEIN', value: Math.round(totals.protein), target: macros.protein_g },
+    { key: 'carbs',   label: 'CARBS',   value: Math.round(totals.carbs),   target: macros.carbs_g },
+    { key: 'fat',     label: 'FAT',     value: Math.round(totals.fat),     target: macros.fat_g },
   ];
 
   return (
@@ -456,6 +470,9 @@ export function DiaryPage() {
             <span className="font-medium text-foreground">Create meal</span>.
             Meal and quick-add entries can't be used as ingredients.
           </div>
+        )}
+        {profile && !selectMode && (
+          <DietPauseBanner date={currentDate} profile={profile} />
         )}
         {isUntracked && !selectMode && (
           <div className="flex items-start gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">

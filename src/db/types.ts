@@ -135,6 +135,19 @@ export interface Profile {
    */
   untracked_dates?: string;
 
+  /**
+   * Diet pauses: dated windows where the daily goal is replaced by a higher
+   * one (a maintenance break off a cut). JSON array of
+   * `{ id, start, end?, kcal, note? }`, stored as a string so it round-trips
+   * through sync without any JSON transform (parsed via parseDietPauses).
+   *
+   * Kept as a history rather than one current window on purpose: the budget
+   * grades every past day against that day's goal, so a finished break has
+   * to stay on the record or the week it covered would later read as days of
+   * massive overeating.
+   */
+  diet_pauses?: string;
+
   /** User-created meal categories, as a JSON array of lowercase tokens.
    *  Stored as a string so it round-trips through sync without a JSON
    *  transform (parsed at use via parseCustomCategories). */

@@ -23,6 +23,12 @@
  *
  * The week runs 7 days from a configurable start day; the month is the
  * calendar month.
+ *
+ * Every "daily goal" here is resolved PER DATE through `dailyGoalsFor`, not
+ * read once off `kcal_target`. A diet pause replaces the goal for the days it
+ * covers, so a period that straddles the start of a maintenance break is
+ * budgeted part at the cut goal and part at the maintenance one, and a past
+ * break keeps being graded against the goal that was in force at the time.
  */
 
 import { addDays, differenceInCalendarDays, getDaysInMonth, startOfMonth } from 'date-fns';
@@ -36,6 +42,11 @@ import {
   todayLocal,
   type LocalDate,
 } from '@/lib/dates';
+import {
+  activePause,
+  dailyGoalsFor,
+  type DietPause,
+} from '@/features/diet-pause/dietPause';
 import type { Profile } from '@/db/types';
 
 export const WEEK_DAY_LABELS = [
@@ -188,7 +199,7 @@ export function parseUntrackedDates(raw: string | undefined): Set<string> {
 /**
  * Resolve each week-day's effective consumption for the budget maths.
  *
- * A day is treated as "on-target" (counted as exactly the daily goal,
+ * A day is treated as "on-target" (counted as exactly THAT day's goal,
  * neither a saving nor an overage) when:
  *  - it is a *past* day with nothing logged at all - a day simply forgotten,
  *    which would otherwise look like a full day of banked calories; or
@@ -196,13 +207,16 @@ export function parseUntrackedDates(raw: string | undefined): Set<string> {
  *    half-logged and don't want skewing the week).
  * Counting it as the goal is mathematically the same as dropping the day
  * from the budget. Every other day uses its real logged value.
+ *
+ * `goals` is per-date, so an un-logged day inside a maintenance break is
+ * neutralised at the maintenance goal, not the cut goal.
  */
 export function effectiveDailyKcal(
   dates: LocalDate[],
   kcal: number[],
   logged: boolean[],
   today: LocalDate,
-  dailyGoal: number,
+  goals: number[],
   untracked: Set<string>,
 ): { effective: number[]; missedCount: number } {
   let missedCount = 0;
@@ -210,7 +224,7 @@ export function effectiveDailyKcal(
     const neutral = untracked.has(d) || (d < today && !logged[i]);
     if (neutral) {
       missedCount += 1;
-      return dailyGoal;
+      return goals[i];
     }
     return kcal[i];
   });
@@ -226,9 +240,16 @@ export interface WeeklyBudget {
   dayIndex: number;
   /** Days left in the period, including `date`. */
   daysRemaining: number;
-  /** Base period budget = daily goal x days in the period. */
+  /** Base period budget = the sum of every day's own goal across the period.
+   *  Not `goal x days`: a diet pause can raise part of the period only. */
   weeklyBudget: number;
+  /** The goal in force on `date` itself - the maintenance figure while a
+   *  diet pause covers it, otherwise `kcal_target`. */
   dailyGoal: number;
+  /** The un-paused goal (`kcal_target`), for wording that contrasts the two. */
+  baseGoal: number;
+  /** The diet pause covering `date`, when there is one. */
+  pause: DietPause | null;
   /** Signed kcal actually fed into this period's target. 0 in 'warn' mode
    *  and whenever carry-over has no start date. */
   carryIn: number;
@@ -264,15 +285,20 @@ export interface WeeklyBudget {
 
 /**
  * Sum each period-date's effective consumption: real logged kcal, except
- * un-logged past days and explicitly-untracked days count as exactly the
- * daily goal (neutral). Returns the per-day effective array, the total, and
- * how many days were neutralised. Shared by the current + previous period.
+ * un-logged past days and explicitly-untracked days count as exactly that
+ * day's goal (neutral). Returns the per-day effective array, the per-day
+ * goals, the total, and how many days were neutralised.
  */
 async function fetchEffective(
   dates: LocalDate[],
   profile: Profile,
-  dailyGoal: number,
-): Promise<{ effective: number[]; total: number; missedCount: number }> {
+): Promise<{
+  effective: number[];
+  goals: number[];
+  total: number;
+  budget: number;
+  missedCount: number;
+}> {
   const uid = currentUserId();
   const rows = await db.diary_entries
     .where('[user_id+date]')
@@ -287,36 +313,42 @@ async function fetchEffective(
   }
   const kcal = dates.map((d) => byDate.get(d) ?? 0);
   const logged = dates.map((d) => loggedDates.has(d));
+  const goals = dailyGoalsFor(dates, profile);
   const { effective, missedCount } = effectiveDailyKcal(
     dates,
     kcal,
     logged,
     todayLocal(),
-    dailyGoal,
+    goals,
     parseUntrackedDates(profile.untracked_dates),
   );
   return {
     effective,
+    goals,
     total: effective.reduce((a, b) => a + b, 0),
+    budget: goals.reduce((a, b) => a + b, 0),
     missedCount,
   };
 }
 
 /**
- * Signed running balance across `[start, end]` inclusive: budget minus what
- * was effectively consumed. Positive = banked, negative = owed. Returns 0
- * for an empty or inverted range.
+ * Signed running balance across `[start, end]` inclusive: the sum of each
+ * day's own goal minus what was effectively consumed. Positive = banked,
+ * negative = owed. Returns 0 for an empty or inverted range.
+ *
+ * Summing per-day goals is what keeps a maintenance break from reading as a
+ * deficit blow-out: those days are measured against the maintenance figure
+ * that was in force, so eating to it leaves the balance exactly level.
  */
 export async function accumulatedBalance(
   start: LocalDate,
   end: LocalDate,
   profile: Profile,
-  dailyGoal: number,
 ): Promise<number> {
   const dates = datesBetween(start, end);
   if (dates.length === 0) return 0;
-  const { total } = await fetchEffective(dates, profile, dailyGoal);
-  return dailyGoal * dates.length - total;
+  const { total, budget } = await fetchEffective(dates, profile);
+  return budget - total;
 }
 
 /**
@@ -333,21 +365,24 @@ export async function computeWeeklyBudget(
   const mode = resolveBudgetMode(profile);
   if (!profile || mode === 'off') return null;
   const weekStartDay = profile.week_start_day ?? 1;
-  const dailyGoal = profile.kcal_target ?? 0;
+  const baseGoal = profile.kcal_target ?? 0;
   const period: BudgetPeriod = profile.budget_period ?? 'week';
   const dates = periodDatesFor(date, period, weekStartDay);
   const carryStart = profile.budget_carryover_start;
   const carryoverOn = !!carryStart;
 
-  const { effective, missedCount } = await fetchEffective(
+  const { effective, goals, budget, missedCount } = await fetchEffective(
     dates,
     profile,
-    dailyGoal,
   );
 
   const dayIndex = Math.max(0, dates.indexOf(date));
   const daysRemaining = dates.length - dayIndex;
-  const weeklyBudget = dailyGoal * dates.length;
+  // The period's budget is the sum of each day's own goal, so a break that
+  // starts mid-week raises only the days it actually covers.
+  const weeklyBudget = budget;
+  const dailyGoal = goals[dayIndex] ?? baseGoal;
+  const pause = activePause(date, profile);
   const consumedBeforeDay = effective
     .slice(0, dayIndex)
     .reduce((a, b) => a + b, 0);
@@ -364,7 +399,6 @@ export async function computeWeeklyBudget(
       carryStart,
       shiftDate(dates[0], -1),
       profile,
-      dailyGoal,
     );
     carryIn = clampCarry(raw, profile.budget_carryover_cap);
   }
@@ -377,7 +411,6 @@ export async function computeWeeklyBudget(
     balanceFrom,
     shiftDate(date, -1),
     profile,
-    dailyGoal,
   );
 
   let adjustedTarget = dailyGoal;
@@ -407,6 +440,8 @@ export async function computeWeeklyBudget(
     daysRemaining,
     weeklyBudget,
     dailyGoal,
+    baseGoal,
+    pause,
     carryIn,
     carryBalance,
     balanceFrom,

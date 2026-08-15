@@ -9,6 +9,7 @@ import {
   ZERO_TOTALS,
 } from '@/db/repos/diary';
 import { useWeeklyBudget } from '@/features/weekly-budget/weeklyBudget';
+import { dailyGoalFor } from '@/features/diet-pause/dietPause';
 import { fromLocalDate, todayLocal } from '@/lib/dates';
 import {
   dogPose,
@@ -61,8 +62,9 @@ export function useDogState(opts: DogStateOptions = {}): DogState {
   const lastLogged = useLastLoggedDate();
 
   const totals = entries ? sumTotals(entries) : ZERO_TOTALS;
-  // With the weekly budget on, the dog reads today's adjusted target.
-  const goalKcal = weekly?.adjustedTarget ?? profile?.kcal_target ?? 0;
+  // With the weekly budget on, the dog reads today's adjusted target;
+  // otherwise the goal in force today, which a diet pause can replace.
+  const goalKcal = weekly?.adjustedTarget ?? dailyGoalFor(todayLocal(), profile);
   const wellbeing = pet?.wellbeing ?? 70;
   const petName = pet?.name ?? 'Biscuit';
   const species = normalizeSpecies(pet?.breed);

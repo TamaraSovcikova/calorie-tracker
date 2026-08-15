@@ -35,6 +35,14 @@ export function WeeklyBudgetCard({ weekly }: { weekly: WeeklyBudget }) {
         />
       </div>
 
+      {weekly.pause && (
+        <p className="mt-2 text-xs font-medium text-primary">
+          Diet paused - this {periodWord}'s budget counts the paused days at{' '}
+          {formatKcal(weekly.pause.kcal)} kcal, not your {formatKcal(weekly.baseGoal)}{' '}
+          cut goal.
+        </p>
+      )}
+
       <p className="mt-2 text-xs text-muted-foreground">
         {warnOnly
           ? weekly.catchupApplied > 0

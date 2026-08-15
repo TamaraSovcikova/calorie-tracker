@@ -1,6 +1,7 @@
 import { PageHeader } from '@/components/PageHeader';
 import { useProfile } from '@/db/repos/profile';
 import { GoalsSection } from '@/features/settings/GoalsSection';
+import { DietPauseSection } from '@/features/settings/DietPauseSection';
 import { ProfileSection } from '@/features/settings/ProfileSection';
 import { FitbitSection } from '@/features/settings/FitbitSection';
 import { PreferencesSection } from '@/features/settings/PreferencesSection';
@@ -46,6 +47,7 @@ export function SettingsPage() {
           <>
             <Group label="Tracking">
               <GoalsSection profile={profile} />
+              <DietPauseSection profile={profile} />
             </Group>
 
             <Group label="Profile">

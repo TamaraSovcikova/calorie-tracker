@@ -12,6 +12,7 @@ import { currentUserId } from '@/db/userId';
 import { useProfile } from '@/db/repos/profile';
 import { fromLocalDate, shiftDate, todayLocal, type LocalDate } from '@/lib/dates';
 import { weekDates, weekStartFor } from '@/features/weekly-budget/weeklyBudget';
+import { goalResolver } from '@/features/diet-pause/dietPause';
 import type { Profile } from '@/db/types';
 
 const DIGEST_SEEN_KEY = 'calorie-tracker:digest-seen-week';
@@ -60,11 +61,15 @@ export async function computeWeeklyDigest(
   const daysLogged = loggedKcals.length;
   const avgKcal =
     daysLogged > 0 ? loggedKcals.reduce((a, b) => a + b, 0) / daysLogged : 0;
-  const daysOnTarget =
-    dailyGoal > 0
-      ? loggedKcals.filter((k) => Math.abs(k - dailyGoal) / dailyGoal <= 0.1)
-          .length
-      : 0;
+  // Each day is judged against its own goal - a diet pause raises it for the
+  // days it covers, and those days should read as on-target, not as blowouts.
+  const goalOn = goalResolver(profile);
+  const daysOnTarget = dates.filter((d) => {
+    const k = kcalByDate.get(d);
+    if (k === undefined) return false;
+    const goal = goalOn(d);
+    return goal > 0 && Math.abs(k - goal) / goal <= 0.1;
+  }).length;
 
   const exercise = await db.exercise_entries
     .where('[user_id+date]')

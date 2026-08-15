@@ -73,6 +73,8 @@ describe('effectiveDailyKcal', () => {
   const today = '2026-05-20';
 
   const none = new Set<string>();
+  /** Flat 2000 goal on every day - the no-pause case. */
+  const goals = dates.map(() => 2000);
 
   it('counts an un-logged past day as the daily goal', () => {
     const { effective, missedCount } = effectiveDailyKcal(
@@ -80,7 +82,7 @@ describe('effectiveDailyKcal', () => {
       [0, 1800, 0, 0, 0, 0, 0],
       [false, true, false, false, false, false, false],
       today,
-      2000,
+      goals,
       none,
     );
     expect(effective[0]).toBe(2000); // Mon - missed, neutralised
@@ -94,7 +96,7 @@ describe('effectiveDailyKcal', () => {
       [2000, 2000, 0, 0, 0, 0, 0],
       [true, true, false, false, false, false, false],
       today,
-      2000,
+      goals,
       none,
     );
     expect(effective[2]).toBe(0); // today, nothing logged yet
@@ -108,7 +110,7 @@ describe('effectiveDailyKcal', () => {
       [400, 0, 0, 0, 0, 0, 0],
       [true, false, false, false, false, false, false],
       today,
-      2000,
+      goals,
       none,
     );
     expect(effective[0]).toBe(400); // logged - a real low day, not erased
@@ -122,12 +124,28 @@ describe('effectiveDailyKcal', () => {
       [400, 2000, 0, 0, 0, 0, 0],
       [true, true, false, false, false, false, false],
       today,
-      2000,
+      goals,
       new Set(['2026-05-18']), // Mon marked untracked despite being logged
     );
     expect(effective[0]).toBe(2000); // overridden to on-target
     expect(effective[1]).toBe(2000); // Tue - logged, kept
     expect(missedCount).toBe(1);
+  });
+
+  it('neutralises a missed day at THAT day\'s goal, not a flat one', () => {
+    // A diet pause raises Tue-Sun to 2400. Monday (cut) and Tuesday (paused)
+    // are both un-logged past days, so each is neutralised at its own goal.
+    const paused = [2000, 2400, 2400, 2400, 2400, 2400, 2400];
+    const { effective } = effectiveDailyKcal(
+      dates,
+      [0, 0, 0, 0, 0, 0, 0],
+      [false, false, false, false, false, false, false],
+      '2026-05-20',
+      paused,
+      none,
+    );
+    expect(effective[0]).toBe(2000); // Mon - still on the cut goal
+    expect(effective[1]).toBe(2400); // Tue - neutralised at maintenance
   });
 });
 

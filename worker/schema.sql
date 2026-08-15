@@ -30,6 +30,11 @@ CREATE TABLE IF NOT EXISTS profiles (
   budget_max_daily_trim REAL,     -- kcal; NULL/0 = no limit on the daily trim
   budget_warn_catchup   REAL,     -- kcal/day taken off the target in 'warn' mode while over; NULL/0 = off
   untracked_dates       TEXT,     -- JSON array of YYYY-MM-DD; NULL = none
+  budget_period         TEXT,     -- 'week'|'month'; NULL = week
+  budget_carryover_enabled INTEGER, -- legacy on/off; superseded by budget_carryover_start
+  budget_carryover_cap  REAL,     -- kcal; NULL/0 = uncapped carry-over
+  diet_pauses           TEXT,     -- JSON [{id,start,end?,kcal,note?}]; NULL = none
+  custom_meal_categories TEXT,    -- JSON array of lowercase tokens; NULL = none
   units             TEXT    NOT NULL,
   theme             TEXT    NOT NULL,
   plan              TEXT    NOT NULL,
@@ -59,6 +64,11 @@ CREATE TABLE IF NOT EXISTS profiles (
 --     "ALTER TABLE profiles ADD COLUMN budget_max_daily_trim REAL"
 --   wrangler d1 execute <db> --remote --command \
 --     "ALTER TABLE profiles ADD COLUMN budget_warn_catchup REAL"
+--
+-- Diet pause (dated maintenance windows; the daily goal becomes a function
+-- of the date rather than a constant):
+--   wrangler d1 execute <db> --remote --command \
+--     "ALTER TABLE profiles ADD COLUMN diet_pauses TEXT"
 
 CREATE TABLE IF NOT EXISTS foods (
   id              TEXT PRIMARY KEY,

@@ -75,6 +75,7 @@ const COLUMNS: Record<TableName, string[]> = {
     'week_start_day',
     'weekly_budget_floor',
     'untracked_dates',
+    'diet_pauses',
     'custom_meal_categories',
     'units',
     'theme',
