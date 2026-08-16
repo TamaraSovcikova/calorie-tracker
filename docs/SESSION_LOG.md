@@ -6,12 +6,158 @@ How to use:
 - Start of session: read only the top entry, announce the chat number.
 - End of session: prepend a new entry, bump `Session count`.
 
-Session count: 9
-Last updated: 2026-08-14
+Session count: 10
+Last updated: 2026-08-16
 
 > **This file is the live log.** `Projects/calorie_tracker/docs/SESSION_LOG.md` in
 > the OneDrive vault is a stale copy that stopped at Chat #2 (2026-06-19); the
 > project CLAUDE.md used to point there. Fixed 2026-08-13. Append here.
+
+---
+
+## Chat #4h - 2026-08-16 (the daily goal became a function of the date: diet pause, target breakdown, calorie reservations; all deployed)
+
+One structural change underneath four features. Everything in the app that
+wanted "the calorie goal" used to read `profile.kcal_target`, a single
+number. It is now resolved per date, and that is what made the rest
+possible.
+
+### Round 1 - diet pause (`60ba797`)
+
+Prompt: pause the diet for a maintenance week, then resume the cut.
+
+- **The obvious implementation is wrong.** Editing `kcal_target` for a week
+  and putting it back would re-grade every past day against whichever number
+  happens to be stored. A finished maintenance week would later read as seven
+  days of massive overeating and swing the running balance by thousands.
+- So a pause is a **dated window carrying its own goal**, kept as a JSON list
+  on the profile (`diet_pauses`) so a finished break stays on the record.
+  `goalResolver(profile)` answers "the goal on day D".
+- `weeklyBudget` now sums per-day goals for the period budget and the
+  balance. A week straddling the start of a break is budgeted part at the cut
+  goal, part at maintenance. `effectiveDailyKcal` neutralises an un-logged
+  past day at THAT day's goal.
+- Macros follow: protein holds, the calorie difference goes on carbs and fat
+  in proportion to the energy they already carry, so a low-fat split stays a
+  low-fat split.
+- Maintenance is prefilled from the profile's own TDEE and stays editable.
+  Lengths are 3 days / 1 week / 2 weeks / open-ended.
+- D1: `ALTER TABLE profiles ADD COLUMN diet_pauses TEXT`, applied to remote
+  before deploying. `schema.sql` also picked up `budget_period`,
+  `budget_carryover_enabled`, `budget_carryover_cap` and
+  `custom_meal_categories`, which existed in `sync.ts` and in the live table
+  but had never been written into the canonical file.
+
+### Round 2 - "Why this number?" (`6cba636`)
+
+Four things can move a day's target and each explained itself somewhere
+different, or not at all. Tapping the "x of y" line on the arc now opens the
+ledger: base goal, then every step that moved it, then the total, each row
+saying what did it and tapping through to whatever set it.
+
+- **Deltas are derived from ROUNDED running values**, not rounded
+  individually. With a pause, a budget trim and eat-back all in play the
+  naive version drifts and the column visibly stops adding up, which is worse
+  than no breakdown. There is a test that walks the steps with fractional
+  inputs and asserts the on-screen arithmetic reconciles.
+- Steps that changed nothing are omitted rather than shown as `+0`; dropping
+  them cannot break the chain because their running value equals the one
+  before.
+
+### Round 3 - calorie reservations (`49dd54d`, `d840437`)
+
+Prompt: set calories aside for a birthday or a specific snack, and have the
+days around it re-plan. Designed in full first (`docs/CALORIE_BANKING.md`),
+then built in the order that doc sets out.
+
+- **The invariant: a reservation MOVES calories and never creates them.** Its
+  deltas sum to zero. That is what stops the budget undoing it. Lowering
+  Monday's *intake* reads as a surplus in `adjust` mode and comes straight
+  back on Tuesday; lowering Monday's *goal* produces no surplus at all.
+  Tested across every fund mode and request size.
+- **The funding window is derived, never stored:**
+  `windowStart = max(eventDate - spread, createdDate)`. Deriving it from the
+  creation date rather than from today is what keeps history still.
+  Recomputing against today would shrink the window as days passed and
+  retroactively zero the deltas of days already eaten to - the same trap the
+  pause avoids.
+- **The event day gets only what was actually funded.** If the window can
+  carry 4,200 of a 6,000 request, the day gets 4,200 and the shortfall is
+  stated with the three real options. Handing over the full ask is how this
+  would blow the period budget while appearing to work.
+- Allocation is water-filled: a day at its floor gives nothing and the others
+  carry its share. Floor is an explicit `budget_max_daily_trim` when set,
+  otherwise the stricter of 70% and a flat 1200 kcal.
+- Two reservations close together compound safely: planned soonest-event
+  first, each taking only the capacity left by the ones before it.
+- A **table**, not JSON on the profile, unlike pauses: several live at once,
+  edited from two devices, carries a `food_id`, and cancelling one should not
+  rewrite a blob holding the others. Dexie v6, D1 table + two indexes, both
+  sync column lists.
+- Step 3 closes the loop: pick the real food or saved meal from the library
+  at a real portion (reusing `FoodSearchPanel` / `QuantityStep` /
+  `LogMealStep`), then one tap to log it on the day and a report against the
+  RESERVATION rather than the day ("reserved 480, logged 512, 32 more than
+  reserved"). Offered only when the reservation names a real row - a bare
+  number cannot know which of the day's calories were the cake.
+- `useMealResolved` grew a hook-free `resolveMeal` for the logging path.
+
+### State
+
+- HEAD `675b2a0` on `main`, tree clean. **Ahead of `origin/main` by 6** - not
+  pushed, only commit + deploy were asked. Note `origin/main` sits at
+  `b956d17`, so #4g's three "unpushed" commits had in fact been pushed.
+- Deployed four times, ending at worker version `fa5ae0e4`, live 200.
+- 420 tests pass (up from 336), `tsc --noEmit` clean, `npm run build` clean.
+  `npm run lint` still reports the same 26 pre-existing errors in
+  `scripts/*.mjs` and `portionSuggestions.ts`. None in changed files.
+- D1 migrations applied to remote before their deploys: the `diet_pauses`
+  column, and the `reservations` table with its two indexes. The live
+  reservations column list was checked against the worker's `COLUMNS`, in
+  order.
+
+### Next
+
+1. **Device-test on the Pixel. None of this session has been seen by eye.**
+   The sequence that exercises the most: reserve a real food from the library
+   for a day next week, check the reason line on the days before it, then on
+   the day use the one-tap log and read the comparison line.
+2. Also unseen: the pause banner and Settings card, the breakdown sheet on a
+   plain day (it should say "Nothing moved it"), the shortfall path (ask for
+   6,000 kcal), and whether the new help icon on the arc collides with the
+   dog when it is dragged into the centre.
+3. Sync of the `reservations` table is unverified end to end - it needs a
+   sync code, so only the schema was checked.
+
+### Open
+
+- Carried from #4g and still unexplained: `beef mince` UNFLAGGED at `library`
+  tier while `grated cheddar` at the same tier WAS flagged.
+- Blank 0 kcal stubs (e.g. "Garlic") left by the pre-fix scanner, need
+  deleting by hand.
+- From `docs/CALORIE_BANKING.md`, deliberately unresolved: default spread is a
+  flat 7 days rather than the days left in the period; the funding floor is a
+  hard no with no confirm-to-override; overlapping windows compound safely but
+  with no warning when two events squeeze each other.
+- The budget's carry-over window and reservations: a funding day earlier than
+  `budget_carryover_start` would contribute its share to nothing while the
+  event day's credit still counts. The doc proposes clamping the window;
+  **not implemented**.
+- Still unverified from earlier chats: re-scan the stuffed-pepper recipe,
+  scan a nutrition label above 640px, the capture chooser and torch, the
+  near-black primary button, the rebuilt Progress page.
+- Not built, offered and not taken: persisted planner preferences in Settings.
+- Deferred: desktop/tablet layout, an onboarding cut/maintain/gain step,
+  syncing the alias store.
+
+### Skills/conventions
+
+- Commit messages go in a FILE, never a heredoc inside a single-quoted
+  `wsl.exe bash -lc '...'`. An apostrophe in the body ("day's") terminates the
+  outer quote and silently truncates the message. Cost one `--amend`.
+- npm/wrangler in WSL need `bash -lic` (login + interactive) so nvm is on the
+  PATH. With `-lc` the Windows node on `/Program Files` wins and `tsc`
+  resolves to a UNC path that does not exist.
 
 ---
 
