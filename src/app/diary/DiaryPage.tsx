@@ -53,6 +53,8 @@ import {
 import { WeeklyDigestCard } from '@/features/digest/WeeklyDigestCard';
 import { dailyGoalFor, macroTargetsFor } from '@/features/diet-pause/dietPause';
 import { DietPauseBanner } from '@/features/diet-pause/DietPauseBanner';
+import { explainTarget } from '@/features/diary/targetBreakdown';
+import { TargetBreakdownSheet } from '@/features/diary/TargetBreakdownSheet';
 import { MEAL_SECTIONS, type DiaryEntry, type MealSection } from '@/db/types';
 
 export function DiaryPage() {
@@ -75,6 +77,7 @@ export function DiaryPage() {
   const [selectMode, setSelectMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [menuOpen, setMenuOpen] = useState(false);
+  const [explainOpen, setExplainOpen] = useState(false);
   const dateInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -155,6 +158,12 @@ export function DiaryPage() {
       : 2000;
   const effective = profile?.eat_back_burned ? baseTarget + burned : baseTarget;
   const remaining = Math.max(0, Math.round(effective - totals.kcal));
+
+  // Computed for the arc's marker even while the sheet is shut - it is what
+  // tells the user there is something to ask about.
+  const targetBreakdown = profile
+    ? explainTarget({ date: currentDate, profile, weekly, burnedKcal: burned })
+    : null;
 
   // Macro targets follow the day's goal: on a paused day protein holds and
   // the extra calories land on carbs and fat, so the rows don't all read as
@@ -304,6 +313,8 @@ export function DiaryPage() {
               value={totals.kcal}
               max={effective}
               remaining={remaining}
+              onExplainTarget={() => setExplainOpen(true)}
+              targetAdjusted={targetBreakdown?.adjusted ?? false}
             />
             {dog.ready && (
               <DraggableDogArc pose={dog.pose} mood={dog.mood} species={dog.species} />
@@ -572,6 +583,16 @@ export function DiaryPage() {
         fromDate={currentDate}
         onClose={() => setCopyOpen(false)}
       />
+      {profile && (
+        <TargetBreakdownSheet
+          open={explainOpen}
+          onClose={() => setExplainOpen(false)}
+          date={currentDate}
+          profile={profile}
+          weekly={weekly}
+          burnedKcal={burned}
+        />
+      )}
     </>
   );
 }

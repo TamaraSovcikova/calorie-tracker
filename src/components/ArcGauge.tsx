@@ -1,9 +1,18 @@
+import { HelpCircle } from 'lucide-react';
+
 interface ArcGaugeProps {
   value: number;
   max: number;
   remaining: number;
   size?: number;
   strokeWidth?: number;
+  /** When set, the "x of y" line becomes the way to ask why the target is
+   *  what it is. The target is the number being questioned, so the question
+   *  gets asked on the number itself rather than from a button elsewhere. */
+  onExplainTarget?: () => void;
+  /** True when something moved the target off the plain daily goal, which
+   *  marks the line so the question suggests itself. */
+  targetAdjusted?: boolean;
 }
 
 export function ArcGauge({
@@ -12,6 +21,8 @@ export function ArcGauge({
   remaining,
   size = 236,
   strokeWidth = 5,
+  onExplainTarget,
+  targetAdjusted = false,
 }: ArcGaugeProps) {
   const r = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * r;
@@ -87,17 +98,48 @@ export function ArcGauge({
           >
             {isOver ? 'KCAL OVER' : 'KCAL LEFT'}
           </div>
-          <div
-            style={{
-              fontSize: 12,
-              fontWeight: 500,
-              color: 'var(--color-text-muted)',
-              marginTop: 6,
-              fontVariantNumeric: 'tabular-nums',
-            }}
-          >
-            {fmt(value)} of {fmt(max)}
-          </div>
+          {onExplainTarget ? (
+            <button
+              type="button"
+              onClick={onExplainTarget}
+              aria-label={`${fmt(value)} of ${fmt(max)} kcal. Why this number?`}
+              style={{
+                fontSize: 12,
+                fontWeight: 500,
+                color: targetAdjusted
+                  ? 'var(--color-accent-deep)'
+                  : 'var(--color-text-muted)',
+                marginTop: 6,
+                fontVariantNumeric: 'tabular-nums',
+                background: 'none',
+                border: 'none',
+                padding: '2px 6px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 4,
+              }}
+            >
+              {fmt(value)} of {fmt(max)}
+              <HelpCircle
+                size={11}
+                strokeWidth={2.2}
+                style={{ opacity: targetAdjusted ? 0.8 : 0.45, flexShrink: 0 }}
+              />
+            </button>
+          ) : (
+            <div
+              style={{
+                fontSize: 12,
+                fontWeight: 500,
+                color: 'var(--color-text-muted)',
+                marginTop: 6,
+                fontVariantNumeric: 'tabular-nums',
+              }}
+            >
+              {fmt(value)} of {fmt(max)}
+            </div>
+          )}
         </div>
       </div>
 
