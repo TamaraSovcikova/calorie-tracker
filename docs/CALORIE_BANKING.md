@@ -1,7 +1,25 @@
 # Calorie banking (reservations)
 
-Status: design, not built. Written 2026-08-15 (chat #4h), after the diet
-pause landed and made the daily goal a function of the date.
+Status: **built and deployed**, all three steps, chat #4h. Written as a design
+doc after the diet pause landed and made the daily goal a function of the
+date; kept as the record of why it is shaped this way.
+
+Unverified by eye: none of it has been used on a device yet.
+
+What shipped, against the order at the bottom of this file:
+
+1. `explainTarget` + `TargetBreakdownSheet` - tapping the "x of y" line on
+   the diary arc opens the ledger.
+2. `reservations.ts` (planning), `dailyGoal.ts` (composition), the
+   `reservations` table through Dexie v6 and D1, `/reserve`,
+   `ReservationDayNote`.
+3. `ReserveItemPicker` (library search at a real portion), `logReserved.ts`
+   (one-tap log on the day, and the report against the reservation).
+
+Still open from "Open questions" below: the default spread is a flat 7 days,
+not the days left in the period; the floor is a hard no with no confirm-to-
+override; overlapping funding windows compound safely (tested) but there is
+no warning when two events are close enough to squeeze each other.
 
 ## The ask
 
