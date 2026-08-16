@@ -512,7 +512,9 @@ export function DiaryPage() {
         {profile && !selectMode && (
           <DietPauseBanner date={currentDate} profile={profile} />
         )}
-        {!selectMode && <ReservationDayNote effect={reservationEffect} />}
+        {!selectMode && (
+          <ReservationDayNote effect={reservationEffect} date={currentDate} />
+        )}
         {isUntracked && !selectMode && (
           <div className="flex items-start gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
             <CalendarOff className="mt-0.5 h-3.5 w-3.5 shrink-0" />

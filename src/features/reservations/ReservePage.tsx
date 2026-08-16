@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
-import { CalendarPlus, ChevronLeft, Trash2 } from 'lucide-react';
+import { CalendarPlus, ChevronLeft, Search, Trash2, Utensils } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { LabeledInput } from '@/components/ui/Input';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
@@ -23,6 +23,8 @@ import {
   previewReservation,
   type FundMode,
 } from './reservations';
+import { ReserveItemPicker, type PickedItem } from './ReserveItemPicker';
+import { isLoggable } from './logReserved';
 import type { Reservation } from '@/db/types';
 
 /** Rough sizes for things people actually reserve for. Estimates, and said
@@ -47,6 +49,10 @@ function ReserveForm({ onDone }: { onDone: () => void }) {
   const [date, setDate] = useState<LocalDate>(shiftDate(today, 7));
   const [fundMode, setFundMode] = useState<FundMode>('before');
   const [spread, setSpread] = useState(7);
+  const [picking, setPicking] = useState(false);
+  // Set when the amount came from a real food or meal, so the reservation
+  // can be logged with one tap on the day instead of retyped.
+  const [picked, setPicked] = useState<PickedItem | null>(null);
 
   const kcalNum = parseFloat(kcal);
   const valid = Number.isFinite(kcalNum) && kcalNum > 0 && date >= today;
@@ -70,6 +76,16 @@ function ReserveForm({ onDone }: { onDone: () => void }) {
       label: label.trim() || 'Reserved calories',
       fund_mode: fundMode,
       spread_days: spread,
+      // Only carried when the amount still matches what was picked - editing
+      // the number by hand means it is no longer that portion of that food.
+      ...(picked && Math.round(picked.kcal) === Math.round(kcalNum)
+        ? {
+            food_id: picked.food_id,
+            meal_id: picked.meal_id,
+            qty: picked.qty,
+            unit: picked.unit,
+          }
+        : {}),
     });
     toast({ message: 'Reserved', variant: 'success' });
     onDone();
@@ -94,6 +110,27 @@ function ReserveForm({ onDone }: { onDone: () => void }) {
         onChange={(e) => setKcal(e.target.value)}
         trailing="kcal"
       />
+      {/* Picking the real thing beats guessing at it, and it is what lets
+          the day itself offer to log it. */}
+      <button
+        type="button"
+        onClick={() => setPicking(true)}
+        className="flex w-full items-center gap-2 rounded-lg border border-border px-3 py-2.5 text-left text-sm hover:bg-muted"
+      >
+        <Search className="h-4 w-4 shrink-0 text-muted-foreground" />
+        <span className="flex-1">Pick the actual food or meal</span>
+      </button>
+
+      {picked && Math.round(picked.kcal) === Math.round(kcalNum) && (
+        <div className="flex items-start gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-xs">
+          <Utensils className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary" />
+          <span className="text-muted-foreground">
+            <span className="font-medium text-foreground">{picked.label}</span> at{' '}
+            {formatKcal(picked.kcal)} kcal. On the day you can log it in one tap.
+          </span>
+        </div>
+      )}
+
       <div className="flex flex-wrap gap-1.5">
         {PRESETS.map(([name, n]) => (
           <button
@@ -101,6 +138,7 @@ function ReserveForm({ onDone }: { onDone: () => void }) {
             type="button"
             onClick={() => {
               setKcal(String(n));
+              setPicked(null);
               if (!label.trim()) setLabel(name);
             }}
             className="rounded-full border border-border px-2.5 py-1 text-xs font-medium text-muted-foreground hover:bg-muted"
@@ -110,8 +148,19 @@ function ReserveForm({ onDone }: { onDone: () => void }) {
         ))}
       </div>
       <p className="text-[11px] text-muted-foreground/70">
-        Those are rough estimates. Type the real number when you know it.
+        Those are rough estimates. Pick the real food above, or type the number
+        when you know it.
       </p>
+
+      <ReserveItemPicker
+        open={picking}
+        onClose={() => setPicking(false)}
+        onPick={(item) => {
+          setPicked(item);
+          setKcal(String(Math.round(item.kcal)));
+          if (!label.trim()) setLabel(item.label);
+        }}
+      />
 
       <LabeledInput
         label="Which day"
@@ -244,6 +293,12 @@ function ReservationRow({
             ? `${formatKcal(perDay)} kcal off each of ${days} day${days === 1 ? '' : 's'}${past ? ', done' : ''}.`
             : 'No days could fund this.'}
         </div>
+        {isLoggable(reservation) && (
+          <div className="mt-1 flex items-center gap-1 text-[11px] text-muted-foreground/70">
+            <Utensils className="h-3 w-3 shrink-0" />
+            One tap to log it on the day.
+          </div>
+        )}
       </div>
       <button
         type="button"
