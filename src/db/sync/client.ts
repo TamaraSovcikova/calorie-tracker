@@ -21,6 +21,7 @@ import type {
   MealItem,
   Pet,
   Profile,
+  Reservation,
   WeightEntry,
 } from '../types';
 import {
@@ -43,6 +44,7 @@ const TABLES = [
   'weight_log',
   'fitbit_tokens',
   'pet',
+  'reservations',
 ] as const;
 type TableName = (typeof TABLES)[number];
 
@@ -221,6 +223,9 @@ class SyncEngine {
     out.pet = (await db.pet.toArray()).filter(
       (r: Pet) => r.updated_at > since('pet'),
     );
+    out.reservations = (await db.reservations.toArray()).filter(
+      (r: Reservation) => r.updated_at > since('reservations'),
+    );
 
     return out;
   }
@@ -240,6 +245,7 @@ class SyncEngine {
         db.weight_log,
         db.fitbit_tokens,
         db.pet,
+        db.reservations,
       ],
       async () => {
         if (pull.profiles?.length) {
@@ -301,6 +307,13 @@ class SyncEngine {
         }
         if (pull.pet?.length) {
           await this.upsertWithLww(db.pet, pull.pet as Pet[], 'user_id');
+        }
+        if (pull.reservations?.length) {
+          await this.upsertWithLww(
+            db.reservations,
+            pull.reservations as Reservation[],
+            'id',
+          );
         }
       },
     );

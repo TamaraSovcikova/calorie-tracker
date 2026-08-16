@@ -10,6 +10,7 @@ import type {
   MealItem,
   Pet,
   Profile,
+  Reservation,
   WeightEntry,
 } from './types';
 
@@ -34,6 +35,7 @@ class CalorieDB extends Dexie {
   pet!: EntityTable<Pet, 'user_id'>;
   food_recents!: EntityTable<FoodRecent, 'id'>;
   ingredient_aliases!: EntityTable<IngredientAlias, 'id'>;
+  reservations!: EntityTable<Reservation, 'id'>;
 
   constructor() {
     super('calorie-tracker');
@@ -70,6 +72,12 @@ class CalorieDB extends Dexie {
     // so the app remembers what was picked instead.
     this.version(5).stores({
       ingredient_aliases: '&id, user_id, [user_id+phrase], food_id, updated_at',
+    });
+
+    // v6: calorie reservations - room set aside for one day, paid for by
+    // trimming the goal of the days around it. Additive.
+    this.version(6).stores({
+      reservations: '&id, user_id, date, [user_id+date], deleted_at, updated_at',
     });
   }
 }

@@ -13,6 +13,7 @@ import {
   ListChecks,
   Loader2,
   MoreVertical,
+  PiggyBank,
   TrendingDown,
   TrendingUp,
 } from 'lucide-react';
@@ -54,6 +55,10 @@ import { WeeklyDigestCard } from '@/features/digest/WeeklyDigestCard';
 import { dailyGoalFor, macroTargetsFor } from '@/features/diet-pause/dietPause';
 import { DietPauseBanner } from '@/features/diet-pause/DietPauseBanner';
 import { explainTarget } from '@/features/diary/targetBreakdown';
+import { useReservations } from '@/db/repos/reservations';
+import { useReservationSchedule } from '@/features/reservations/dailyGoal';
+import { dayEffect } from '@/features/reservations/reservations';
+import { ReservationDayNote } from '@/features/reservations/ReservationDayNote';
 import { TargetBreakdownSheet } from '@/features/diary/TargetBreakdownSheet';
 import { MEAL_SECTIONS, type DiaryEntry, type MealSection } from '@/db/types';
 
@@ -66,6 +71,8 @@ export function DiaryPage() {
   const entries = useDiaryDay(currentDate);
   const exercise = useExerciseDay(currentDate);
   const weekly = useWeeklyBudget(currentDate, profile);
+  const reservations = useReservations();
+  const schedule = useReservationSchedule(profile);
   const { syncFailed: fitbitSyncFailed } = useFitbitDailySync(currentDate);
 
   const greeting = useDailyGreeting();
@@ -154,7 +161,8 @@ export function DiaryPage() {
   const baseTarget = weekly
     ? weekly.adjustedTarget
     : profile
-      ? dailyGoalFor(currentDate, profile)
+      ? dailyGoalFor(currentDate, profile) +
+        (schedule.deltaByDate.get(currentDate) ?? 0)
       : 2000;
   const effective = profile?.eat_back_burned ? baseTarget + burned : baseTarget;
   const remaining = Math.max(0, Math.round(effective - totals.kcal));
@@ -162,8 +170,16 @@ export function DiaryPage() {
   // Computed for the arc's marker even while the sheet is shut - it is what
   // tells the user there is something to ask about.
   const targetBreakdown = profile
-    ? explainTarget({ date: currentDate, profile, weekly, burnedKcal: burned })
+    ? explainTarget({
+        date: currentDate,
+        profile,
+        weekly,
+        burnedKcal: burned,
+        reservations: reservations ?? [],
+        schedule,
+      })
     : null;
+  const reservationEffect = dayEffect(currentDate, reservations ?? [], schedule);
 
   // Macro targets follow the day's goal: on a paused day protein holds and
   // the extra calories land on carbs and fat, so the rows don't all read as
@@ -297,6 +313,17 @@ export function DiaryPage() {
                         {isUntracked ? 'Mark day as tracked' : 'Mark day as untracked'}
                       </button>
                     )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMenuOpen(false);
+                        navigate('/reserve');
+                      }}
+                      className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-sm hover:bg-muted"
+                    >
+                      <PiggyBank className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      Reserve calories
+                    </button>
                   </div>
                 </>
               )}
@@ -485,6 +512,7 @@ export function DiaryPage() {
         {profile && !selectMode && (
           <DietPauseBanner date={currentDate} profile={profile} />
         )}
+        {!selectMode && <ReservationDayNote effect={reservationEffect} />}
         {isUntracked && !selectMode && (
           <div className="flex items-start gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
             <CalendarOff className="mt-0.5 h-3.5 w-3.5 shrink-0" />
@@ -591,6 +619,8 @@ export function DiaryPage() {
           profile={profile}
           weekly={weekly}
           burnedKcal={burned}
+          reservations={reservations ?? []}
+          schedule={schedule}
         />
       )}
     </>

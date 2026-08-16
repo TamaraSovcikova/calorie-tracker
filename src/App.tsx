@@ -8,6 +8,7 @@ import { ProgressPage } from '@/app/progress/ProgressPage';
 import { SettingsPage } from '@/app/settings/SettingsPage';
 import { MealEditor } from '@/features/meals/MealEditor';
 import { MealPlannerPage } from '@/features/meal-planner/MealPlannerPage';
+import { ReservePage } from '@/features/reservations/ReservePage';
 import { FitbitCallback } from '@/app/auth/FitbitCallback';
 import { useThemeEffect } from '@/features/settings/useThemeEffect';
 import { OnboardingGate } from '@/features/onboarding/OnboardingWizard';
@@ -35,6 +36,7 @@ export default function App() {
           <Route path="/library" element={<LibraryPage />} />
           <Route path="/meals" element={<Navigate to="/library" replace />} />
           <Route path="/progress" element={<ProgressPage />} />
+          <Route path="/reserve" element={<ReservePage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="*" element={<Navigate to="/diary" replace />} />
         </Route>

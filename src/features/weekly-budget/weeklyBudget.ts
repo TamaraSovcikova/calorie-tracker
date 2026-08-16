@@ -24,11 +24,17 @@
  * The week runs 7 days from a configurable start day; the month is the
  * calendar month.
  *
- * Every "daily goal" here is resolved PER DATE through `dailyGoalsFor`, not
- * read once off `kcal_target`. A diet pause replaces the goal for the days it
- * covers, so a period that straddles the start of a maintenance break is
- * budgeted part at the cut goal and part at the maintenance one, and a past
- * break keeps being graded against the goal that was in force at the time.
+ * Every "daily goal" here is resolved PER DATE through `composedGoalsFor`,
+ * not read once off `kcal_target`. A diet pause replaces the goal for the
+ * days it covers, so a period that straddles the start of a maintenance
+ * break is budgeted part at the cut goal and part at the maintenance one,
+ * and a past break keeps being graded against the goal in force at the time.
+ *
+ * Reservations then move calories between days on top of that. Because their
+ * deltas sum to zero, a reservation entirely inside the period leaves the
+ * period budget untouched: the days that funded it gave up exactly what the
+ * event day received, so there is no surplus for `adjust` mode to find and
+ * hand back, which is what would otherwise undo the saving.
  */
 
 import { addDays, differenceInCalendarDays, getDaysInMonth, startOfMonth } from 'date-fns';
@@ -42,11 +48,9 @@ import {
   todayLocal,
   type LocalDate,
 } from '@/lib/dates';
-import {
-  activePause,
-  dailyGoalsFor,
-  type DietPause,
-} from '@/features/diet-pause/dietPause';
+import { activePause, type DietPause } from '@/features/diet-pause/dietPause';
+import { composedGoalsFor, loadSchedule } from '@/features/reservations/dailyGoal';
+import { EMPTY_SCHEDULE, type ReservationSchedule } from '@/features/reservations/reservations';
 import type { Profile } from '@/db/types';
 
 export const WEEK_DAY_LABELS = [
@@ -292,6 +296,7 @@ export interface WeeklyBudget {
 async function fetchEffective(
   dates: LocalDate[],
   profile: Profile,
+  schedule: ReservationSchedule,
 ): Promise<{
   effective: number[];
   goals: number[];
@@ -313,7 +318,7 @@ async function fetchEffective(
   }
   const kcal = dates.map((d) => byDate.get(d) ?? 0);
   const logged = dates.map((d) => loggedDates.has(d));
-  const goals = dailyGoalsFor(dates, profile);
+  const goals = composedGoalsFor(dates, profile, schedule);
   const { effective, missedCount } = effectiveDailyKcal(
     dates,
     kcal,
@@ -344,10 +349,11 @@ export async function accumulatedBalance(
   start: LocalDate,
   end: LocalDate,
   profile: Profile,
+  schedule: ReservationSchedule = EMPTY_SCHEDULE,
 ): Promise<number> {
   const dates = datesBetween(start, end);
   if (dates.length === 0) return 0;
-  const { total, budget } = await fetchEffective(dates, profile);
+  const { total, budget } = await fetchEffective(dates, profile, schedule);
   return budget - total;
 }
 
@@ -371,9 +377,13 @@ export async function computeWeeklyBudget(
   const carryStart = profile.budget_carryover_start;
   const carryoverOn = !!carryStart;
 
+  // Reservations move calories between days, so they are part of what each
+  // day's goal IS before the budget reacts to anything.
+  const schedule = await loadSchedule(profile);
   const { effective, goals, budget, missedCount } = await fetchEffective(
     dates,
     profile,
+    schedule,
   );
 
   const dayIndex = Math.max(0, dates.indexOf(date));
@@ -399,6 +409,7 @@ export async function computeWeeklyBudget(
       carryStart,
       shiftDate(dates[0], -1),
       profile,
+      schedule,
     );
     carryIn = clampCarry(raw, profile.budget_carryover_cap);
   }
@@ -411,6 +422,7 @@ export async function computeWeeklyBudget(
     balanceFrom,
     shiftDate(date, -1),
     profile,
+    schedule,
   );
 
   let adjustedTarget = dailyGoal;

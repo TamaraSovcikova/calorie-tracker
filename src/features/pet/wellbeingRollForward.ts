@@ -11,7 +11,10 @@ import { getPet, updatePet } from '@/db/repos/pet';
 import { getProfile } from '@/db/repos/profile';
 import { shiftDate, todayLocal, type LocalDate } from '@/lib/dates';
 import { computeWeeklyBudget } from '@/features/weekly-budget/weeklyBudget';
-import { goalResolver } from '@/features/diet-pause/dietPause';
+import {
+  composedGoalResolver,
+  loadSchedule,
+} from '@/features/reservations/dailyGoal';
 import { rollWellbeing, type DayOutcome } from './wellbeing';
 
 /** How that day went: logged at all, hit the goal, or went over. */
@@ -43,8 +46,9 @@ export async function runWellbeingRollForward(): Promise<void> {
 
   const outcomes: DayOutcome[] = [];
   // Judge each day against the goal that was in force on it, so a finished
-  // maintenance break isn't scored as a week of overeating.
-  const goalOn = goalResolver(profile);
+  // maintenance break isn't scored as a week of overeating and a day that
+  // was funding a reservation isn't scored against a target it never had.
+  const goalOn = composedGoalResolver(profile, await loadSchedule(profile));
   let cursor = shiftDate(pet.wellbeing_evaluated_date, 1);
   // Guard against a wildly stale evaluated_date producing an endless loop.
   for (let guard = 0; cursor <= yesterday && guard < 400; guard++) {

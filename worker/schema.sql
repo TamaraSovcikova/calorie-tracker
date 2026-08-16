@@ -70,6 +70,29 @@ CREATE TABLE IF NOT EXISTS profiles (
 --   wrangler d1 execute <db> --remote --command \
 --     "ALTER TABLE profiles ADD COLUMN diet_pauses TEXT"
 
+-- Calorie reservations: room set aside for one day, funded by trimming the
+-- goal of the days around it. The funding window is derived at read time
+-- from date + fund_mode + spread_days + created_date, never stored.
+CREATE TABLE IF NOT EXISTS reservations (
+  id            TEXT PRIMARY KEY,
+  user_id       TEXT NOT NULL,
+  date          TEXT NOT NULL,  -- the day being funded, YYYY-MM-DD
+  kcal          REAL NOT NULL,
+  label         TEXT NOT NULL,
+  fund_mode     TEXT NOT NULL,  -- 'before' | 'after' | 'split'
+  spread_days   INTEGER NOT NULL,
+  created_date  TEXT NOT NULL,  -- local date; earliest day it may fund from
+  food_id       TEXT,
+  meal_id       TEXT,
+  qty           REAL,
+  unit          TEXT,
+  created_at    TEXT NOT NULL,
+  updated_at    TEXT NOT NULL,
+  deleted_at    TEXT
+);
+CREATE INDEX IF NOT EXISTS reservations_updated_at ON reservations (updated_at);
+CREATE INDEX IF NOT EXISTS reservations_user_date ON reservations (user_id, date);
+
 CREATE TABLE IF NOT EXISTS foods (
   id              TEXT PRIMARY KEY,
   user_id         TEXT NOT NULL,

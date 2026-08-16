@@ -161,6 +161,48 @@ export interface Profile {
   updated_at: ISOTimestamp;
 }
 
+/**
+ * A calorie reservation: extra room set aside for one day, paid for by
+ * trimming the goal of the days around it.
+ *
+ * A row rather than JSON on the profile, unlike diet pauses: several can be
+ * live at once, they are edited from more than one device, they can point at
+ * a food, and cancelling one should not rewrite a blob holding the others.
+ *
+ * The funding window is DERIVED from `date`, `fund_mode`, `spread_days` and
+ * `created_date`, never stored. See `fundingDates` for why deriving it from
+ * the creation date rather than from today is what keeps history still.
+ */
+export interface Reservation {
+  id: ID;
+  user_id: ID;
+  /** The day being funded. */
+  date: LocalDate;
+  /** kcal set aside for it. */
+  kcal: number;
+  label: string;
+  /** Which side of the event pays: before it, after it, or both. */
+  fund_mode: 'before' | 'after' | 'split';
+  /** How many days wide the funding window is. */
+  spread_days: number;
+  /**
+   * The local date this was created on, and so the earliest day it may fund
+   * from. Stored explicitly rather than sliced off `created_at`, which is
+   * UTC and lands on the wrong day either side of midnight.
+   */
+  created_date: LocalDate;
+
+  /** Set when the reservation came from the library rather than a number. */
+  food_id?: ID;
+  meal_id?: ID;
+  qty?: number;
+  unit?: QuantityUnit;
+
+  created_at: ISOTimestamp;
+  updated_at: ISOTimestamp;
+  deleted_at?: ISOTimestamp;
+}
+
 export interface Food {
   id: ID;
   user_id: ID;

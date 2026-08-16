@@ -3,9 +3,13 @@ import { ChevronRight } from 'lucide-react';
 import { Sheet } from '@/components/ui/Sheet';
 import { formatKcal } from '@/lib/macros';
 import { explainTarget, type TargetStep } from './targetBreakdown';
+import {
+  EMPTY_SCHEDULE,
+  type ReservationSchedule,
+} from '@/features/reservations/reservations';
 import type { WeeklyBudget } from '@/features/weekly-budget/weeklyBudget';
 import type { LocalDate } from '@/lib/dates';
-import type { Profile } from '@/db/types';
+import type { Profile, Reservation } from '@/db/types';
 
 /** One line of the ledger. The base row has no delta and no arrow. */
 function StepRow({ step, onGo }: { step: TargetStep; onGo: () => void }) {
@@ -66,6 +70,8 @@ export function TargetBreakdownSheet({
   profile,
   weekly,
   burnedKcal,
+  reservations = [],
+  schedule = EMPTY_SCHEDULE,
 }: {
   open: boolean;
   onClose: () => void;
@@ -73,9 +79,18 @@ export function TargetBreakdownSheet({
   profile: Profile;
   weekly: WeeklyBudget | null;
   burnedKcal: number;
+  reservations?: Reservation[];
+  schedule?: ReservationSchedule;
 }) {
   const navigate = useNavigate();
-  const breakdown = explainTarget({ date, profile, weekly, burnedKcal });
+  const breakdown = explainTarget({
+    date,
+    profile,
+    weekly,
+    burnedKcal,
+    reservations,
+    schedule,
+  });
 
   const go = (href: string) => {
     onClose();

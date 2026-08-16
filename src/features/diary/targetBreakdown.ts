@@ -18,10 +18,21 @@
 import { formatKcal } from '@/lib/macros';
 import { isToday, type LocalDate } from '@/lib/dates';
 import { activePause, daysLeftInPause } from '@/features/diet-pause/dietPause';
+import {
+  dayEffect,
+  EMPTY_SCHEDULE,
+  type DayReservationEffect,
+  type ReservationSchedule,
+} from '@/features/reservations/reservations';
 import type { WeeklyBudget } from '@/features/weekly-budget/weeklyBudget';
-import type { Profile } from '@/db/types';
+import type { Profile, Reservation } from '@/db/types';
 
-export type TargetStepKey = 'base' | 'pause' | 'budget' | 'eatback';
+export type TargetStepKey =
+  | 'base'
+  | 'pause'
+  | 'reservation'
+  | 'budget'
+  | 'eatback';
 
 export interface TargetStep {
   key: TargetStepKey;
@@ -52,6 +63,9 @@ export interface ExplainInput {
   /** Null when the calorie budget is off. */
   weekly: WeeklyBudget | null;
   burnedKcal: number;
+  /** Live reservations and their plan. Omit when there are none. */
+  reservations?: Reservation[];
+  schedule?: ReservationSchedule;
 }
 
 /** A step before its delta and rounded running value are worked out. */
@@ -88,6 +102,35 @@ function pauseDetail(
 }
 
 /**
+ * How the reservation row describes itself. The name of the thing being
+ * saved for is the whole point: a lower target with nothing attached to it
+ * is exactly the confusion this feature exists to remove.
+ */
+function reservationDetail(effect: DayReservationEffect): string {
+  if (effect.hosting && effect.event > 0) {
+    const { plan, reservation } = effect.hosting;
+    const days = plan.days.length;
+    const saved =
+      days > 0
+        ? `Set aside for ${reservation.label} over ${days} day${days === 1 ? '' : 's'}.`
+        : `Set aside for ${reservation.label}.`;
+    const short =
+      plan.shortfall >= 1
+        ? ` You asked for ${formatKcal(plan.requested)}, and this is what those days could carry.`
+        : '';
+    return saved + short;
+  }
+  const names = effect.fundingFor.map((f) => f.reservation.label);
+  const towards =
+    names.length === 0
+      ? ''
+      : names.length === 1
+        ? ` for ${names[0]}`
+        : ` for ${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+  return `Put by${towards}. Today is measured against the lower number, so eating to it is on target rather than under.`;
+}
+
+/**
  * Assemble the steps that produced `date`'s target. Steps that change
  * nothing are left out entirely - a row reading "+0" is noise, and dropping
  * it cannot break the chain because its running value equals the one before.
@@ -97,6 +140,8 @@ export function explainTarget({
   profile,
   weekly,
   burnedKcal,
+  reservations = [],
+  schedule = EMPTY_SCHEDULE,
 }: ExplainInput): TargetBreakdown {
   const base = profile.kcal_target ?? 0;
   const pause = activePause(date, profile);
@@ -123,9 +168,24 @@ export function explainTarget({
     });
   }
 
+  // Reservations, before the budget: they are a plan made in advance, while
+  // the budget is a reaction to days already logged.
+  const effect = dayEffect(date, reservations, schedule);
+  if (Math.abs(effect.net) >= 0.5) {
+    const goalSoFar = stages[stages.length - 1].value;
+    stages.push({
+      key: 'reservation',
+      label: effect.event > 0 ? 'Reserved for today' : 'Saving up',
+      detail: reservationDetail(effect),
+      href: '/reserve',
+      value: goalSoFar + effect.net,
+    });
+  }
+
   if (weekly) {
     // `adjustedTarget` already sits on top of the day's own goal, which the
-    // pause step has just applied - so this row is the budget's own effect.
+    // pause and reservation steps have applied - this row is the budget's
+    // own effect on top of them.
     stages.push({
       key: 'budget',
       label: weekly.periodLabel === 'month' ? 'Monthly budget' : 'Weekly budget',
