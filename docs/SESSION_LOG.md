@@ -7,7 +7,7 @@ How to use:
 - End of session: prepend a new entry, bump `Session count`.
 
 Session count: 10
-Last updated: 2026-08-16
+Last updated: 2026-09-10
 
 > **This file is the live log.** `Projects/calorie_tracker/docs/SESSION_LOG.md` in
 > the OneDrive vault is a stale copy that stopped at Chat #2 (2026-06-19); the
@@ -15,7 +15,7 @@ Last updated: 2026-08-16
 
 ---
 
-## Chat #4h - 2026-08-16 (the daily goal became a function of the date: diet pause, target breakdown, calorie reservations; all deployed)
+## Chat #4h - 2026-09-10 (the daily goal became a function of the date: diet pause, target breakdown, calorie reservations; all deployed)
 
 One structural change underneath four features. Everything in the app that
 wanted "the calorie goal" used to read `profile.kcal_target`, a single
@@ -104,10 +104,11 @@ then built in the order that doc sets out.
 
 ### State
 
-- HEAD `675b2a0` on `main`, tree clean. **Ahead of `origin/main` by 6** - not
-  pushed, only commit + deploy were asked. Note `origin/main` sits at
-  `b956d17`, so #4g's three "unpushed" commits had in fact been pushed.
-- Deployed four times, ending at worker version `fa5ae0e4`, live 200.
+- `main`, tree clean, **pushed**. Last code commit `d840437`; the commits
+  after it are docs only, so the code tip is stable at that SHA.
+- Deployed five times, ending at worker version `82748921`, live 200. That
+  last deploy carried no code change; `fa5ae0e4` at `d840437` was the last one
+  that did, so the two are the same bundle.
 - 420 tests pass (up from 336), `tsc --noEmit` clean, `npm run build` clean.
   `npm run lint` still reports the same 26 pre-existing errors in
   `scripts/*.mjs` and `portionSuggestions.ts`. None in changed files.
@@ -158,6 +159,35 @@ then built in the order that doc sets out.
 - npm/wrangler in WSL need `bash -lic` (login + interactive) so nvm is on the
   PATH. With `-lc` the Windows node on `/Program Files` wins and `tsc`
   resolves to a UNC path that does not exist.
+- The WSL login banner's "System information as of ..." line is generated at
+  login and goes stale on a long-running instance. It said Aug 16 on a machine
+  where both clocks read Sep 10, and this entry was misdated from it before
+  being corrected. Use `date`, never the banner.
+
+### How this session worked
+
+The rhythm that produced the above, worth repeating:
+
+1. **Design in a doc before building**, for anything with a shape worth
+   arguing about. `docs/CALORIE_BANKING.md` was written first and then built in
+   the order it set out; every non-obvious decision in the code traces to a
+   paragraph there. The doc is kept as the record of WHY, not as a plan to
+   tick off.
+2. **Find the version that is wrong before writing the one that is right.**
+   Both features here had an obvious implementation that quietly corrupts
+   history (edit `kcal_target` and put it back; recompute a funding window
+   from today). Naming that failure first is what produced the dated-window
+   design in both cases.
+3. **Pure maths in its own module, tested; React on top.** `dietPause.ts`,
+   `reservations.ts`, `targetBreakdown.ts` are all hook-free and carry the
+   tests. Components stayed thin enough not to need any.
+4. **When a test fails, check the test's premise before the code's.** Three
+   failures this session were all bad fixtures, not bugs: macros that did not
+   sum to the target, a floor that was not actually reached.
+5. Ship loop each time: typecheck, test, build, lint (confirm the 26
+   pre-existing errors are unchanged, none in changed files), **D1 migration
+   applied to remote FIRST**, then deploy, then curl for 200, then commit.
+6. Commit and deploy freely; **push only when asked**.
 
 ---
 

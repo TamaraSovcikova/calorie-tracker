@@ -1,7 +1,7 @@
 # calorie-tracker
 
 **Status:** Live, deployed, multi-user. Head `675b2a0`, worker version
-`fa5ae0e4`. 420 tests passing. (Updated 2026-08-16, chat #4h. This line goes
+`fa5ae0e4`. 420 tests passing. (Updated 2026-09-10, chat #4h. This line goes
 stale fast: `docs/SESSION_LOG.md` top entry is the authority.)
 
 Personal calorie + nutrition tracking PWA (Tamara + sister + ~3 friends). Local-first via Dexie/IndexedDB, sync via Cloudflare Worker + D1, per-user isolation via private sync codes. Live at https://calorie-tracker.tamara-sovcik.workers.dev.
@@ -85,7 +85,7 @@ npx wrangler d1 execute calorie-tracker --remote --command "ALTER TABLE foods AD
 5. GitHub remote: `TamaraSovcikova/calorie-tracker`.
 6. Push only when asked.
 
-## Current state (2026-08-16)
+## Current state (2026-09-10)
 
 All features live. See `docs/EVOLUTION.md` for the full story, and the top of
 `docs/SESSION_LOG.md` for what is actually current.
