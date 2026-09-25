@@ -394,8 +394,8 @@ export interface WeightEntry {
  * available on every device.
  *
  * Plaintext at rest. Security model = the same as everything else here:
- * the only line of defence is the bearer SYNC_TOKEN you set on the worker
- * + private Cloudflare account.
+ * the only line of defence is the private per-user sync code (the bearer
+ * token every request carries) plus your private Cloudflare account.
  */
 /**
  * The virtual pet - one row per user. `wellbeing` is the long-arc 0-100
