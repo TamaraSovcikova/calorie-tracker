@@ -33,3 +33,6 @@ pnpm-debug.log*
 
 # pwa
 dev-dist
+
+# publish-readiness scan report (local only, not for publishing)
+PUBLISH_READINESS.md
