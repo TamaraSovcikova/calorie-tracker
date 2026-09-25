@@ -4,6 +4,14 @@ Personal calorie & nutrition tracking PWA. Mobile-first, installable to phone ho
 
 **Live demo:** https://calorie-tracker.tamara-sovcik.workers.dev - opens to a fresh, empty install. The app is local-first, so no personal data is shared; add data locally to try it, or connect a private sync code to test sync.
 
+## Screenshots
+
+| Today | Pet | Progress | Add food |
+|---|---|---|---|
+| <img src="docs/screenshots/1-diary.png" width="200" alt="Diary: calorie ring, pet and macros"> | <img src="docs/screenshots/2-pet.png" width="200" alt="Pet playground with species picker and wellbeing"> | <img src="docs/screenshots/3-progress.png" width="200" alt="Progress: 7-day calorie chart and weight log"> | <img src="docs/screenshots/4-add-food.png" width="200" alt="Add food: search, scan, meals and quick-add"> |
+
+_Sample data; the app ships empty._
+
 ## Stack
 
 - Vite + React 18 + TypeScript (strict)
