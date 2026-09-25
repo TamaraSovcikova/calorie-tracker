@@ -703,7 +703,7 @@ which had never been written down). Then built every task in it.
 - State: DEPLOYED to https://calorie-tracker.tamara-sovcik.workers.dev (Version 5c5d40ce). COMMITTED + PUSHED: `main` at `3169a9d`, clean tree, 0 unpushed. `npm run build` clean, worker typecheck clean, 184/184 tests pass.
 - Next: live device QA (see Open); then next feature.
 - Open:
-  - Rotate the Gemini API key pasted in chat (transcript exposure); delete "API key 2" once pets confirmed. Key config: Vertex "Agent Platform (Vertex)" API on the key, billing on GCP project `obsidian-voice-501509`.
+  - Rotate the Gemini API key pasted in chat (transcript exposure); delete "API key 2" once pets confirmed. Key config: Vertex "Agent Platform (Vertex)" API on the key, billing on GCP project `<redacted>`.
   - Not verified in-browser (dev server in WSL, session cwd on Windows OneDrive - preview bridge unreliable). Device-test: swipe-copy, meal-draft restore, `/quick-add` shortcut, pet switching, community foods.
   - Community foods search/contribute only active when a sync code is set in Settings AND the toggle is on.
 - Skills/conventions: none new.
