@@ -39,7 +39,7 @@ The foundations are good. Nothing below proposes replacing them.
 
 ---
 
-## 1. Information architecture — 5/10
+## 1. Information architecture - 5/10
 
 | # | Sev | Finding |
 |---|-----|---------|
@@ -54,7 +54,7 @@ stays off-nav, reachable from the diary caption.
 
 ---
 
-## 2. Interaction state coverage — 6/10
+## 2. Interaction state coverage - 6/10
 
 Loading and error coverage is genuinely good: day-loading spinner, barcode
 lookup step, typed errors on label and photo scan, `ErrorBoundary`, offline
@@ -74,7 +74,7 @@ One shared helper, four call sites. Discoverable and honest.
 
 ---
 
-## 3. User journey & emotional arc — 6/10
+## 3. User journey & emotional arc - 6/10
 
 The emotional layer is unusually strong for a tracker: mascot with wellbeing
 state and daily greetings, rotating food facts, weekly digest, streaks.
@@ -83,7 +83,7 @@ quantities and recents at 5 minutes, weight trend and digest long-term).
 
 | # | Sev | Finding |
 |---|-----|---------|
-| 3.1 | **P2** | `ArcGauge` paints the over state with `hsl(var(--destructive))` — the same token as "delete this entry" and "cloud sync failed". Eating 180 over, losing sync, and destroying data speak in one colour. This matters more since Warn mode shipped: its entire premise is that days read as over without the app trimming anything, deliberately, as information. The diary can currently show an amber "1,240 kcal over" pill directly above a red arc saying the same thing in error language. |
+| 3.1 | **P2** | `ArcGauge` paints the over state with `hsl(var(--destructive))` - the same token as "delete this entry" and "cloud sync failed". Eating 180 over, losing sync, and destroying data speak in one colour. This matters more since Warn mode shipped: its entire premise is that days read as over without the app trimming anything, deliberately, as information. The diary can currently show an amber "1,240 kcal over" pill directly above a red arc saying the same thing in error language. |
 | 3.2 | P3 | No goal-hit moment. Hitting the calorie or primary-macro target passes unmarked. Raised as `UX_AUDIT.md` §5.6, never built. |
 | 3.3 | P3 | No first-log acknowledgement. |
 
@@ -93,7 +93,7 @@ goes back to meaning destructive.
 
 ---
 
-## 4. AI slop risk — 8/10
+## 4. AI slop risk - 8/10
 
 Classified **APP UI**; App UI rules applied.
 
@@ -111,7 +111,7 @@ No change needed.
 
 ---
 
-## 5. Design system alignment — 4/10
+## 5. Design system alignment - 4/10
 
 The colour layer is properly built. Nothing above colour got the same
 treatment, because none of it is written down.
@@ -122,7 +122,7 @@ treatment, because none of it is written down.
 | 5.2 | **P2** | No type or space scale. `letterSpacing: '0.18em'` is hand-written at `LibraryPage.tsx:27` and `DiaryPage.tsx:191`; `fontSize: 26` at `LibraryPage.tsx:36` and `DiaryPage.tsx:200`. Identical values, two files, no shared source. |
 | 5.3 | P2 | Two header systems: `PageHeader` on Progress and Settings, hand-rolled on Diary and Library. |
 | 5.4 | **P2** | No `DESIGN.md`. This is the root cause of 5.1-5.3: nothing tells a new session that `ui/Tabs` already exists. |
-| 5.5 | **P2** | `tailwind.config.ts` set `fontFamily.sans` to `system-ui, -apple-system, …` with Hanken Grotesk absent, so anything using Tailwind's `font-sans` utility silently fell back to system UI while the rest of the app rendered in the real typeface. **Fixed 2026-08-13** — the stack now leads with Hanken Grotesk. |
+| 5.5 | **P2** | `tailwind.config.ts` set `fontFamily.sans` to `system-ui, -apple-system, …` with Hanken Grotesk absent, so anything using Tailwind's `font-sans` utility silently fell back to system UI while the rest of the app rendered in the real typeface. **Fixed 2026-08-13** - the stack now leads with Hanken Grotesk. |
 
 **Ruling:** add type and space scales to the token layer, fold the hand-rolled
 headers into `PageHeader`, collapse the three segmented controls into one
@@ -130,11 +130,11 @@ component, then document all of it in `DESIGN.md`.
 
 ---
 
-## 6. Responsive & accessibility — 3/10
+## 6. Responsive & accessibility - 3/10
 
 The weakest dimension. These findings are arithmetic, not opinion.
 
-### 6.1 Contrast — P1
+### 6.1 Contrast - P1
 
 | Token | Colour | On | Measured | Needs |
 |---|---|---|---|---|
@@ -155,19 +155,19 @@ opened in a supermarket.
 landing muted around `#6F6D66`. A starting point, not a prescription: it needs
 a real look, and it will make the app less airy. That tradeoff is genuine.
 
-### 6.2 Accessible names — P1
+### 6.2 Accessible names - P1
 
 Nav links render a bare lucide SVG with no text and no `aria-label`, so a
 screen reader announces the href. Four unnamed links. Same root cause as 1.2:
 rendering `label` fixes the visual and the accessible name together.
 
-### 6.3 Touch targets — P2
+### 6.3 Touch targets - P2
 
 `.tap-target` exists and is widely applied, but the "Jump to today" pill, the
 balance pill, "View all" in the weight log and "Edit this meal's ingredients"
 are all roughly 22-28px tall.
 
-### 6.4 Above phone width — P3
+### 6.4 Above phone width - P3
 
 Everything is `max-w-md` centred; a tablet or desktop gets a phone column on
 empty canvas. Defensible for a personal PWA, but currently a decision by
@@ -201,14 +201,14 @@ themes. **"Background" means any surface text sits on, not just the page.**
 
 | Decision | Status |
 |---|---|
-| Where the budget breakdown lives | **Resolved** — Progress, with the page rebuilt |
-| AI features with no sync code | **Resolved** — check first, explain in place |
-| What "over target" looks like | **Resolved** — dedicated amber token |
+| Where the budget breakdown lives | **Resolved** - Progress, with the page rebuilt |
+| AI features with no sync code | **Resolved** - check first, explain in place |
+| What "over target" looks like | **Resolved** - dedicated amber token |
 | Swipe-to-copy affordance | **Scheduled** (T13) |
 | Nutrition range toggle | **Scheduled** (T12, folds into the Progress rebuild) |
 | Goal-hit moment | **Scheduled** (T14) |
-| Onboarding goal direction (cut/maintain/bulk) | **Deferred** — real product scope, not design debt |
-| Layout above phone width | **Deferred** — P3, note only |
+| Onboarding goal direction (cut/maintain/bulk) | **Deferred** - real product scope, not design debt |
+| Layout above phone width | **Deferred** - P3, note only |
 
 ---
 
@@ -231,13 +231,13 @@ Considered and deliberately excluded from this review:
 
 Each derives from a finding above. P1 blocks ship, P2 same branch, P3 follow-up.
 
-### P1 — done and deployed 2026-08-13 (commit `f132d99`)
+### P1 - done and deployed 2026-08-13 (commit `f132d99`)
 
-- [x] **T1** — `components/Layout.tsx` — nav `label` now renders under each
+- [x] **T1** - `components/Layout.tsx` - nav `label` now renders under each
       icon, and each `NavLink` carries `aria-label`; icons are `aria-hidden`
       so the name is not announced twice. Nav item is a `.tap-target`.
-  - Surfaced by: 1.2 + 6.2 — `label` declared and dropped; screen readers got the href
-- [x] **T2** — `src/index.css` — retuned in both themes:
+  - Surfaced by: 1.2 + 6.2 - `label` declared and dropped; screen readers got the href
+- [x] **T2** - `src/index.css` - retuned in both themes:
       light `--color-text-muted` `#989690` → `#605D55` (2.66:1 → 5.92:1),
       `--color-text-faint` `#B4B2AC` → `#6F6C63` (1.91:1 → 4.73:1),
       `--muted-foreground` `45 6% 47%` → `45 8% 38%` (3.79:1 → 5.26:1);
@@ -246,70 +246,70 @@ Each derives from a finding above. P1 blocks ship, P2 same branch, P3 follow-up.
   - **Still needs your eye.** The maths passes; whether it still feels like
     Stone & Amber is a judgement only you can make. Faint and muted now sit
     closer together, so tertiary/secondary hierarchy leans on weight and size.
-- [x] **T3** — `src/lib/contrast.ts` + `contrast.test.ts` — WCAG relative
+- [x] **T3** - `src/lib/contrast.ts` + `contrast.test.ts` - WCAG relative
       luminance and ratio, plus a guard that parses the real token values out
       of `index.css` and fails below 4.5:1 for 10 text-on-background pairs per
       theme. 30 tests.
   - Verified by regression: restoring `#B4B2AC` failed with
     `--color-text-faint (#B4B2AC) on --color-bg (#F4F3EF) = 1.91:1`.
-- [x] **T4** — new `features/settings/aiAvailability.ts` (pure check) and
+- [x] **T4** - new `features/settings/aiAvailability.ts` (pure check) and
       `AiFeatureGate.tsx` (explainer + route to Settings). Photo log and recipe
       scan wrap in the gate; the label-scan buttons in `AddFoodSheet` and
       `ManualEntryForm`, and the planner's `handleGenerate`, check before
       opening a camera or firing a request.
-  - Surfaced by: 2.1 — four AI features failed only after the user had done the work
-- [x] **T4b** — `tailwind.config.ts` — `fontFamily.sans` now leads with
+  - Surfaced by: 2.1 - four AI features failed only after the user had done the work
+- [x] **T4b** - `tailwind.config.ts` - `fontFamily.sans` now leads with
       Hanken Grotesk (finding 5.5). Pulled forward out of T7 because the
       typeface was silently not applying to any `font-sans` utility.
 
-### P2 — done 2026-08-13
+### P2 - done 2026-08-13
 
-- [x] **T5** — `WeeklyBudgetCard` moved from `PetPage` to `ProgressPage`, and
+- [x] **T5** - `WeeklyBudgetCard` moved from `PetPage` to `ProgressPage`, and
       Progress rebuilt into three labelled horizons: Right now (budget and
       balance), Recent days (nutrition), Over time (weight and goal). The
       diary balance pill now routes to `/progress`; Pet gets a "See your
       calorie budget" link out.
-- [x] **T6** — new `--over` token in both themes. `ArcGauge` and the diary
+- [x] **T6** - new `--over` token in both themes. `ArcGauge` and the diary
       balance pill both use it; `--destructive` is back to meaning destructive.
-      Added to the contrast test — it carries an 11px "KCAL OVER" label, so it
+      Added to the contrast test - it carries an 11px "KCAL OVER" label, so it
       needs the body-text floor, and the first value picked (`32 68% 42%`)
       failed at 3.58:1 and was darkened to `32 68% 36%` (4.65:1).
-- [x] **T7** — named type scale in `tailwind.config.ts`: `text-display`,
+- [x] **T7** - named type scale in `tailwind.config.ts`: `text-display`,
       `text-title`, `text-eyebrow`. Tailwind's own spacing scale is the space
       scale; deliberately no second one.
-- [x] **T8** — `PageHeader` gained an `eyebrow` and a `display` variant.
+- [x] **T8** - `PageHeader` gained an `eyebrow` and a `display` variant.
       Library uses it. Diary keeps its date navigator, which is genuinely a
       different component, but now draws from the type scale rather than
-      hand-written values — folding it into `PageHeader` would have bloated
+      hand-written values - folding it into `PageHeader` would have bloated
       that component to serve one caller.
-- [x] **T9** — new `ui/SegmentedControl` with `track` and `solid` variants and
+- [x] **T9** - new `ui/SegmentedControl` with `track` and `solid` variants and
       an `onDeselect` for optional fields. `ui/Tabs` deleted; all five call
       sites migrated (AddFoodSheet, IngredientPickerSheet, LibraryPage,
       PreferencesSection, GoalsSection, ProfileSection). Only `Tabs` had any
       ARIA before; all of them do now.
-- [x] **T10** — `DESIGN.md` written.
-- [x] **T11** — `.tap-target` on the Jump-to-today pill, balance pill,
+- [x] **T10** - `DESIGN.md` written.
+- [x] **T11** - `.tap-target` on the Jump-to-today pill, balance pill,
       weight-log View all, Edit-this-meal link, and every nav item.
-- [x] **T12** — **the original finding was wrong.** Inherited from the stale
+- [x] **T12** - **the original finding was wrong.** Inherited from the stale
       `UX_AUDIT.md` §7.1, which predated the nutrition summary getting its own
       7/14/30 toggle. The real asymmetry was span (nutrition stopped at 30 days
       while weight ran to a year) and a fifth near-duplicate pill control.
       Added 90D, and extracted `ui/RangePills` used by both charts.
 
-### P3 — done 2026-08-13
+### P3 - done 2026-08-13
 
-- [x] **T13** — `SwipeToCopy` now shows a thin grip at the row's trailing edge
+- [x] **T13** - `SwipeToCopy` now shows a thin grip at the row's trailing edge
       that fades once the drag starts.
-- [x] **T14** — a macro reaching its target turns its value, bar and label
+- [x] **T14** - a macro reaching its target turns its value, bar and label
       accent-coloured and adds a check. Deliberately not a celebration overlay:
       the dog already pulses happy on calorie fullness, and a tracker that
       congratulates loudly gets tiring by the third day.
-- [x] **T15** — first-run `CoachTip` on the diary, shown only while today is
+- [x] **T15** - first-run `CoachTip` on the diary, shown only while today is
       genuinely empty.
 
 ### Deferred
 
-- [ ] **T16** — intentional layout above phone width. Real product decision,
+- [ ] **T16** - intentional layout above phone width. Real product decision,
       not design debt; `max-w-md` stands until you want a desktop story.
 - [ ] Onboarding goal direction (cut / maintain / gain), `UX_AUDIT.md` §6.1.
 

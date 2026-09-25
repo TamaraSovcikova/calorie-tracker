@@ -287,7 +287,7 @@ export function fuzzyWordsMatch(a: string, b: string): boolean {
  * these four boxes used to carry its own substring filter, so the same query
  * behaved differently depending on which one you typed it into.
  *
- * `fuzzy` additionally forgives a typo per word. It is off by default and
+ * `fuzzy` also forgives a typo per word. It is off by default and
  * meant as a SECOND pass, run only when the strict pass found nothing: a
  * search that already has good answers should never dilute them with
  * near-misses.

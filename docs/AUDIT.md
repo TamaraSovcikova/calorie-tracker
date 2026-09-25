@@ -1,11 +1,11 @@
-# Calorie Tracker — Production Audit & Action Plan
+# Calorie Tracker - Production Audit & Action Plan
 
 Full review of the app after the core build. Items are grouped by priority.
 Tackle P1 → P2 → P3, then hardening/cleanup. Check items off as done.
 
 ---
 
-## P1 — Critical: data loss / broken core features
+## P1 - Critical: data loss / broken core features
 
 - [ ] **Fitbit tokens never sync.** `src/db/sync/client.ts` `TABLES` omits
   `fitbit_tokens`, though the worker, D1 schema and `FitbitTokens` type all
@@ -34,7 +34,7 @@ Tackle P1 → P2 → P3, then hardening/cleanup. Check items off as done.
 
 ---
 
-## P2 — Real bugs (visible misbehaviour)
+## P2 - Real bugs (visible misbehaviour)
 
 - [ ] **Barcode scanner camera restarts on every render.** `AddFoodSheet`'s
   `handleBarcode` is a fresh closure each render and is in `BarcodeScanner`'s
@@ -57,10 +57,10 @@ Tackle P1 → P2 → P3, then hardening/cleanup. Check items off as done.
 
 ---
 
-## P3 — Confusing UX & forgotten features
+## P3 - Confusing UX & forgotten features
 
 - [ ] **No "copy to another day" for diary entries or whole days.** This was
-  a confirmed feature in the original plan and is entirely missing — diary
+  a confirmed feature in the original plan and is entirely missing - diary
   rows only support edit/delete. → Add a "copy to date" action (long-press
   or row menu) for a single entry and for a whole day.
 
@@ -74,40 +74,40 @@ Tackle P1 → P2 → P3, then hardening/cleanup. Check items off as done.
   → Remember and restore the originating tab.
 
 - [ ] **Diary has no loading state.** While `useDiaryDay` is loading, the day
-  renders as fully empty (zeros + "No entries yet") — indistinguishable from
+  renders as fully empty (zeros + "No entries yet") - indistinguishable from
   a real empty day; brief fake-empty flash on every date change. → Show a
   subtle skeleton/spinner while `entries === undefined`.
 
 - [ ] **eat-back-burned default mismatch on the existing profile.** The
   profile created during early testing still has `eat_back_burned: true`
-  (the old default); new profiles default `false`. Not a code bug — just
+  (the old default); new profiles default `false`. Not a code bug - just
   toggle it once in Settings → Goals, or leave as preferred.
 
 ---
 
-## P4 — Stale content (quick fixes)
+## P4 - Stale content (quick fixes)
 
-- [ ] `AboutSection.tsx` — still says "Cloud sync — Coming in Phase 11" and
-  "Fitbit — Coming in Phase 12"; both shipped. → Replace with live status or
+- [ ] `AboutSection.tsx` - still says "Cloud sync - Coming in Phase 11" and
+  "Fitbit - Coming in Phase 12"; both shipped. → Replace with live status or
   remove.
-- [ ] `DataSection.tsx` — "your data never leaves the device until cloud
+- [ ] `DataSection.tsx` - "your data never leaves the device until cloud
   sync (Phase 11)"; cloud sync exists now. → Reword.
-- [ ] `ExerciseSheet.tsx` — "Fitbit auto-sync arrives in Phase 12 — until
+- [ ] `ExerciseSheet.tsx` - "Fitbit auto-sync arrives in Phase 12 - until
   then enter the burn yourself"; auto-sync is live. → Reword.
-- [ ] `.env.example` + `src/vite-env.d.ts` — still declare `VITE_SUPABASE_URL`
+- [ ] `.env.example` + `src/vite-env.d.ts` - still declare `VITE_SUPABASE_URL`
   / `VITE_SUPABASE_ANON_KEY`; the app dropped Supabase for Cloudflare. → Remove.
-- [ ] `~/.claude/plans/*.md` — stale planning notes referencing Supabase
+- [ ] `~/.claude/plans/*.md` - stale planning notes referencing Supabase
   (not app code; ignore or delete).
 
 ---
 
-## P5 — Production hardening
+## P5 - Production hardening
 
 - [ ] **No React error boundary.** Any thrown render error = white screen,
   no recovery. → Add a top-level `ErrorBoundary` around `<Routes>` with a
   "reload" fallback.
 
-- [ ] **ESLint is fully broken — 68 errors, all config noise.**
+- [ ] **ESLint is fully broken - 68 errors, all config noise.**
   `eslint.config.js` has a hand-rolled `globals` list missing most browser
   globals (`crypto`, `URLSearchParams`, `Response`, `AbortSignal`, …) and no
   worker-types globals (`D1Database`, `Fetcher`). `pnpm lint` fails entirely
@@ -131,35 +131,35 @@ Tackle P1 → P2 → P3, then hardening/cleanup. Check items off as done.
 
 - [ ] **Sync errors are near-silent.** A bad token just sets an internal
   `status: 'error'`; `install.ts` swallows it. → Surface a visible "sync
-  failed — check token" banner.
+  failed - check token" banner.
 
 - [ ] **Run a Lighthouse PWA audit** once deployed; target ≥90 PWA +
   Performance. Generate proper maskable icons if it flags any.
 
 ---
 
-## P6 — Cleanup / dead code
+## P6 - Cleanup / dead code
 
-- [ ] Delete the feature-flag scaffolding — `features/feature-flags/`
+- [ ] Delete the feature-flag scaffolding - `features/feature-flags/`
   (`featureFlags.ts`, `useFeature.ts`, `PremiumLock.tsx`) is unused; a Pro
   tier makes no sense for a personal local-first app.
 - [ ] Remove unused exports: `offIdFromBarcode`, `newLocalFoodId` (×2),
   `usdaIdFromFdcId`, and the dormant `fetchUsdaFoodPortions` /
   `enrichUsdaFoodWithPortions` in `usda-api.ts` (USDA detail endpoints 404).
 - [ ] `CreateFoodInput.source` only allows `'off' | 'custom'` but `Food.source`
-  has `'usda' | 'curated'` too — tidy the type or document why.
-- [ ] Unbounded cache growth — `useFoodSearch` `bulkPut`s every OFF/USDA hit
+  has `'usda' | 'curated'` too - tidy the type or document why.
+- [ ] Unbounded cache growth - `useFoodSearch` `bulkPut`s every OFF/USDA hit
   forever; no eviction. → Periodic prune of `source='off'|'usda'` rows not
   referenced by any diary entry and older than ~60 days.
 - [ ] `recentFoodsInSection` uses `'0000-00-00'`/`'9999-99-99'` sentinel
-  bounds — works (string compare) but add a comment so it's not mistaken
+  bounds - works (string compare) but add a comment so it's not mistaken
   for a bug.
-- [ ] Rename the lingering `fitbit_user_id` field — data now flows via
+- [ ] Rename the lingering `fitbit_user_id` field - data now flows via
   Google Health, not the Fitbit API (cosmetic).
 
 ---
 
-## Phase 15 — Cloudflare deploy (the big outstanding milestone)
+## Phase 15 - Cloudflare deploy (the big outstanding milestone)
 
 Still not done; unlocks permanent HTTPS, real cloud sync, and phone-side
 Fitbit OAuth. Needs Tamara to run `wrangler login`, then:
@@ -172,10 +172,10 @@ The P1 sync bugs should be fixed *before* relying on sync in anger.
 
 ## Suggested order of attack
 
-1. **P4 stale text + P6 dead code** — fast, low-risk, clears noise.
-2. **P5 eslint fix** — restores real lint coverage to catch regressions.
-3. **P2 barcode + exercise-sheet bugs** — quick, visible.
-4. **P1 sync bugs** (fitbit_tokens, meal_items, weight_log) — before deploy.
-5. **Phase 15 deploy** — then verify one real laptop↔phone sync.
+1. **P4 stale text + P6 dead code** - fast, low-risk, clears noise.
+2. **P5 eslint fix** - restores real lint coverage to catch regressions.
+3. **P2 barcode + exercise-sheet bugs** - quick, visible.
+4. **P1 sync bugs** (fitbit_tokens, meal_items, weight_log) - before deploy.
+5. **Phase 15 deploy** - then verify one real laptop↔phone sync.
 6. **P3 UX** (copy-to-day, ingredient edit, tab restore, loading state).
 7. **P5 error boundary, tests, SW caching, focus trap.**

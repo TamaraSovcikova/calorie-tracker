@@ -1,5 +1,5 @@
 /**
- * Cloudflare Worker config — serves the Vite SPA (./dist) alongside a
+ * Cloudflare Worker config - serves the Vite SPA (./dist) alongside a
  * sync API backed by D1.
  *
  * Build pipeline:
@@ -17,7 +17,7 @@
  *   3. wrangler d1 execute calorie-tracker --remote --file ./worker/schema.sql
  *   4. wrangler deploy
  *
- * Auth is per-user sync codes (no shared secret) — see worker/index.ts.
+ * Auth is per-user sync codes (no shared secret) - see worker/index.ts.
  * The "ai" binding is Cloudflare Workers AI: the free allocation (10k
  * neurons/day) powers food facts + the meal planner at no cost.
  */

@@ -2,7 +2,7 @@
 
 Personal calorie & nutrition tracking PWA. Mobile-first, installable to phone home screen, offline-capable. Cloud sync between web + phone via Cloudflare Workers + D1.
 
-**Live demo:** https://calorie-tracker.tamara-sovcik.workers.dev — opens to a fresh, empty install. The app is local-first, so no personal data is shared; add data locally to try it, or connect a private sync code to test sync.
+**Live demo:** https://calorie-tracker.tamara-sovcik.workers.dev - opens to a fresh, empty install. The app is local-first, so no personal data is shared; add data locally to try it, or connect a private sync code to test sync.
 
 ## Stack
 
@@ -41,7 +41,7 @@ Three double-clickable `.cmd` files in `scripts/` for day-to-day use:
 |---|---|
 | `scripts/dev-on.cmd` | Opens a Windows Terminal tab in WSL and starts `pnpm dev --host` on port 5173. Close the tab to stop. |
 | `scripts/dev-off.cmd` | Kills any vite/esbuild/cloudflared processes in WSL. Use this when you've left a stray dev server running and want to free port 5173 for another project. |
-| `scripts/dev-tunnel.cmd` | Opens a second tab running `cloudflared tunnel --url http://localhost:5173`. Prints an HTTPS `*.trycloudflare.com` URL you can open on your phone. **Use this for testing the barcode scanner** — phone cameras only work over HTTPS. |
+| `scripts/dev-tunnel.cmd` | Opens a second tab running `cloudflared tunnel --url http://localhost:5173`. Prints an HTTPS `*.trycloudflare.com` URL you can open on your phone. **Use this for testing the barcode scanner** - phone cameras only work over HTTPS. |
 
 Pin them to your taskbar (right-click → Pin to taskbar) for one-click switching between projects.
 
@@ -50,14 +50,14 @@ Pin them to your taskbar (right-click → Pin to taskbar) for one-click switchin
 Vite's "Network" URL is the WSL2 virtual NIC, not your laptop's actual
 LAN IP, so your phone can't reach it directly. Pick one of these:
 
-**Easiest — Win11 22H2+: enable mirrored networking (one-time)**
+**Easiest - Win11 22H2+: enable mirrored networking (one-time)**
 
 Add `[wsl2]\nnetworkingMode=mirrored\n` to `%USERPROFILE%\.wslconfig`,
 then `wsl --shutdown` in PowerShell. WSL ports become available on every
 host network interface automatically. No script needed; the phone just
 opens `http://<your-laptop-lan-ip>:5173`.
 
-**Otherwise — netsh portproxy (works on all WSL2 setups)**
+**Otherwise - netsh portproxy (works on all WSL2 setups)**
 
 From an *elevated* PowerShell (Run as administrator):
 
@@ -68,7 +68,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\wsl-lan-setup.ps1
 
 The script prints a `Phone URL:` line. Open exactly that URL on your
 phone (same Wi-Fi as the laptop), making sure to type the explicit
-`http://` prefix — Chrome on Android sometimes auto-upgrades to HTTPS
+`http://` prefix - Chrome on Android sometimes auto-upgrades to HTTPS
 which the dev server doesn't speak.
 
 WSL2's IP changes after every WSL restart, so re-run the setup script
@@ -80,7 +80,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\wsl-lan-teardown.ps1
 
 ### Camera / barcode scanner on phone
 
-Even with LAN access set up, **the barcode scanner won't work on your phone over plain HTTP** — browsers only expose `navigator.mediaDevices.getUserMedia` in secure contexts (HTTPS or localhost). For phone testing of the scanner, use the Cloudflare tunnel:
+Even with LAN access set up, **the barcode scanner won't work on your phone over plain HTTP** - browsers only expose `navigator.mediaDevices.getUserMedia` in secure contexts (HTTPS or localhost). For phone testing of the scanner, use the Cloudflare tunnel:
 
 ```cmd
 scripts\dev-on.cmd       (start the dev server)
@@ -158,7 +158,7 @@ pnpm build && npx wrangler deploy
 ```
 
 D1 schema changes go through `npx wrangler d1 execute calorie-tracker
---remote --file ./worker/schema.sql` (the SQL is idempotent — uses
+--remote --file ./worker/schema.sql` (the SQL is idempotent - uses
 `CREATE TABLE IF NOT EXISTS` and `CREATE INDEX IF NOT EXISTS`).
 
 ## Open Food Facts attribution

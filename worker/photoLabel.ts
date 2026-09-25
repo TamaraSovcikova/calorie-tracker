@@ -1,5 +1,5 @@
 /**
- * AI nutrition-label scanning — read a photo of a nutrition label and
+ * AI nutrition-label scanning - read a photo of a nutrition label and
  * transcribe its printed values into food fields.
  *
  *   POST /api/photo-label   (body: raw JPEG bytes)
@@ -114,7 +114,7 @@ export async function handlePhotoLabel(req: Request, env: Env): Promise<Response
     return jsonResponse({ label: null, error: 'No image received.' });
   }
   if (buf.byteLength > MAX_BYTES) {
-    return jsonResponse({ label: null, error: 'Image too large — try again.' });
+    return jsonResponse({ label: null, error: 'Image too large - try again.' });
   }
 
   let parsed: unknown = null;
@@ -124,7 +124,7 @@ export async function handlePhotoLabel(req: Request, env: Env): Promise<Response
     console.error('photo-label AI error:', err instanceof Error ? err.message : err);
     return jsonResponse({
       label: null,
-      error: "Couldn't read the label right now — try again.",
+      error: "Couldn't read the label right now - try again.",
     });
   }
 
@@ -132,7 +132,7 @@ export async function handlePhotoLabel(req: Request, env: Env): Promise<Response
   if (!label) {
     return jsonResponse({
       label: null,
-      error: "Couldn't read a nutrition label in that image — try a clearer, closer photo.",
+      error: "Couldn't read a nutrition label in that image - try a clearer, closer photo.",
     });
   }
   return jsonResponse({ label });

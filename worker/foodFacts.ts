@@ -4,7 +4,7 @@
  *   POST /api/food-fact  { "name": "<food name>" }  →  { "fact": "<text>" | null }
  *
  * A fact is generic knowledge about a food, so it is generated once by
- * Cloudflare Workers AI and cached in D1 keyed by the normalised name —
+ * Cloudflare Workers AI and cached in D1 keyed by the normalised name -
  * every later request for that food (any user) is a free cache hit. If
  * Workers AI is unavailable (e.g. the daily free allocation is spent) the
  * handler fails soft with `fact: null`; the client just shows nothing.
@@ -43,13 +43,13 @@ export async function handleFoodFact(req: Request, env: Env): Promise<Response> 
     const body = (await req.json()) as { name?: unknown };
     if (typeof body.name === 'string') name = body.name.trim();
   } catch {
-    /* malformed body — treated as no name */
+    /* malformed body - treated as no name */
   }
   if (!name) return jsonResponse({ fact: null });
 
   const key = normaliseKey(name);
 
-  // Cache hit — free, instant.
+  // Cache hit - free, instant.
   const cached = await env.DB.prepare('SELECT fact FROM food_facts WHERE key = ?')
     .bind(key)
     .first<{ fact: string }>();
@@ -66,7 +66,7 @@ export async function handleFoodFact(req: Request, env: Env): Promise<Response> 
           role: 'system',
           content:
             'You give one short, accurate nutrition insight about a food. ' +
-            'Reply with a SINGLE sentence under 30 words — friendly and ' +
+            'Reply with a SINGLE sentence under 30 words - friendly and ' +
             'specific, naming a key nutrient or genuine benefit. If the ' +
             'food is low in nutrients (sweets, fried snacks, sugary ' +
             'drinks), say so honestly but kindly. No preamble, no quotes, ' +

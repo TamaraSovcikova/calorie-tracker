@@ -10,11 +10,11 @@
  *   }
  *
  * For each table the server:
- *   1. Upserts every row from `push` (last-write-wins by updated_at — if the
+ *   1. Upserts every row from `push` (last-write-wins by updated_at - if the
  *      stored row's updated_at is greater than the incoming, we keep ours).
  *   2. Returns every row with updated_at > since[table] (including server-
  *      side rows the client hasn't seen, AND rows just upserted from the
- *      same client — that's intentional, gives the client a chance to
+ *      same client - that's intentional, gives the client a chance to
  *      reconcile its cursor).
  *
  *   Response:
@@ -338,7 +338,7 @@ export async function handleSync(
   // Apply every pushed row across all tables in ONE atomic D1 batch, so a
   // mid-sync failure can't leave a partial apply. Pushes go in before the
   // pulls so the client's own writes round-trip back consistently. Every
-  // pushed row's user_id is forced to the caller's account id — a client
+  // pushed row's user_id is forced to the caller's account id - a client
   // can only ever write into its own dataset.
   const pushStatements: D1PreparedStatement[] = [];
   for (const table of TABLES) {

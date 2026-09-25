@@ -2,7 +2,7 @@
  * Shared helpers for the Workers AI vision endpoints (photo logging,
  * recipe scanning).
  *
- * Model: Mistral Small 3.1 — capable at vision, Apache-2.0 licensed (no
+ * Model: Mistral Small 3.1 - capable at vision, Apache-2.0 licensed (no
  * usage gate, unlike Meta's llama-3.2-vision which excludes EU users).
  */
 

@@ -2,7 +2,7 @@
 """Prepare the dog pose art for the app.
 
 Reads the master illustrations from src/assets/pet/raw/, removes the
-background (AI segmentation — the dog and the cream backdrop are too
+background (AI segmentation - the dog and the cream backdrop are too
 close in colour to key out), autocrops to the dog, downsizes, and writes
 transparent optimised PNGs to src/assets/pet/.
 

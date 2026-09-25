@@ -1,7 +1,7 @@
 @echo off
 REM Open a Cloudflare quick tunnel that exposes the running dev server
 REM over real HTTPS. Use this when you want to test camera/barcode scanner
-REM on your phone — getUserMedia requires HTTPS and won't run over plain
+REM on your phone - getUserMedia requires HTTPS and won't run over plain
 REM LAN HTTP.
 REM
 REM Prerequisite: dev-on.cmd is already running (dev server on :5173).

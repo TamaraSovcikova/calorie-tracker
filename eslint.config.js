@@ -29,7 +29,7 @@ export default [
       // TypeScript itself resolves identifiers and ambient/lib types
       // (DOM, WebWorker, @cloudflare/workers-types). The eslint core
       // no-undef rule understands none of that and produces only false
-      // positives on a TS project — typescript-eslint recommends turning
+      // positives on a TS project - typescript-eslint recommends turning
       // it off. The base no-unused-vars is likewise superseded by the
       // typescript-eslint version below.
       'no-undef': 'off',

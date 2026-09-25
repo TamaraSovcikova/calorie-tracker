@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-  Reverse the changes made by wsl-lan-setup.ps1 — remove the netsh
+  Reverse the changes made by wsl-lan-setup.ps1 - remove the netsh
   portproxy entry and the firewall rule.
 
 .DESCRIPTION

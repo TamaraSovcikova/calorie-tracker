@@ -469,7 +469,7 @@ independent causes, all now fixed and tested.
   `BEEF` and `BLACK BEANS` all three. Matching now lives in
   `src/features/food-search/ingredientMatch.ts`, measures coverage against the
   QUERY, and penalises extra food-name words mildly instead of disqualifying.
-  Prefix matching additionally requires the shorter word to cover 70% of the
+  Prefix matching also requires the shorter word to cover 70% of the
   longer, so `pepper`/`peppers` matches and `pepp`/`peppers` does not.
 - **Dry vs cooked (~700 kcal of the error on one ingredient).** Dry black
   beans are 341 kcal/100g, cooked 132, and the scan applied dry macros to a

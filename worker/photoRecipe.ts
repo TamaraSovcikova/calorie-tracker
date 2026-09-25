@@ -1,5 +1,5 @@
 /**
- * AI recipe scanning — turn a screenshot of a recipe into a structured
+ * AI recipe scanning - turn a screenshot of a recipe into a structured
  * meal.
  *
  *   POST /api/photo-recipe   (body: raw JPEG bytes)
@@ -71,7 +71,7 @@ function cleanRecipe(parsed: unknown): CleanRecipe | null {
 }
 
 const PROMPT =
-  'You are a recipe assistant. This image is a recipe — it may show an ' +
+  'You are a recipe assistant. This image is a recipe - it may show an ' +
   'ingredients list, a method, and/or nutrition info. Extract it and ' +
   'reply with ONLY JSON, no other text: ' +
   '{"name":"<recipe name>","servings":<how many servings the recipe ' +
@@ -106,7 +106,7 @@ export async function handlePhotoRecipe(
     return jsonResponse({ recipe: null, error: 'No image received.' });
   }
   if (buf.byteLength > MAX_BYTES) {
-    return jsonResponse({ recipe: null, error: 'Image too large — try again.' });
+    return jsonResponse({ recipe: null, error: 'Image too large - try again.' });
   }
 
   let parsed: unknown = null;
@@ -116,7 +116,7 @@ export async function handlePhotoRecipe(
     console.error('photo-recipe AI error:', err instanceof Error ? err.message : err);
     return jsonResponse({
       recipe: null,
-      error: "Couldn't read the recipe right now — try again.",
+      error: "Couldn't read the recipe right now - try again.",
     });
   }
 
@@ -124,7 +124,7 @@ export async function handlePhotoRecipe(
   if (!recipe) {
     return jsonResponse({
       recipe: null,
-      error: "Couldn't find a recipe in that image — try a clearer screenshot.",
+      error: "Couldn't find a recipe in that image - try a clearer screenshot.",
     });
   }
   return jsonResponse({ recipe });

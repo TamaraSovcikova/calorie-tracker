@@ -53,7 +53,7 @@ export async function handlePhotoFood(req: Request, env: Env): Promise<Response>
     return jsonResponse({ foods: [], error: 'No image received.' });
   }
   if (buf.byteLength > MAX_BYTES) {
-    return jsonResponse({ foods: [], error: 'Image too large — try again.' });
+    return jsonResponse({ foods: [], error: 'Image too large - try again.' });
   }
 
   let parsed: unknown = null;
@@ -63,7 +63,7 @@ export async function handlePhotoFood(req: Request, env: Env): Promise<Response>
     console.error('photo-food AI error:', err instanceof Error ? err.message : err);
     return jsonResponse({
       foods: [],
-      error: "Couldn't analyse the photo right now — try again.",
+      error: "Couldn't analyse the photo right now - try again.",
     });
   }
 

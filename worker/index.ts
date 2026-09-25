@@ -2,12 +2,12 @@
  * Cloudflare Worker entry point.
  *
  * Two responsibilities:
- *   1. /api/* routes — sync API for the PWA.
- *   2. Everything else — fall through to the static-assets binding (the
+ *   1. /api/* routes - sync API for the PWA.
+ *   2. Everything else - fall through to the static-assets binding (the
  *      Vite SPA build in ./dist).
  *
  * Auth: every device sends a private **sync code** as its bearer token.
- * The account id is `SHA-256(code)` — there is no server-side user list,
+ * The account id is `SHA-256(code)` - there is no server-side user list,
  * a code simply *is* its own isolated, private dataset. Every sync query
  * is scoped to that derived id, so no two codes ever see each other's
  * data.
@@ -25,11 +25,11 @@ import { checkRateLimit } from './rateLimit';
 export interface Env {
   DB: D1Database;
   ASSETS: Fetcher;
-  /** Cloudflare Workers AI binding — food facts + meal planner. */
+  /** Cloudflare Workers AI binding - food facts + meal planner. */
   AI: Ai;
 }
 
-/** Shortest accepted sync code — generated codes are far longer; this
+/** Shortest accepted sync code - generated codes are far longer; this
  *  just rejects empty / obviously-bogus tokens. */
 const MIN_TOKEN_LENGTH = 12;
 
@@ -86,7 +86,7 @@ export default {
     }
 
     // Google Health API proxy. health.googleapis.com sends no CORS
-    // headers so the browser can't call it directly — forward the
+    // headers so the browser can't call it directly - forward the
     // request server-side, passing the user's Google bearer token
     // through unchanged. The Google token is the only auth needed; this
     // proxy only ever targets one fixed host.
@@ -95,7 +95,7 @@ export default {
         'https://health.googleapis.com' +
         url.pathname.replace(/^\/gh-api/, '') +
         url.search;
-      // Forward only the headers Google needs — copying Host would point
+      // Forward only the headers Google needs - copying Host would point
       // the upstream request back at the worker.
       const fwdHeaders = new Headers();
       const auth = req.headers.get('authorization');
@@ -118,7 +118,7 @@ export default {
     }
 
     if (url.pathname.startsWith('/api/')) {
-      // /api/health — unauthenticated, lets the client probe reachability.
+      // /api/health - unauthenticated, lets the client probe reachability.
       if (url.pathname === '/api/health' && req.method === 'GET') {
         return jsonResponse({ ok: true, version: 1 });
       }
@@ -140,7 +140,7 @@ export default {
         }
       }
 
-      // /api/food-fact — AI nutrition fact for a logged food (cached).
+      // /api/food-fact - AI nutrition fact for a logged food (cached).
       if (url.pathname === '/api/food-fact' && req.method === 'POST') {
         if (!(await checkRateLimit(env, `fact:${userId}`, 30, 60))) {
           return jsonResponse({ fact: null }, { status: 429 });
@@ -152,7 +152,7 @@ export default {
         }
       }
 
-      // /api/meal-plan — AI meal-prep suggestions from the user's
+      // /api/meal-plan - AI meal-prep suggestions from the user's
       // ingredients + macro targets.
       if (url.pathname === '/api/meal-plan' && req.method === 'POST') {
         if (!(await checkRateLimit(env, `plan:${userId}`, 6, 60))) {
@@ -160,7 +160,7 @@ export default {
             {
               meals: [],
               error:
-                'Too many plans in a short time — give it a minute and try again.',
+                'Too many plans in a short time - give it a minute and try again.',
             },
             { status: 429 },
           );
@@ -168,56 +168,56 @@ export default {
         try {
           return await handleMealPlan(req, env);
         } catch {
-          return jsonResponse({ meals: [], error: 'Planner failed — try again.' });
+          return jsonResponse({ meals: [], error: 'Planner failed - try again.' });
         }
       }
 
-      // /api/photo-food — AI vision: identify foods in a meal photo.
+      // /api/photo-food - AI vision: identify foods in a meal photo.
       if (url.pathname === '/api/photo-food' && req.method === 'POST') {
         if (!(await checkRateLimit(env, `photo:${userId}`, 12, 60))) {
           return jsonResponse(
-            { foods: [], error: 'Too many photos in a short time — wait a minute.' },
+            { foods: [], error: 'Too many photos in a short time - wait a minute.' },
             { status: 429 },
           );
         }
         try {
           return await handlePhotoFood(req, env);
         } catch {
-          return jsonResponse({ foods: [], error: 'Photo analysis failed — try again.' });
+          return jsonResponse({ foods: [], error: 'Photo analysis failed - try again.' });
         }
       }
 
-      // /api/photo-recipe — AI vision: extract a recipe from a screenshot.
+      // /api/photo-recipe - AI vision: extract a recipe from a screenshot.
       if (url.pathname === '/api/photo-recipe' && req.method === 'POST') {
         if (!(await checkRateLimit(env, `recipe:${userId}`, 12, 60))) {
           return jsonResponse(
-            { recipe: null, error: 'Too many scans in a short time — wait a minute.' },
+            { recipe: null, error: 'Too many scans in a short time - wait a minute.' },
             { status: 429 },
           );
         }
         try {
           return await handlePhotoRecipe(req, env);
         } catch {
-          return jsonResponse({ recipe: null, error: 'Recipe scan failed — try again.' });
+          return jsonResponse({ recipe: null, error: 'Recipe scan failed - try again.' });
         }
       }
 
-      // /api/photo-label — AI vision: transcribe a nutrition label.
+      // /api/photo-label - AI vision: transcribe a nutrition label.
       if (url.pathname === '/api/photo-label' && req.method === 'POST') {
         if (!(await checkRateLimit(env, `label:${userId}`, 12, 60))) {
           return jsonResponse(
-            { label: null, error: 'Too many scans in a short time — wait a minute.' },
+            { label: null, error: 'Too many scans in a short time - wait a minute.' },
             { status: 429 },
           );
         }
         try {
           return await handlePhotoLabel(req, env);
         } catch {
-          return jsonResponse({ label: null, error: 'Label scan failed — try again.' });
+          return jsonResponse({ label: null, error: 'Label scan failed - try again.' });
         }
       }
 
-      // /api/shared-foods — community food pool: GET searches it, POST
+      // /api/shared-foods - community food pool: GET searches it, POST
       // contributes a manually-entered product to it.
       if (url.pathname === '/api/shared-foods' && req.method === 'GET') {
         try {
@@ -237,7 +237,7 @@ export default {
         }
       }
 
-      // /api/auth — minimal "is my code accepted" probe used by the
+      // /api/auth - minimal "is my code accepted" probe used by the
       // Settings panel to validate before saving.
       if (url.pathname === '/api/auth' && req.method === 'GET') {
         return jsonResponse({ ok: true });

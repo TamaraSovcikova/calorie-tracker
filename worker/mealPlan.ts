@@ -12,7 +12,7 @@
  *
  *   → { "meals": [ { name, description, ingredients:[{name,grams}], steps } ] }
  *
- * The model ONLY proposes recipes — names, ingredient amounts and method.
+ * The model ONLY proposes recipes - names, ingredient amounts and method.
  * It is deliberately NOT asked for calories or macros: small models are
  * unreliable at nutrition numbers. The client computes real macros from
  * the food database (curated foods + USDA) and scales each recipe to fit
@@ -21,7 +21,7 @@
 
 import type { Env } from './index';
 
-// 8B "fast" — quick (~10-20s) and good enough now it only writes recipes.
+// 8B "fast" - quick (~10-20s) and good enough now it only writes recipes.
 const MODEL = '@cf/meta/llama-3.1-8b-instruct-fast';
 
 const RESPONSE_SCHEMA = {
@@ -156,7 +156,7 @@ export async function handleMealPlan(req: Request, env: Env): Promise<Response> 
     : [];
 
   const targetLines: string[] = [
-    `Each recipe must make exactly ${portions} portion(s) — ingredient ` +
+    `Each recipe must make exactly ${portions} portion(s) - ingredient ` +
       `amounts are the totals for the whole batch.`,
   ];
   if (kcalMax) targetLines.push(`Aim for at most ${kcalMax} kcal per portion.`);
@@ -169,7 +169,7 @@ export async function handleMealPlan(req: Request, env: Env): Promise<Response> 
       ? `Build the meals around these ingredients where they fit: ` +
         `${ingredients.join(', ')}. You don't have to use all of them and ` +
         `may add others.`
-      : `I haven't picked ingredients — suggest varied meals for inspiration.`;
+      : `I haven't picked ingredients - suggest varied meals for inspiration.`;
 
   // What the app knows about this cook. None of this used to be sent, so the
   // planner was a stranger every single time - the main reason it lost to a
@@ -244,9 +244,9 @@ export async function handleMealPlan(req: Request, env: Env): Promise<Response> 
       (contextLines.length ? `${contextLines.join('\n')}\n` : '') +
       `\nSuggest exactly 5 distinct, realistic meal-prep recipes. For each: a ` +
       `short name, a one-line description, an ingredient list (each with a ` +
-      `name and a gram amount for the whole batch — include staples like oil ` +
+      `name and a gram amount for the whole batch - include staples like oil ` +
       `and salt), and up to 8 short method steps. Do NOT include calories or ` +
-      `macros — only ingredient names and gram amounts.`;
+      `macros - only ingredient names and gram amounts.`;
 
   let parsed: unknown = null;
   try {
@@ -259,7 +259,7 @@ export async function handleMealPlan(req: Request, env: Env): Promise<Response> 
           role: 'system',
           content:
             'You are a practical meal-prep planner. Reply ONLY with JSON ' +
-            'matching the requested schema — no prose, no markdown. Use ' +
+            'matching the requested schema - no prose, no markdown. Use ' +
             'realistic gram amounts for a batch of the requested size.',
         },
         { role: 'user', content: userPrompt },
@@ -278,7 +278,7 @@ export async function handleMealPlan(req: Request, env: Env): Promise<Response> 
   if (meals.length === 0) {
     return jsonResponse({
       meals: [],
-      error: 'Could not generate a plan — please try again.',
+      error: 'Could not generate a plan - please try again.',
     });
   }
   return jsonResponse({ meals });

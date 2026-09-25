@@ -1,4 +1,4 @@
-# Design system — Stone & Amber
+# Design system - Stone & Amber
 
 The system is real and enforced in code. This file exists because it wasn't
 written down: three segmented controls, two header systems and a copy-pasted
@@ -52,12 +52,12 @@ you need a value the semantic layer doesn't have (`--color-accent-deep`,
 this is enforced.** `src/lib/contrast.test.ts` parses the real values out of
 `index.css` and fails the build below the floor. It exists because the app
 shipped with `--color-text-faint` at 1.91:1 carrying the macro labels, the
-date eyebrow and the arc scale numbers, and nobody noticed — pale-on-cream
+date eyebrow and the arc scale numbers, and nobody noticed - pale-on-cream
 looks fine indoors on the device you designed it on.
 
 **"Background" includes filled surfaces, not just the page.** The first
 version of the guard only checked text on page backgrounds, and behind that
-hole sat white-on-amber at 2.83:1 — the label on every Add, Save and Log
+hole sat white-on-amber at 2.83:1 - the label on every Add, Save and Log
 button in the app. Button fills, chips, banners and badges all count. When you
 add a filled surface that carries text, add the pair to `TEXT_ON_BG`.
 
@@ -82,7 +82,7 @@ destructive fill is deepened instead, so it keeps the conventional
 white-on-red read that a destructive action wants.
 
 **`--over` and `--destructive` are not interchangeable.** Going over your
-target is information, not an error — Warn mode deliberately produces over-days
+target is information, not an error - Warn mode deliberately produces over-days
 as something the user chose to see and paces themselves. The arc used to paint
 "180 kcal over" in the same colour as "cloud sync failed".
 
@@ -94,7 +94,7 @@ Never use them decoratively.
 ## Type
 
 **Hanken Grotesk**, loaded from Google Fonts in `index.html`, set on `body` in
-`index.css` and led with in `tailwind.config.ts`. Both places must agree —
+`index.css` and led with in `tailwind.config.ts`. Both places must agree -
 they didn't for a while, so anything using the `font-sans` utility silently
 rendered in system UI.
 
@@ -108,7 +108,7 @@ Named sizes in `tailwind.config.ts`. Use these instead of hand-writing values:
 
 Everything else uses Tailwind's defaults (`text-sm`, `text-xs`, …).
 
-**Never set body text below 16px** — `text-sm` is the practical floor for
+**Never set body text below 16px** - `text-sm` is the practical floor for
 anything read as prose. Small sizes are for labels and numeric annotations.
 
 ---
@@ -126,7 +126,7 @@ deliberate deferral rather than an oversight.
 
 ---
 
-## Components — reach for these
+## Components - reach for these
 
 Building a new one when these exist is how the system fragmented.
 
@@ -169,14 +169,14 @@ Adding a fifth capability means one entry in `CaptureChooser` - not a new tab,
 not a new button hidden inside another flow.
 
 `SegmentedControl` has two variants: `track` (recessed track, raised active
-segment — for switching between views) and `solid` (bordered row, accent-filled
-active segment — for picking a setting value). `onDeselect` makes the selection
+segment - for switching between views) and `solid` (bordered row, accent-filled
+active segment - for picking a setting value). `onDeselect` makes the selection
 clearable for genuinely optional fields.
 
 ### Cards
 
 The card shell is `rounded-2xl border border-border bg-card shadow-sm`. About
-15 surfaces use it and they are byte-identical, which is fine — there is no
+15 surfaces use it and they are byte-identical, which is fine - there is no
 extracted `Card` component and none is needed.
 
 **A card must be a real container** (a meal section, a settings group, a
@@ -185,12 +185,12 @@ App-UI pattern to avoid.
 
 ---
 
-## Accessibility — non-negotiable
+## Accessibility - non-negotiable
 
 - **4.5:1** on all text. Enforced by `contrast.test.ts`.
 - **44px minimum touch target.** The `.tap-target` utility in `index.css`
   applies it. Every interactive control gets it, including small text links
-  and pills — pad them out rather than shrinking the target.
+  and pills - pad them out rather than shrinking the target.
 - **Every control has an accessible name.** An icon-only button needs
   `aria-label`; a decorative icon inside a labelled control needs
   `aria-hidden="true"` so it isn't announced twice.
@@ -202,7 +202,7 @@ App-UI pattern to avoid.
 
 ---
 
-## States — every surface owes five
+## States - every surface owes five
 
 Loading, empty, error, success, partial. Coverage is good; keep it that way.
 
@@ -223,7 +223,7 @@ Utility language. Orientation, status, action. Not mood or aspiration.
 - Say what happened: "Copied to today", not "Success!"
 - Name the fix in the error: "Connect a sync code in Settings to scan labels."
 - No congratulation beyond a quiet acknowledgement. A tracker that celebrates
-  loudly gets tiring by the third day — a macro hitting its target turns the
+  loudly gets tiring by the third day - a macro hitting its target turns the
   bar accent-coloured and adds a check, and that is the whole celebration.
 - Hyphens, not em dashes.
 
@@ -231,7 +231,7 @@ Utility language. Orientation, status, action. Not mood or aspiration.
 
 ## Related
 
-- `DESIGN_REVIEW.md` — the whole-app review this system was hardened by,
+- `DESIGN_REVIEW.md` - the whole-app review this system was hardened by,
   including the findings and their scores.
-- `ART_BRIEF.md` — the pet illustration brief, a separate concern.
-- `src/index.css` — the tokens themselves, the source of truth.
+- `ART_BRIEF.md` - the pet illustration brief, a separate concern.
+- `src/index.css` - the tokens themselves, the source of truth.

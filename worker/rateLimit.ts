@@ -6,7 +6,7 @@
  * Cost can't run away (the free tier hard-stops), but throughput should.
  *
  * Fixed-window counter: `limit` requests per `windowSec` per key. Fails
- * OPEN — a limiter error never blocks a genuine request.
+ * OPEN - a limiter error never blocks a genuine request.
  */
 
 import type { Env } from './index';

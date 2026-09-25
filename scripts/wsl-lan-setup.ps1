@@ -5,7 +5,7 @@
 
 .DESCRIPTION
   Two paths:
-    1. WSL2 mirrored networking (recommended on Win11 22H2+) — handled
+    1. WSL2 mirrored networking (recommended on Win11 22H2+) - handled
        outside this script: edit %USERPROFILE%\.wslconfig, add
        `[wsl2]\nnetworkingMode=mirrored\n`, then `wsl --shutdown`.
     2. Classic netsh portproxy + firewall rule (this script). Re-run after
@@ -17,7 +17,7 @@
   After running this script:
     - Open Vite's "Network" URL using the Windows LAN IP printed at the end,
       not the WSL IP that vite shows in its banner.
-    - On the phone, type the URL with the explicit `http://` prefix —
+    - On the phone, type the URL with the explicit `http://` prefix -
       Chrome may otherwise auto-upgrade to HTTPS, which the dev server
       doesn't speak.
 

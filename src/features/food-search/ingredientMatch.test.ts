@@ -294,7 +294,7 @@ describe('resolveTier', () => {
   });
 });
 
-describe('rankLibraryCandidates — the ordering the feature rests on', () => {
+describe('rankLibraryCandidates - the ordering the feature rests on', () => {
   const mine = food('Beef mince 5%', { id: 'mine', source: 'shared' });
   const once = food('Beef mince value', { id: 'once', source: 'shared' });
   const builtIn = food('Beef mince, cooked', { id: 'curated', source: 'curated' });
@@ -382,7 +382,7 @@ describe('the stuffed-pepper scan, second run', () => {
   });
 });
 
-describe('formPenalty — a processed form is a different food', () => {
+describe('formPenalty - a processed form is a different food', () => {
   it('penalises asking for a form and getting the raw ingredient', () => {
     // Reported 5 kcal for 30 g of tomato puree; the truth is nearer 24.
     expect(formPenalty('tomato puree', 'Tomato')).toBe(0.45);
