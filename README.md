@@ -2,6 +2,8 @@
 
 Personal calorie & nutrition tracking PWA. Mobile-first, installable to phone home screen, offline-capable. Cloud sync between web + phone via Cloudflare Workers + D1.
 
+**Live demo:** https://calorie-tracker.tamara-sovcik.workers.dev — opens to a fresh, empty install. The app is local-first, so no personal data is shared; add data locally to try it, or connect a private sync code to test sync.
+
 ## Stack
 
 - Vite + React 18 + TypeScript (strict)
@@ -11,7 +13,7 @@ Personal calorie & nutrition tracking PWA. Mobile-first, installable to phone ho
 - Zustand for app state
 - React Router for navigation
 - vite-plugin-pwa (Workbox) for service worker + manifest
-- Cloudflare Workers + D1 for cloud sync (single bearer token, no auth flow)
+- Cloudflare Workers + D1 for cloud sync (per-user sync codes, no accounts)
 
 ## Local development
 
@@ -60,7 +62,7 @@ opens `http://<your-laptop-lan-ip>:5173`.
 From an *elevated* PowerShell (Run as administrator):
 
 ```powershell
-cd \\wsl.localhost\Ubuntu\home\snaccident\projects_\calorie-tracker
+cd \\wsl.localhost\Ubuntu\home\<user>\calorie-tracker
 powershell -ExecutionPolicy Bypass -File .\scripts\wsl-lan-setup.ps1
 ```
 
@@ -137,19 +139,17 @@ npx wrangler d1 create calorie-tracker
 # 3. Apply the schema to the remote DB
 npx wrangler d1 execute calorie-tracker --remote --file ./worker/schema.sql
 
-# 4. Set the shared bearer token (any 32+ char random string)
-#    This is what you'll paste in Settings → Cloud sync on every device.
-openssl rand -base64 32 | tr -d '\n' | npx wrangler secret put SYNC_TOKEN
-# (or run `npx wrangler secret put SYNC_TOKEN` and paste a token interactively)
-
-# 5. Deploy
+# 4. Deploy
 pnpm build && npx wrangler deploy
 ```
 
-Wrangler prints the deployed URL (e.g.
+Auth is per-user sync codes, not a shared secret: there is nothing to set on
+the worker. Wrangler prints the deployed URL (e.g.
 `https://calorie-tracker.<your-subdomain>.workers.dev`). Open it on each
-device, go to **Settings → Cloud sync**, paste the URL + the same token,
-and tap **Connect**. From then on every change syncs automatically.
+device, go to **Settings → Cloud sync**, paste the URL and choose a private
+sync code (any hard-to-guess string). Enter the same code on every device you
+want to share data with: the code is the account, so each code is its own
+isolated dataset. From then on every change syncs automatically.
 
 To re-deploy after pulling new commits:
 
