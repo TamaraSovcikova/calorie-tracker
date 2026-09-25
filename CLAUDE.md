@@ -29,7 +29,7 @@ Cross-project conventions (commit rules, em-dash, co-author): `~/devhub/conventi
 
 ## Stack
 
-TypeScript strict. Vite 5, React 18, Tailwind CSS, vite-plugin-pwa, Dexie + dexie-react-hooks, react-router, zustand, date-fns, lucide-react, ZXing, @tanstack/react-query. Cloudflare Workers + D1 + Workers AI. Open Food Facts (no key), USDA FoodData Central (optional free key via VITE_USDA_API_KEY).
+TypeScript strict. Vite 5, React 18, Tailwind CSS, vite-plugin-pwa, Dexie + dexie-react-hooks, react-router, zustand, date-fns, lucide-react, ZXing, @tanstack/react-query. Cloudflare Workers + D1 + Workers AI. Open Food Facts (no key), USDA FoodData Central (bundled free key, overridable via VITE_USDA_API_KEY).
 
 ## Layout
 
@@ -110,4 +110,4 @@ Dexie/Worker verified live. `npm run test`.
 
 ## Credentials
 
-See `~/devhub/credentials_reference.md`. All credentials are user-supplied at runtime or set via build-time env vars (see `.env.example`). No keys committed.
+See `~/devhub/credentials_reference.md`. All credentials are user-supplied at runtime or set via build-time env vars, except a bundled free USDA FoodData Central key (public, low-value, accepted). See `.env.example`.

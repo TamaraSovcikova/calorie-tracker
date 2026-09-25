@@ -22,18 +22,17 @@ const BASE = 'https://api.nal.usda.gov/fdc/v1';
 const API_KEY_LS = 'calorie-tracker:usda-key';
 
 /**
- * USDA FoodData Central key, supplied at build time via VITE_USDA_API_KEY
- * (see .env.example). FDC is a free public database (1000 requests/hour per
- * key, instant signup at api.data.gov). Left unset, the app still works:
- * Open Food Facts covers packaged products and barcodes, and a user can paste
- * their own key in Settings. No key is committed to the repo.
+ * Shared USDA FoodData Central key bundled into the app, so the food search
+ * works for everyone with zero setup. FDC is a free public database (1000
+ * requests/hour per key, instant signup at api.data.gov), so a single shared
+ * key is fine here. Overridable at build time via VITE_USDA_API_KEY.
  *
- * Note: this is a client-side app, so any VITE_ value is inlined into the
- * public bundle at build time. For a genuinely private key, proxy USDA through
- * the Worker (the same way /gh-api proxies Google Health).
+ * Note: this is a client-side app, so this value is inlined into the public
+ * bundle at build time and is readable by anyone. That is an accepted trade
+ * for a free, low-value, rate-limited key.
  */
-export const BUNDLED_USDA_KEY: string | null =
-  import.meta.env.VITE_USDA_API_KEY ?? null;
+export const BUNDLED_USDA_KEY: string =
+  import.meta.env.VITE_USDA_API_KEY ?? 'cP45kucaUCY1TsM8twp7BndJVnVWBbTeoOGy0Xbp';
 
 /** The user's own saved key, ignoring the bundled fallback. */
 export function getUserUsdaApiKey(): string | null {
