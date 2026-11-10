@@ -13,7 +13,12 @@ import { db } from '@/db/dexie';
 import { currentUserId } from '@/db/userId';
 import { getSyncConfig, syncBaseUrl } from '@/db/sync/config';
 import { createMeal, type MealItemInput } from '@/db/repos/meals';
-import { frequentFoods, recentFoods, type DayTotals } from '@/db/repos/diary';
+import {
+  foodUsage,
+  frequentFoods,
+  recentFoods,
+  type DayTotals,
+} from '@/db/repos/diary';
 import { addDays } from 'date-fns';
 import { toLocalDate } from '@/lib/dates';
 import { getAliasFood } from '@/db/repos/ingredientAliases';
@@ -23,6 +28,7 @@ import {
   rankLibraryCandidates,
   ALIAS_SCORE,
   type IngredientCandidate,
+  isMatchable,
 } from '@/features/food-search/ingredientMatch';
 import { getUsdaApiKey, searchUsda } from '@/lib/usda-api';
 import type { Food } from '@/db/types';
@@ -238,19 +244,26 @@ function loadRecentFoods(): Promise<Food[]> {
 
 let allFoodsCache: Promise<Food[]> | null = null;
 
-/** Every food in the user's library - curated, custom, and cached search
- *  hits (incl. barcode-scanned products). Cached for the session. */
+/**
+ * Every food worth matching an ingredient against: curated, custom, USDA
+ * generics, and any packaged or shared-pool row the user has actually used.
+ *
+ * Packaged and shared rows she has never touched are left out. They are
+ * leftovers of old searches, in any language and of any quality, and one of
+ * them (a row literally named "YELLOW ONION" at about 100 kcal/100g) beat
+ * the built-in Onion on an exact name match. Cached for the session.
+ */
 function loadAllFoods(): Promise<Food[]> {
   if (!allFoodsCache) {
     allFoodsCache = (async () => {
       const uid = currentUserId();
+      const { usedIds } = await foodUsage();
       return db.foods
         .where('user_id')
         .equals(uid)
-        .filter((f) => !f.deleted_at)
-        .toArray()
-        .catch(() => [] as Food[]);
-    })();
+        .filter((f) => !f.deleted_at && isMatchable(f, usedIds))
+        .toArray();
+    })().catch(() => [] as Food[]);
   }
   return allFoodsCache;
 }

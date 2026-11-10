@@ -598,3 +598,30 @@ describe('typo tolerance', () => {
     ).toBe(true);
   });
 });
+
+describe('the yellow onion scan', () => {
+  const none = { frequentIds: new Set<string>(), recentIds: new Set<string>() };
+
+  it('reaches the built-in Onion through the variety word', () => {
+    const onion = food('Onion', { source: 'curated', kcal_100: 40 });
+    const [top] = rankLibraryCandidates([onion], 'yellow onion', none);
+    expect(top.food).toBe(onion);
+    expect(top.nameScore).toBe(1);
+  });
+
+  it('never offers a packaged or shared row she has not used', async () => {
+    const { isMatchable } = await import('./ingredientMatch');
+    const used = new Set(['mine']);
+    const junk = food('YELLOW ONION', { source: 'shared', kcal_100: 100 });
+    expect(isMatchable(junk, used)).toBe(false);
+    expect(isMatchable(food('X', { source: 'off' }), used)).toBe(false);
+    expect(
+      isMatchable(food('X', { source: 'usda', usda_data_type: 'branded' }), used),
+    ).toBe(false);
+    expect(isMatchable(food('X', { source: 'off', id: 'mine' }), used)).toBe(true);
+    expect(isMatchable(food('X', { source: 'curated' }), used)).toBe(true);
+    expect(
+      isMatchable(food('X', { source: 'usda', usda_data_type: 'sr_legacy' }), used),
+    ).toBe(true);
+  });
+});

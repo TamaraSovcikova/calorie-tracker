@@ -27,6 +27,7 @@ const USER_AGENT_HEADER = `${APP_NAME}/${APP_VERSION}`;
 const FIELDS = [
   'code',
   'product_name',
+  'product_name_en',
   'generic_name',
   'brands',
   'nutriments',
@@ -110,6 +111,7 @@ function sodiumMg100(n: OffNutriments | undefined): number | undefined {
 interface OffProduct {
   code?: string;
   product_name?: string;
+  product_name_en?: string;
   generic_name?: string;
   brands?: string;
   nutriments?: OffNutriments;
@@ -158,7 +160,12 @@ function resolveOffCustomUnits(
  */
 export function offProductToFood(p: OffProduct): Food | null {
   if (!p.code) return null;
-  const name = p.product_name?.trim() || p.generic_name?.trim();
+  // English name when the product has one: the same Belgian product is
+  // often entered in French, Dutch and English.
+  const name =
+    p.product_name_en?.trim() ||
+    p.product_name?.trim() ||
+    p.generic_name?.trim();
   if (!name) return null;
   const kcal = kcalFromNutriments(p.nutriments);
   if (kcal === null) return null;

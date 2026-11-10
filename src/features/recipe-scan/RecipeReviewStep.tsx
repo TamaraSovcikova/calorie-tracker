@@ -159,8 +159,20 @@ export function RecipeReviewStep({
       </ul>
 
       <div className="border-t border-border bg-card p-4">
-        <Button type="button" variant="primary" block disabled={saving} onClick={onConfirm}>
-          {saving ? 'Creating…' : 'Create meal'}
+        {/* A flagged match is a guess. Creating the meal on guesses is how a
+            300 kcal onion got through, so each one needs a tap first. */}
+        <Button
+          type="button"
+          variant="primary"
+          block
+          disabled={saving || unsure > 0}
+          onClick={onConfirm}
+        >
+          {saving
+            ? 'Creating…'
+            : unsure > 0
+              ? `Check ${unsure} flagged ${unsure === 1 ? 'ingredient' : 'ingredients'} first`
+              : 'Create meal'}
         </Button>
       </div>
 

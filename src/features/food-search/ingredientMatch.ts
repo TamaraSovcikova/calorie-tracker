@@ -154,6 +154,10 @@ const QUALIFIER_WORDS: ReadonlySet<string> = new Set([
   'cup', 'cups', 'handful', 'pinch', 'bunch', 'sprig', 'sprigs',
   'stick', 'sticks', 'can', 'cans', 'tin', 'tins', 'packet', 'pack',
   'jar', 'bag', 'head', 'heads',
+  // variety names that are the same food. "2 yellow onion" has to reach the
+  // built-in Onion. Deliberately ONLY this one: red/green/white/brown tell
+  // real foods apart (green beans, brown rice, white wine).
+  'yellow',
   // knife work - changes the shape, not the macros
   'grated', 'chopped', 'diced', 'sliced', 'crushed', 'finely', 'roughly',
   'peeled', 'trimmed',
@@ -600,4 +604,15 @@ export function isConfident(
   const runnerUp = candidates[1];
   if (!runnerUp) return true;
   return top.score - runnerUp.score >= CONFIDENT_MARGIN;
+}
+
+/**
+ * Whether a stored food may be offered as an ingredient match. Anything the
+ * user made, starred or has used qualifies, as do the built-ins and USDA
+ * generics. A packaged or community row she has never touched does not.
+ */
+export function isMatchable(food: Food, usedIds: ReadonlySet<string>): boolean {
+  if (usedIds.has(food.id) || food.favorite) return true;
+  if (food.source === 'custom' || food.source === 'curated') return true;
+  return food.source === 'usda' && food.usda_data_type !== 'branded';
 }

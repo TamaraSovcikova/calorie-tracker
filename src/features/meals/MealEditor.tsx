@@ -280,8 +280,25 @@ export function MealEditor({ mode }: MealEditorProps) {
     }
   };
 
-  const addIngredient = (input: MealItemInput, food: Food) =>
+  const addIngredient = (input: MealItemInput, food: Food) => {
+    // Same food, same unit: add to the row that is already there rather
+    // than listing the ingredient twice.
+    const dup = items.find(
+      (i) => i.food_id === input.food_id && i.unit === input.unit,
+    );
+    if (dup) {
+      setItems((curr) =>
+        curr.map((i) =>
+          i.uiKey === dup.uiKey ? { ...i, qty: i.qty + input.qty } : i,
+        ),
+      );
+      toast({
+        message: `${food.name} was already in this meal - amounts added.`,
+      });
+      return;
+    }
     setItems((curr) => [...curr, inputToDraft(input, food, nextKey())]);
+  };
 
   const removeIngredient = (uiKey: string) =>
     setItems((curr) => curr.filter((i) => i.uiKey !== uiKey));

@@ -7,6 +7,7 @@
  * review-and-save.
  */
 
+import { mergeDuplicateIngredients } from './mergeIngredients';
 import { getSyncConfig, syncBaseUrl } from '@/db/sync/config';
 import { createFood } from '@/db/repos/foods';
 import type { MealItemInput } from '@/db/repos/meals';
@@ -113,17 +114,21 @@ export async function resolveScannedRecipe(
   // On a fresh install nothing can reach a personal tier, so requiring one
   // would flag every single ingredient.
   const ctx = { hasPersonalHistory: await hasPersonalFoodHistory() };
-  const ingredients: RecipeIngredientDraft[] = [];
+  const resolved: (RecipeIngredientDraft & { foodId?: string })[] = [];
   for (const ing of recipe.ingredients) {
     const candidates = await rankIngredientCandidates(ing.name);
-    ingredients.push({
+    resolved.push({
       name: ing.name,
       grams: ing.grams,
       candidates,
       chosen: candidates.length > 0 ? 0 : -1,
       confident: isConfident(candidates, ctx),
+      foodId: candidates[0]?.food.id,
     });
   }
+  const ingredients: RecipeIngredientDraft[] = mergeDuplicateIngredients(
+    resolved,
+  ).map(({ foodId: _foodId, ...draft }) => draft);
   return {
     name: recipe.name,
     servings: recipe.servings,
@@ -162,7 +167,10 @@ export async function commitResolvedRecipe(
       });
       foodId = created.id;
     }
-    items.push({ food_id: foodId, qty: ing.grams, unit: 'g' });
+    // The user can point two rows at one food during review.
+    const same = items.find((it) => it.food_id === foodId);
+    if (same) same.qty += ing.grams;
+    else items.push({ food_id: foodId, qty: ing.grams, unit: 'g' });
   }
   return items;
 }
