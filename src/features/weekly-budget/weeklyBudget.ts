@@ -37,6 +37,11 @@
  * hand back, which is what would otherwise undo the saving.
  */
 
+import {
+  parseDayMarks,
+  resolveDay,
+  type DayMarks,
+} from '@/features/day-status/dayStatus';
 import { addDays, differenceInCalendarDays, getDaysInMonth, startOfMonth } from 'date-fns';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/db/dexie';
@@ -209,6 +214,8 @@ export function parseUntrackedDates(raw: string | undefined): Set<string> {
  *    which would otherwise look like a full day of banked calories; or
  *  - the user explicitly marked it "untracked" (e.g. a day they only
  *    half-logged and don't want skewing the week).
+ * A day marked with an estimate ("I went about 500 over") counts as its
+ * goal plus that amount. The rules live in `resolveDay`.
  * Counting it as the goal is mathematically the same as dropping the day
  * from the budget. Every other day uses its real logged value.
  *
@@ -221,16 +228,22 @@ export function effectiveDailyKcal(
   logged: boolean[],
   today: LocalDate,
   goals: number[],
-  untracked: Set<string>,
+  untracked: ReadonlySet<string> | DayMarks,
 ): { effective: number[]; missedCount: number } {
+  // A bare set of dates is the old "untracked" list.
+  const marks: DayMarks =
+    untracked instanceof Map
+      ? untracked
+      : new Map([...untracked.keys()].map((d) => [d, {}]));
   let missedCount = 0;
   const effective = dates.map((d, i) => {
-    const neutral = untracked.has(d) || (d < today && !logged[i]);
-    if (neutral) {
-      missedCount += 1;
-      return goals[i];
-    }
-    return kcal[i];
+    const r = resolveDay(
+      { date: d, kcal: kcal[i], hasEntries: logged[i], goal: goals[i] },
+      marks.get(d),
+      today,
+    );
+    if (r.kind === 'empty' || r.kind === 'untracked') missedCount += 1;
+    return r.effective;
   });
   return { effective, missedCount };
 }
@@ -325,7 +338,7 @@ async function fetchEffective(
     logged,
     todayLocal(),
     goals,
-    parseUntrackedDates(profile.untracked_dates),
+    parseDayMarks(profile.untracked_dates),
   );
   return {
     effective,

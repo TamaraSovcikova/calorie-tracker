@@ -19,7 +19,7 @@ type Range = (typeof RANGES)[number];
 
 export function WeeklySummarySection({ profile }: WeeklySummarySectionProps) {
   const [range, setRange] = useState<Range>(7);
-  const summary = useWeeklySummary(profile.kcal_target, range);
+  const summary = useWeeklySummary(profile, range);
 
   return (
     <section className="rounded-2xl border border-border bg-card p-4 shadow-sm">
@@ -54,17 +54,21 @@ function SummaryBody({
   kcalTarget: number;
   range: Range;
 }) {
-  const maxKcal = Math.max(kcalTarget, ...summary.days.map((d) => d.kcal));
+  const maxKcal = Math.max(kcalTarget, ...summary.days.map((d) => d.counted));
 
   return (
     <>
       <div className="grid grid-cols-3 gap-3">
-        <Stat label="Avg kcal" value={formatKcal(summary.avgKcal)} />
+        <Stat
+          label="Avg kcal"
+          value={formatKcal(summary.avgKcal)}
+          hint={`over ${summary.daysCounted} tracked ${summary.daysCounted === 1 ? 'day' : 'days'}`}
+        />
         <Stat label="Avg protein" value={`${Math.round(summary.avgProtein)} g`} />
         <Stat
           label="Days on target"
-          value={`${summary.daysHitTarget}/${range}`}
-          hint="±10% of kcal target"
+          value={`${summary.daysHitTarget}/${summary.daysCounted}`}
+          hint="±10% of that day's goal"
         />
       </div>
 
@@ -82,18 +86,25 @@ function SummaryBody({
         )}
         <div className="flex h-full items-end gap-1">
           {summary.days.map((d) => {
-            const h = maxKcal > 0 ? Math.max(2, (d.kcal / maxKcal) * 96) : 2;
+            // Left-out days get a stub: there is no number to draw.
+            const shown = d.inAverage ? d.counted : 0;
+            const h = maxKcal > 0 ? Math.max(2, (shown / maxKcal) * 96) : 2;
             const onTarget =
-              kcalTarget > 0 &&
-              d.hasEntries &&
-              Math.abs(d.kcal - kcalTarget) / kcalTarget <= 0.1;
-            const status = !d.hasEntries
-              ? 'no entries'
-              : onTarget
-                ? 'on target'
-                : d.kcal > kcalTarget
-                  ? 'over target'
-                  : 'under target';
+              d.inAverage &&
+              d.goal > 0 &&
+              Math.abs(d.counted - d.goal) / d.goal <= 0.1;
+            const status =
+              d.kind === 'untracked'
+                ? 'untracked, left out'
+                : d.kind === 'empty' || d.kind === 'pending'
+                  ? 'no entries'
+                  : d.kind === 'estimated'
+                    ? 'estimate'
+                    : onTarget
+                      ? 'on target'
+                      : d.counted > d.goal
+                        ? 'over target'
+                        : 'under target';
             return (
               <div
                 key={d.date}
@@ -102,11 +113,12 @@ function SummaryBody({
                   height: `${h}px`,
                   backgroundColor: onTarget
                     ? 'hsl(var(--primary))'
-                    : d.hasEntries
+                    : d.inAverage
                       ? 'hsl(var(--kcal))'
                       : 'hsl(var(--muted))',
+                  opacity: d.kind === 'estimated' ? 0.55 : 1,
                 }}
-                title={`${d.date} - ${formatKcal(d.kcal)} kcal (${status})`}
+                title={`${d.date} - ${formatKcal(shown)} kcal (${status})`}
               />
             );
           })}
@@ -126,10 +138,17 @@ function SummaryBody({
         </div>
       )}
 
+      {summary.daysLeftOut > 0 && (
+        <p className="mt-3 text-[11px] text-muted-foreground">
+          {summary.daysLeftOut} {summary.daysLeftOut === 1 ? 'day is' : 'days are'}{' '}
+          left out of the averages (nothing logged, or marked untracked).
+        </p>
+      )}
+
       <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[11px] text-muted-foreground">
         <LegendKey color="hsl(var(--primary))" label="On target (±10%)" />
         <LegendKey color="hsl(var(--kcal))" label="Over / under" />
-        <LegendKey color="hsl(var(--muted))" label="No entries" />
+        <LegendKey color="hsl(var(--muted))" label="Not tracked" />
         <span className="flex items-center gap-1.5">
           <span className="inline-block h-0 w-3.5 border-t border-dashed border-foreground/50" />
           Daily target

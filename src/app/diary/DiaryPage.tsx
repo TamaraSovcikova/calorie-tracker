@@ -46,9 +46,8 @@ import {
 } from '@/db/repos/diary';
 import { toast } from '@/components/ui/toast';
 import { useExerciseDay, totalBurned } from '@/db/repos/exercise';
-import { updateProfile, useProfile } from '@/db/repos/profile';
+import { useProfile } from '@/db/repos/profile';
 import {
-  parseUntrackedDates,
   useWeeklyBudget,
 } from '@/features/weekly-budget/weeklyBudget';
 import { WeeklyDigestCard } from '@/features/digest/WeeklyDigestCard';
@@ -60,6 +59,9 @@ import { useReservationSchedule } from '@/features/reservations/dailyGoal';
 import { dayEffect } from '@/features/reservations/reservations';
 import { ReservationDayNote } from '@/features/reservations/ReservationDayNote';
 import { TargetBreakdownSheet } from '@/features/diary/TargetBreakdownSheet';
+import { parseDayMarks } from '@/features/day-status/dayStatus';
+import { setDayMark } from '@/features/day-status/useSuspectDay';
+import { UnderLoggedCard } from '@/features/day-status/UnderLoggedCard';
 import { MEAL_SECTIONS, type DiaryEntry, type MealSection } from '@/db/types';
 
 export function DiaryPage() {
@@ -135,14 +137,12 @@ export function DiaryPage() {
   };
 
   const onToday = isToday(currentDate);
-  const untrackedDays = parseUntrackedDates(profile?.untracked_dates);
-  const isUntracked = untrackedDays.has(currentDate);
+  const dayMark = parseDayMarks(profile?.untracked_dates).get(currentDate);
+  // "ok" is a confirmation that the day is right as logged, not a flag.
+  const isUntracked = !!dayMark && !dayMark.ok;
   const toggleUntracked = () => {
     if (!profile) return;
-    const next = new Set(untrackedDays);
-    if (next.has(currentDate)) next.delete(currentDate);
-    else next.add(currentDate);
-    void updateProfile({ untracked_dates: JSON.stringify([...next].sort()) });
+    void setDayMark(profile, currentDate, isUntracked ? null : {});
     setMenuOpen(false);
   };
 
@@ -299,7 +299,7 @@ export function DiaryPage() {
                         Build a meal from foods
                       </button>
                     )}
-                    {weekly && (
+                    {profile && (
                       <button
                         type="button"
                         onClick={toggleUntracked}
@@ -519,7 +519,11 @@ export function DiaryPage() {
           <div className="flex items-start gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
             <CalendarOff className="mt-0.5 h-3.5 w-3.5 shrink-0" />
             <span>
-              This day is marked untracked - your weekly budget counts it as on-target, not by what's logged here.
+              {dayMark?.over !== undefined
+                ? dayMark.over === 0
+                  ? "You estimated this day as about on goal - totals use that, not what's logged here."
+                  : `You estimated this day at about ${dayMark.over} kcal over goal - totals use that, not what's logged here.`
+                : "This day is marked untracked - totals count it as on-target, not by what's logged here."}
             </span>
           </div>
         )}
@@ -546,6 +550,8 @@ export function DiaryPage() {
             photo - and swipe a past day's row to copy it here.
           </CoachTip>
         )}
+
+        {!selectMode && onToday && profile && <UnderLoggedCard profile={profile} />}
 
         {!selectMode && onToday && <WeeklyDigestCard />}
 

@@ -4,6 +4,11 @@
  * beyond a localStorage "last seen week" marker.
  */
 
+import {
+  averageEffective,
+  parseDayMarks,
+  resolveDay,
+} from '@/features/day-status/dayStatus';
 import { useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { format } from 'date-fns';
@@ -60,19 +65,30 @@ export async function computeWeeklyDigest(
   for (const e of entries) {
     kcalByDate.set(e.date, (kcalByDate.get(e.date) ?? 0) + e.kcal);
   }
-  const loggedKcals = [...kcalByDate.values()];
-  const daysLogged = loggedKcals.length;
-  const avgKcal =
-    daysLogged > 0 ? loggedKcals.reduce((a, b) => a + b, 0) / daysLogged : 0;
   // Each day is judged against its own goal - a diet pause raises it for the
   // days it covers, and those days should read as on-target, not as blowouts.
+  // Days marked untracked are left out, estimates count as the estimate.
   const goalOn = composedGoalResolver(profile, await loadSchedule(profile));
-  const daysOnTarget = dates.filter((d) => {
-    const k = kcalByDate.get(d);
-    if (k === undefined) return false;
+  const marks = parseDayMarks(profile.untracked_dates);
+  const today = todayLocal();
+  const resolved = dates.map((d) => {
     const goal = goalOn(d);
-    return goal > 0 && Math.abs(k - goal) / goal <= 0.1;
-  }).length;
+    const k = kcalByDate.get(d);
+    return {
+      goal,
+      r: resolveDay(
+        { date: d, kcal: k ?? 0, hasEntries: k !== undefined, goal },
+        marks.get(d),
+        today,
+      ),
+    };
+  });
+  const counted = resolved.filter((x) => x.r.inAverage);
+  const daysLogged = counted.length;
+  const avgKcal = averageEffective(resolved.map((x) => x.r));
+  const daysOnTarget = counted.filter(
+    (x) => x.goal > 0 && Math.abs(x.r.effective - x.goal) / x.goal <= 0.1,
+  ).length;
 
   const exercise = await db.exercise_entries
     .where('[user_id+date]')
