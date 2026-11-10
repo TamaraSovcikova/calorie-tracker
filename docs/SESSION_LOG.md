@@ -6,12 +6,71 @@ How to use:
 - Start of session: read only the top entry, announce the chat number.
 - End of session: prepend a new entry, bump `Session count`.
 
-Session count: 10
-Last updated: 2026-09-10
+Session count: 11
+Last updated: 2026-11-10
 
 > **This file is the live log.** `Projects/calorie_tracker/docs/SESSION_LOG.md` in
 > the OneDrive vault is a stale copy that stopped at Chat #2 (2026-06-19); the
 > project CLAUDE.md used to point there. Fixed 2026-08-13. Append here.
+
+---
+
+## Chat #5 - 2026-11-10 (search rework, scroll-lock fix, recipe scan fixes, under-logged days; NOT pushed, NOT deployed)
+
+Tamara brought a list of daily frustrations. Investigated all of them first,
+agreed an order, then built four of six. All on branch
+`claude/peaceful-volta-hdy861`, four commits, 445 tests. Nothing pushed (push
+was not approved in the session) and nothing deployed. No D1 change needed
+for any of it.
+
+### Done
+
+- **Frozen meal editor** (`bc5038d`). Sheet saved/restored
+  `body.style.overflow`; two stacked sheets re-running their effects left
+  'hidden' behind. Now a ref-counted lock in `components/ui/scrollLock.ts`.
+  Sheet keeps `onClose` in a ref, so the effect no longer re-runs per parent
+  render (that re-run also stole focus and closed the keyboard).
+- **Search** (`75bcc33`). Scanned products were only shown while in the 50
+  most recent foods, and local matches were cut to 30 by name prefix before
+  usage counted. Now one "Yours" group (custom, starred, logged, scanned, or
+  a meal ingredient), ranked by usage, never truncated. Grouping is pure and
+  tested in `food-search/searchRanking.ts`. Remote hits are no longer cached
+  on every search: `ensureFoodSaved` stores one when it is picked. Same
+  name+brand rows collapse. USDA brand rows sit behind a "more results" tap.
+  Meals are out of the diary search. Recent = last logged or scanned.
+- **Recipe scan** (`ddf782d`). "yellow" is a variety word; never-used
+  packaged/shared rows are not ingredient candidates (`isMatchable`);
+  duplicate ingredients merge (`recipe-scan/mergeIngredients.ts`); flagged
+  matches must be checked before Create meal; OFF prefers `product_name_en`.
+- **Under-logged days** (`61436ef`). `features/day-status/`. `resolveDay()`
+  is the one place that decides what a day counts as; budget, progress and
+  digest all use it. Marks (untracked / estimate / confirmed) live in the
+  existing `untracked_dates` JSON; a plain date string still means untracked.
+  `UnderLoggedCard` on today's diary asks about the newest finished day
+  logged under 60% of goal.
+
+### Decisions Tamara made
+
+- USDA brand results: behind a tap for now; hide entirely if never used.
+- Meals fully out of the diary search.
+- Under-logged threshold 60% of the day's goal.
+- A logged low day is NOT auto-neutralised in the budget (an existing test
+  pins that). It only changes once she answers the card.
+
+### Not done
+
+- **Meal prep / batches.** Agreed direction: split Recipe (template) from
+  Batch (one dated cook, archived when eaten), scale by one ingredient, fit
+  sides to a protein/kcal target, log by grams for things like a salad bowl.
+  Needs a schema decision (D1 columns or a new table) before building.
+- **Compare tool.** 2 to 4 products side by side per 100 g / per pack / "to
+  hit N g protein", with hand-entered price. Price storage undecided.
+- Pet roll-forward still ignores day marks.
+- `rewriteUserId` in `db/sync/userMigration.ts` does not cover `reservations`
+  (found in passing, not fixed).
+- Verified in headless Chromium with seeded data only. Live USDA / Open Food
+  Facts calls were not reachable there, so the live-result path and
+  everything on a real phone are unverified.
 
 ---
 
