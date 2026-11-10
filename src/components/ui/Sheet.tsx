@@ -2,6 +2,7 @@ import { useEffect, useRef, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/cn';
+import { lockBodyScroll } from './scrollLock';
 
 interface SheetProps {
   open: boolean;
@@ -43,6 +44,12 @@ export function Sheet({
   fullScreenMobile = true,
 }: SheetProps) {
   const ref = useRef<HTMLDivElement>(null);
+  // Callers almost always pass an inline onClose. Keeping it in a ref means
+  // the effect below runs once per open, not once per parent render: a
+  // re-run stole focus from the input being typed in (closing the keyboard)
+  // and reshuffled the sheet stack.
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   useEffect(() => {
     if (!open) return;
@@ -62,7 +69,7 @@ export function Sheet({
       // A sheet under another sheet ignores the keyboard entirely.
       if (!isTopmost()) return;
       if (e.key === 'Escape') {
-        onClose();
+        onCloseRef.current();
         return;
       }
       if (e.key !== 'Tab' || !sheet) return;
@@ -85,19 +92,17 @@ export function Sheet({
     };
     window.addEventListener('keydown', onKey);
 
-    // Lock background scroll.
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
+    const unlockScroll = lockBodyScroll();
 
     return () => {
       window.removeEventListener('keydown', onKey);
       const at = sheetStack.indexOf(stackId);
       if (at >= 0) sheetStack.splice(at, 1);
-      document.body.style.overflow = prevOverflow;
+      unlockScroll();
       // Restore focus to whatever triggered the sheet.
       previouslyFocused?.focus?.();
     };
-  }, [open, onClose]);
+  }, [open]);
 
   if (!open) return null;
 

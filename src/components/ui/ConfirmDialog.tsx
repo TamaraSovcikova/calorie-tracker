@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { lockBodyScroll } from './scrollLock';
 import { createPortal } from 'react-dom';
 import { Button } from './Button';
 
@@ -35,11 +36,10 @@ export function ConfirmDialog({
       if (e.key === 'Escape') onCancel();
     };
     window.addEventListener('keydown', onKey);
-    const prevOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
+    const unlockScroll = lockBodyScroll();
     return () => {
       window.removeEventListener('keydown', onKey);
-      document.body.style.overflow = prevOverflow;
+      unlockScroll();
     };
   }, [open, onCancel]);
 
