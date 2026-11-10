@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Check, Plus } from 'lucide-react';
 import { Sheet } from '@/components/ui/Sheet';
 import { Input, LabeledInput } from '@/components/ui/Input';
+import { ensureFoodSaved } from '@/db/repos/foods';
 import { useFoodSearch } from './useFoodSearch';
 import { computeMacros } from './foodMath';
 import type { Food } from '@/db/types';
@@ -185,8 +186,8 @@ function SearchForFood({
 
   const results = useMemo(() => {
     const groups = query.trim()
-      ? [search.recentMatches, search.myProducts, search.library, search.common, search.packaged]
-      : [search.favorites, search.frequent, search.recents];
+      ? [search.yours, search.common, search.packaged]
+      : [search.recents, search.favorites, search.frequent];
     const seen = new Set<string>();
     const out: Food[] = [];
     for (const g of groups) {
@@ -223,7 +224,7 @@ function SearchForFood({
             <li key={f.id}>
               <button
                 type="button"
-                onClick={() => onPick(f)}
+                onClick={() => void ensureFoodSaved(f).then(onPick)}
                 className="flex w-full items-center gap-3 px-3 py-2.5 text-left hover:bg-muted/50"
               >
                 <span className="min-w-0 flex-1">

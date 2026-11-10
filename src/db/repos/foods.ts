@@ -105,19 +105,22 @@ function localRelevance(food: Food, q: string): number {
   return 0; // matched only after normalisation
 }
 
-/** Ceiling on how many rows we normalise before ranking. */
-const SEARCH_SCAN_CAP = 400;
-
 /**
  * Search local foods across name + brand, for the add-food sheet. Uses the
  * app-wide matcher, so accents, word order and French/Dutch names all work.
  *
- * Ranks BEFORE truncating. It used to take the first `limit * 3` rows Dexie
- * happened to walk past, sort those by source and date, and cut to 20 - so
- * with a few thousand cached foods an exact name match could be dropped
- * before relevance was ever considered.
+ * `keepIds` are the foods the user has logged, scanned or cooked with. They,
+ * her own products and her favourites are returned in full and are exempt
+ * from `limit`. The limit used to apply to everything, ranked by how the
+ * name STARTS, so "Runny honey" scanned fifty times lost its place to thirty
+ * cached database rows called "Honey ..." before her usage was ever looked
+ * at. Only the anonymous cached rows are truncated now.
  */
-export async function searchLocalFoods(query: string, limit = 20): Promise<Food[]> {
+export async function searchLocalFoods(
+  query: string,
+  limit = 20,
+  keepIds: ReadonlySet<string> = new Set(),
+): Promise<Food[]> {
   const q = query.trim().toLowerCase();
   if (!q) return [];
   const userId = currentUserId();
@@ -130,7 +133,6 @@ export async function searchLocalFoods(query: string, limit = 20): Promise<Food[
           !f.deleted_at &&
           matchesSearchQuery(`${f.name} ${f.brand ?? ''}`, q, { fuzzy }),
       )
-      .limit(SEARCH_SCAN_CAP)
       .toArray();
 
   let matches = await scan(false);
@@ -138,23 +140,39 @@ export async function searchLocalFoods(query: string, limit = 20): Promise<Food[
   // real answers should never be diluted by near-misses.
   if (matches.length === 0) matches = await scan(true);
 
-  // relevance, then custom first, then most-recently-updated
-  return matches
+  const isKept = (f: Food) =>
+    f.source === 'custom' || !!f.favorite || keepIds.has(f.id);
+  const kept = matches.filter(isKept);
+  const rest = matches
+    .filter((f) => !isKept(f))
+    // relevance, then most-recently-updated
     .sort((a, b) => {
       const ra = localRelevance(a, q);
       const rb = localRelevance(b, q);
       if (ra !== rb) return rb - ra;
-      if (a.source !== b.source) return a.source === 'custom' ? -1 : 1;
       return a.updated_at < b.updated_at ? 1 : -1;
     })
     .slice(0, limit);
+  return [...kept, ...rest];
+}
+
+/**
+ * Save a food picked from live search results, without touching a row that
+ * is already stored. Search results are no longer cached wholesale (that is
+ * what filled the library with fifty near-identical "HONEY" rows), so a
+ * remote hit only becomes a local food at the moment it is chosen.
+ */
+export async function ensureFoodSaved(food: Food): Promise<Food> {
+  const existing = await db.foods.get(food.id);
+  if (existing && !existing.deleted_at) return existing;
+  await db.foods.put(food);
+  return food;
 }
 
 /**
  * Prune cached OFF / USDA food rows that haven't been touched in a while
- * and aren't referenced by any diary entry or saved meal. Every search
- * caches its hits into Dexie, so without this the table (and every sync
- * payload) grows unbounded. My Products and curated foods are never
+ * and aren't referenced by any diary entry, saved meal, scan or favourite.
+ * Older versions cached every search hit into Dexie; this drains those. My Products and curated foods are never
  * pruned. Runs once at startup.
  */
 export async function pruneStaleSearchCache(maxAgeDays = 60): Promise<void> {
@@ -166,6 +184,10 @@ export async function pruneStaleSearchCache(maxAgeDays = 60): Promise<void> {
   await db.meal_items.each((it) => {
     if (it.food_id) referenced.add(it.food_id);
   });
+  // Scanned but never logged: still hers. This used to be deleted here.
+  await db.food_recents.each((r) => {
+    referenced.add(r.food_id);
+  });
   const stale = await db.foods
     .where('user_id')
     .equals(currentUserId())
@@ -173,6 +195,7 @@ export async function pruneStaleSearchCache(maxAgeDays = 60): Promise<void> {
       (f) =>
         (f.source === 'off' || f.source === 'usda' || f.source === 'shared') &&
         f.updated_at < cutoff &&
+        !f.favorite &&
         !referenced.has(f.id),
     )
     .primaryKeys();

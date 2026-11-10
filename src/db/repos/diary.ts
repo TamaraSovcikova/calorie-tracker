@@ -376,6 +376,77 @@ export async function foodFrequencyScores(): Promise<Map<string, number>> {
   return scores;
 }
 
+/**
+ * Everything search needs to know about what this user actually eats.
+ *
+ * `frequency` is the same decayed count as {@link foodFrequencyScores}, plus
+ * credit for the ingredients of every meal she logs: a rice she only ever
+ * eats inside a meal prep is still her rice. `usedIds` is the wider "she has
+ * touched this" set: logged, scanned, or an ingredient of a saved meal. It
+ * is what keeps a food visible in search no matter how long ago that was.
+ */
+export async function foodUsage(): Promise<{
+  frequency: Map<string, number>;
+  usedIds: Set<string>;
+}> {
+  const userId = currentUserId();
+  const today = fromLocalDate(todayLocal());
+  const frequency = new Map<string, number>();
+  const usedIds = new Set<string>();
+
+  // meal id -> ingredient food ids, for the user's live meals.
+  const mealIds = (
+    await db.meals
+      .where('user_id')
+      .equals(userId)
+      .filter((m) => !m.deleted_at)
+      .primaryKeys()
+  ) as string[];
+  const ingredients = new Map<string, string[]>();
+  if (mealIds.length > 0) {
+    await db.meal_items
+      .where('meal_id')
+      .anyOf(mealIds)
+      .each((it) => {
+        if (!it.food_id) return;
+        usedIds.add(it.food_id);
+        const list = ingredients.get(it.meal_id);
+        if (list) list.push(it.food_id);
+        else ingredients.set(it.meal_id, [it.food_id]);
+      });
+  }
+
+  await db.diary_entries
+    .where('[user_id+date]')
+    .between([userId, '0000-00-00'], [userId, '9999-99-99'])
+    .each((e) => {
+      if (e.deleted_at) return;
+      const ids =
+        e.kind === 'food' && e.food_id
+          ? [e.food_id]
+          : e.kind === 'meal' && e.meal_id
+            ? (ingredients.get(e.meal_id) ?? [])
+            : [];
+      if (ids.length === 0) return;
+      const ageDays = Math.max(
+        0,
+        differenceInCalendarDays(today, fromLocalDate(e.date)),
+      );
+      const weight = Math.pow(0.5, ageDays / FREQUENCY_HALF_LIFE_DAYS);
+      for (const id of ids) {
+        usedIds.add(id);
+        frequency.set(id, (frequency.get(id) ?? 0) + weight);
+      }
+    });
+
+  await db.food_recents
+    .where('user_id')
+    .equals(userId)
+    .each((r) => usedIds.add(r.food_id));
+
+  return { frequency, usedIds };
+}
+
 export async function frequentFoods(limit = 20): Promise<string[]> {
   const scores = await foodFrequencyScores();
   return [...scores.entries()]

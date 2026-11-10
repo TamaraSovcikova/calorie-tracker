@@ -14,19 +14,21 @@ import { Button } from '@/components/ui/Button';
 import { CoachTip } from '@/components/ui/CoachTip';
 import { useFoodSearch } from './useFoodSearch';
 import { FoodResultRow } from './FoodResultRow';
-import { toggleFavorite } from '@/db/repos/foods';
+import { ensureFoodSaved, toggleFavorite } from '@/db/repos/foods';
 import { useMealsWithTotals } from '@/features/meals/useMealsWithTotals';
 import { matchesMealQuery } from '@/features/meals/mealMath';
 import { formatKcal } from '@/lib/macros';
 import type { Food, Meal, MealSection } from '@/db/types';
 
 interface FoodSearchPanelProps {
-  section: MealSection;
+  /** Diary section being added to. Omit where there is none (meal builder). */
+  section?: MealSection;
   onPick: (food: Food) => void;
   onManualEntry: (presetName: string) => void;
   /** When provided, saved meals matching the query are offered alongside
-   *  foods. Omitted where logging a whole meal makes no sense, e.g. while
-   *  picking an ingredient for a meal you are building. */
+   *  foods. Only for pickers with no Meals tab of their own (reservations).
+   *  The diary search leaves this out on purpose: twenty rice meals above
+   *  the first rice is not a food search. Meals are logged from Meals. */
   onPickMeal?: (meal: Meal) => void;
 }
 
@@ -116,21 +118,21 @@ type Category = 'all' | 'favourites' | 'frequent' | 'recent';
 
 export function FoodSearchPanel({
   section,
-  onPick,
+  onPick: onPickSaved,
   onManualEntry,
   onPickMeal,
 }: FoodSearchPanelProps) {
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState<Category>('all');
+  const [showBranded, setShowBranded] = useState(false);
   const {
     favorites,
     frequent,
     recents,
-    recentMatches,
-    myProducts,
-    library,
+    yours,
     common,
     packaged,
+    branded,
     isSearching,
     rateLimitedSeconds,
     errorBanner,
@@ -152,10 +154,15 @@ export function FoodSearchPanel({
       .slice(0, 6);
   }, [allMeals, query, hasQuery, onPickMeal]);
 
-  const handleFav = (food: Food) => void toggleFavorite(food.id);
+  // A remote hit is only stored once it is chosen (picked or starred).
+  const onPick = (food: Food) =>
+    void ensureFoodSaved(food).then(onPickSaved, () => onPickSaved(food));
+  const handleFav = (food: Food) =>
+    void ensureFoodSaved(food).then((f) => toggleFavorite(f.id));
   // Reset category filter when user starts typing
   const handleQueryChange = (v: string) => {
     setQuery(v);
+    setShowBranded(false);
     if (v.trim().length > 0) setCategory('all');
   };
   const emptyStateEmpty =
@@ -164,11 +171,14 @@ export function FoodSearchPanel({
     hasQuery &&
     !isSearching &&
     mealMatches.length === 0 &&
-    myProducts.length === 0 &&
-    recentMatches.length === 0 &&
-    library.length === 0 &&
+    yours.length === 0 &&
     common.length === 0 &&
-    packaged.length === 0;
+    packaged.length === 0 &&
+    branded.length === 0;
+  const favIds = useMemo(() => new Set(favorites.map((f) => f.id)), [favorites]);
+  // "All" lists a food once: starred ones sit under Favourites.
+  const recentsShown =
+    category === 'recent' ? recents : recents.filter((f) => !favIds.has(f.id));
 
   return (
     <div className="flex flex-col">
@@ -186,12 +196,14 @@ export function FoodSearchPanel({
             <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-muted-foreground" />
           )}
         </div>
-        <p className="text-xs text-muted-foreground">
-          Adding to{' '}
-          <span className="font-medium text-foreground">
-            {SECTION_TITLES[section]}
-          </span>
-        </p>
+        {section && (
+          <p className="text-xs text-muted-foreground">
+            Adding to{' '}
+            <span className="font-medium text-foreground">
+              {SECTION_TITLES[section]}
+            </span>
+          </p>
+        )}
         {!hasQuery && (favorites.length > 0 || frequent.length > 0 || recents.length > 0) && (
           <div className="flex gap-1.5 overflow-x-auto pb-0.5" style={{ scrollbarWidth: 'none' }}>
             {(
@@ -267,16 +279,16 @@ export function FoodSearchPanel({
                 ))}
               </Group>
             )}
-            {(category === 'all' || category === 'frequent') && frequent.length > 0 && (
-              <Group title="Frequently logged">
-                {frequent.map((f) => (
+            {(category === 'all' || category === 'recent') && recentsShown.length > 0 && (
+              <Group title="Recent" hint="last logged or scanned">
+                {recentsShown.map((f) => (
                   <FoodResultRow key={f.id} food={f} onClick={onPick} onToggleFavorite={handleFav} />
                 ))}
               </Group>
             )}
-            {(category === 'all' || category === 'recent') && recents.length > 0 && (
-              <Group title="Recent" hint={`${recents.length}`}>
-                {recents.map((f) => (
+            {category === 'frequent' && frequent.length > 0 && (
+              <Group title="Frequently logged">
+                {frequent.map((f) => (
                   <FoodResultRow key={f.id} food={f} onClick={onPick} onToggleFavorite={handleFav} />
                 ))}
               </Group>
@@ -308,35 +320,9 @@ export function FoodSearchPanel({
               </Group>
             )}
 
-            {myProducts.length > 0 && (
-              <Group title="My Products">
-                {myProducts.map((f) => (
-                  <FoodResultRow
-                    key={f.id}
-                    food={f}
-                    onClick={onPick}
-                    onToggleFavorite={handleFav}
-                  />
-                ))}
-              </Group>
-            )}
-
-            {recentMatches.length > 0 && (
-              <Group title="Recently used">
-                {recentMatches.map((f) => (
-                  <FoodResultRow
-                    key={f.id}
-                    food={f}
-                    onClick={onPick}
-                    onToggleFavorite={handleFav}
-                  />
-                ))}
-              </Group>
-            )}
-
-            {library.length > 0 && (
-              <Group title="Saved & scanned">
-                {library.map((f) => (
+            {yours.length > 0 && (
+              <Group title="Yours" hint="most used first">
+                {yours.map((f) => (
                   <FoodResultRow
                     key={f.id}
                     food={f}
@@ -348,7 +334,7 @@ export function FoodSearchPanel({
             )}
 
             {common.length > 0 && (
-              <Group title="Common foods" hint="USDA">
+              <Group title="Common foods">
                 {common.map((f) => (
                   <FoodResultRow
                     key={f.id}
@@ -363,6 +349,31 @@ export function FoodSearchPanel({
             {showPackaged && packaged.length > 0 && (
               <Group title="Packaged products">
                 {packaged.map((f) => (
+                  <FoodResultRow
+                    key={f.id}
+                    food={f}
+                    onClick={onPick}
+                    onToggleFavorite={handleFav}
+                  />
+                ))}
+              </Group>
+            )}
+
+            {showPackaged && branded.length > 0 && !showBranded && (
+              <div className="px-2">
+                <button
+                  type="button"
+                  onClick={() => setShowBranded(true)}
+                  className="tap-target w-full rounded-lg border border-dashed border-border px-3 py-2 text-xs font-medium text-muted-foreground hover:bg-muted/50"
+                >
+                  Show {branded.length} more brand-name{' '}
+                  {branded.length === 1 ? 'result' : 'results'} (USDA)
+                </button>
+              </div>
+            )}
+            {showPackaged && showBranded && branded.length > 0 && (
+              <Group title="Brand-name results" hint="USDA">
+                {branded.map((f) => (
                   <FoodResultRow
                     key={f.id}
                     food={f}

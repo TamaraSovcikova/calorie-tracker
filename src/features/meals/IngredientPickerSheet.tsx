@@ -1,4 +1,5 @@
 import { lazy, Suspense, useCallback, useState } from 'react';
+import { recordFoodSeen } from '@/db/repos/diary';
 import { Loader2 } from 'lucide-react';
 import { Sheet } from '@/components/ui/Sheet';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
@@ -107,6 +108,7 @@ export function IngredientPickerSheet({
   const handleSave = (state: QuantityState, macros: ResolvedMacros) => {
     if (step.kind !== 'quantity') return;
     if (macros.grams <= 0) return;
+    void recordFoodSeen(step.food.id);
     onPicked(
       { food_id: step.food.id, qty: state.qty, unit: macros.unit },
       step.food,
@@ -128,12 +130,16 @@ export function IngredientPickerSheet({
         )
         .first();
       if (cached) {
+        // A scan is a scan wherever it happens: it goes in recents even if
+        // the meal is never saved.
+        void recordFoodSeen(cached.id);
         setStep({ kind: 'quantity', food: cached });
         return;
       }
       const food = await lookupBarcode(code);
       if (food) {
         await db.foods.put(food);
+        void recordFoodSeen(food.id);
         setStep({ kind: 'quantity', food });
         return;
       }
@@ -172,7 +178,6 @@ export function IngredientPickerSheet({
         </div>
         {tab === 'search' && (
           <FoodSearchPanel
-            section="snacks"
             onPick={handlePick}
             onManualEntry={handleManualEntry}
           />
