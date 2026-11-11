@@ -18,6 +18,29 @@ export interface DayOutcome {
   overGoal: boolean;
 }
 
+/**
+ * What a resolved day means to the pet, or null when the day should not
+ * move the score at all.
+ *
+ * A day the user marked untracked is null: they told the app about it, so
+ * it is neither a skipped day (-10) nor a logged one. An estimated day
+ * counts as logged, judged on the estimate. An empty past day is still a
+ * skipped day; that dip is the pet's whole job.
+ */
+export function outcomeForDay(
+  day: { kind: string; effective: number },
+  goalKcal: number,
+): DayOutcome | null {
+  if (day.kind === 'untracked') return null;
+  const logged = day.kind === 'logged' || day.kind === 'estimated';
+  const kcal = logged ? day.effective : 0;
+  return {
+    logged,
+    hitGoal: logged && goalKcal > 0 && Math.abs(kcal - goalKcal) / goalKcal <= 0.1,
+    overGoal: goalKcal > 0 && kcal / goalKcal > 1.1,
+  };
+}
+
 function clampWellbeing(score: number): number {
   return Math.max(WELLBEING_MIN, Math.min(WELLBEING_MAX, score));
 }

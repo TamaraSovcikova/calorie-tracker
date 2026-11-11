@@ -45,7 +45,13 @@ describe('day marks storage', () => {
 describe('resolveDay', () => {
   it('flags a finished day logged under 60% of its goal', () => {
     const r = resolveDay(day('2026-11-09', 1000), undefined, today);
-    expect(r).toMatchObject({ kind: 'logged', effective: 1000, suspect: true });
+    // Real number kept for the budget, but out of the average for now.
+    expect(r).toMatchObject({
+      kind: 'logged',
+      effective: 1000,
+      suspect: true,
+      inAverage: false,
+    });
     expect(resolveDay(day('2026-11-09', 1100), undefined, today).suspect).toBe(false);
   });
 
@@ -55,7 +61,12 @@ describe('resolveDay', () => {
 
   it('stops flagging once confirmed, and keeps the real number', () => {
     const r = resolveDay(day('2026-11-09', 1000), { ok: true }, today);
-    expect(r).toMatchObject({ kind: 'logged', effective: 1000, suspect: false });
+    expect(r).toMatchObject({
+      kind: 'logged',
+      effective: 1000,
+      suspect: false,
+      inAverage: true,
+    });
   });
 
   it('counts an untracked or empty past day as exactly on goal, outside the average', () => {
@@ -91,6 +102,13 @@ describe('averageEffective', () => {
       resolveDay(day('2026-11-09', 900), { over: 400 }, today), // estimate
     ];
     expect(averageEffective(days)).toBe((1800 + 2100) / 2);
+  });
+
+  it('leaves out a low day nobody has answered for, until it is confirmed', () => {
+    const good = resolveDay(day('2026-11-06', 1800), undefined, today);
+    const low = day('2026-11-07', 700);
+    expect(averageEffective([good, resolveDay(low, undefined, today)])).toBe(1800);
+    expect(averageEffective([good, resolveDay(low, { ok: true }, today)])).toBe(1250);
   });
 });
 

@@ -86,15 +86,17 @@ function SummaryBody({
         )}
         <div className="flex h-full items-end gap-1">
           {summary.days.map((d) => {
-            // Left-out days get a stub: there is no number to draw.
-            const shown = d.inAverage ? d.counted : 0;
+            // Untracked and empty days get a stub: there is no number to
+            // draw. An unanswered low day still shows what was logged.
+            const shown = d.inAverage || d.suspect ? d.counted : 0;
             const h = maxKcal > 0 ? Math.max(2, (shown / maxKcal) * 96) : 2;
             const onTarget =
               d.inAverage &&
               d.goal > 0 &&
               Math.abs(d.counted - d.goal) / d.goal <= 0.1;
-            const status =
-              d.kind === 'untracked'
+            const status = d.suspect
+              ? 'looks incomplete, left out until you answer'
+              : d.kind === 'untracked'
                 ? 'untracked, left out'
                 : d.kind === 'empty' || d.kind === 'pending'
                   ? 'no entries'
@@ -138,10 +140,12 @@ function SummaryBody({
         </div>
       )}
 
-      {summary.daysLeftOut > 0 && (
+      {summary.daysLeftOut + summary.daysUnanswered > 0 && (
         <p className="mt-3 text-[11px] text-muted-foreground">
-          {summary.daysLeftOut} {summary.daysLeftOut === 1 ? 'day is' : 'days are'}{' '}
-          left out of the averages (nothing logged, or marked untracked).
+          {summary.daysLeftOut > 0 &&
+            `${summary.daysLeftOut} ${summary.daysLeftOut === 1 ? 'day' : 'days'} left out of the averages (nothing logged, or marked untracked). `}
+          {summary.daysUnanswered > 0 &&
+            `${summary.daysUnanswered} more ${summary.daysUnanswered === 1 ? 'looks' : 'look'} under-logged and ${summary.daysUnanswered === 1 ? 'is' : 'are'} left out until you answer on the Today screen.`}
         </p>
       )}
 

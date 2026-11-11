@@ -92,11 +92,22 @@ If the worker goes out first, every meal push fails on the unknown columns.
 - `findFoodByBarcode` replaces the two copies of the scan lookup that had
   drifted apart.
 
+### Day two, later: the three leftovers (all fixed)
+
+- **Averages.** An unanswered under-logged day is now left out of the
+  progress and digest averages until the card is answered. It still counts
+  at its real number in the weekly budget (the existing test that pins
+  "a real low day is not erased" stands).
+- **Pet.** `outcomeForDay` in `pet/wellbeing.ts`: a day marked untracked
+  does not move the score, an estimated day counts as logged and is judged
+  on the estimate. An empty past day is still a skipped day.
+- **Sync-code adoption.** `rewriteUserId` left `reservations`,
+  `food_recents`, `ingredient_aliases` and `food_prices` behind under the
+  old id. All four now move (the last three are re-keyed, their id embeds
+  the user id). Checked against a real IndexedDB in the browser.
+
 ### Not done
 
-- Pet roll-forward still ignores day marks.
-- `rewriteUserId` in `db/sync/userMigration.ts` does not cover `reservations`
-  (found in passing, not fixed).
 - Verified in headless Chromium with seeded data only. Live USDA / Open Food
   Facts calls were not reachable there, so the live-result path, the camera
   scanner and everything on a real phone are unverified.

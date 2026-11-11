@@ -22,6 +22,9 @@ import { getSyncConfig, setCursors } from './config';
  *  - weight_log - the id embeds the user id (`w:{user}:{date}`), so each
  *    row is re-keyed individually.
  *  - meal_items - no user_id (keyed by meal_id); nothing to do.
+ *  - reservations - user_id field, modify in place.
+ *  - food_recents / ingredient_aliases / food_prices - the id embeds the
+ *    user id, so each row is re-keyed.
  */
 export async function rewriteUserId(from: string, to: string): Promise<void> {
   if (from === to) return;
@@ -36,6 +39,10 @@ export async function rewriteUserId(from: string, to: string): Promise<void> {
       db.weight_log,
       db.fitbit_tokens,
       db.pet,
+      db.reservations,
+      db.food_recents,
+      db.ingredient_aliases,
+      db.food_prices,
     ],
     async () => {
       // user_id IS the primary key here - re-key with delete + put.
@@ -67,6 +74,36 @@ export async function rewriteUserId(from: string, to: string): Promise<void> {
       for (const w of weights) {
         await db.weight_log.delete(w.id);
         await db.weight_log.put({ ...w, user_id: to, id: `w:${to}:${w.date}` });
+      }
+
+      // Tables added after this function was written. They were left
+      // behind under the old id, so adopting a sync code silently dropped
+      // every reservation, the recents list, learned ingredient choices
+      // and saved prices.
+      await db.reservations.where('user_id').equals(from).modify({ user_id: to });
+
+      // These three embed the user id in the primary key: re-key each row.
+      const recents = await db.food_recents.where('user_id').equals(from).toArray();
+      for (const r of recents) {
+        await db.food_recents.delete(r.id);
+        await db.food_recents.put({ ...r, user_id: to, id: `${to}:${r.food_id}` });
+      }
+      const aliases = await db.ingredient_aliases
+        .where('user_id')
+        .equals(from)
+        .toArray();
+      for (const a of aliases) {
+        await db.ingredient_aliases.delete(a.id);
+        await db.ingredient_aliases.put({
+          ...a,
+          user_id: to,
+          id: `ia:${to}:${a.phrase}`,
+        });
+      }
+      const prices = await db.food_prices.where('user_id').equals(from).toArray();
+      for (const p of prices) {
+        await db.food_prices.delete(p.id);
+        await db.food_prices.put({ ...p, user_id: to, id: `${to}:${p.food_id}` });
       }
     },
   );

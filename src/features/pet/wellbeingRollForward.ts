@@ -15,25 +15,41 @@ import {
   composedGoalResolver,
   loadSchedule,
 } from '@/features/reservations/dailyGoal';
-import { rollWellbeing, type DayOutcome } from './wellbeing';
+import { outcomeForDay, rollWellbeing, type DayOutcome } from './wellbeing';
+import {
+  parseDayMarks,
+  resolveDay,
+  type DayMarks,
+} from '@/features/day-status/dayStatus';
 
-/** How that day went: logged at all, hit the goal, or went over. */
+/**
+ * How that day went, or null when it should not count. `ownGoal` is the
+ * day's own goal, which is what an estimate ("about 500 over") is relative
+ * to; `judgeAgainst` is the target the day is graded on, which with the
+ * weekly budget on is that day's recalculated target.
+ */
 async function dayOutcome(
   date: LocalDate,
-  goalKcal: number,
-): Promise<DayOutcome> {
+  ownGoal: number,
+  judgeAgainst: number,
+  marks: DayMarks,
+): Promise<DayOutcome | null> {
   const rows = await db.diary_entries
     .where('[user_id+date]')
     .equals([currentUserId(), date])
     .filter((e) => !e.deleted_at)
     .toArray();
-
-  const logged = rows.length > 0;
-  const kcal = rows.reduce((sum, e) => sum + e.kcal, 0);
-  const hitGoal =
-    logged && goalKcal > 0 && Math.abs(kcal - goalKcal) / goalKcal <= 0.1;
-  const overGoal = goalKcal > 0 && kcal / goalKcal > 1.1;
-  return { logged, hitGoal, overGoal };
+  const resolved = resolveDay(
+    {
+      date,
+      kcal: rows.reduce((sum, e) => sum + e.kcal, 0),
+      hasEntries: rows.length > 0,
+      goal: ownGoal,
+    },
+    marks.get(date),
+    todayLocal(),
+  );
+  return outcomeForDay(resolved, judgeAgainst);
 }
 
 /** Roll the wellbeing score forward over any elapsed, un-evaluated days. */
@@ -49,6 +65,7 @@ export async function runWellbeingRollForward(): Promise<void> {
   // maintenance break isn't scored as a week of overeating and a day that
   // was funding a reservation isn't scored against a target it never had.
   const goalOn = composedGoalResolver(profile, await loadSchedule(profile));
+  const marks = parseDayMarks(profile.untracked_dates);
   let cursor = shiftDate(pet.wellbeing_evaluated_date, 1);
   // Guard against a wildly stale evaluated_date producing an endless loop.
   for (let guard = 0; cursor <= yesterday && guard < 400; guard++) {
@@ -57,11 +74,13 @@ export async function runWellbeingRollForward(): Promise<void> {
     const wb = profile.weekly_budget_enabled
       ? await computeWeeklyBudget(cursor, profile)
       : null;
-    outcomes.push(await dayOutcome(cursor, wb?.adjustedTarget ?? goalOn(cursor)));
+    const own = goalOn(cursor);
+    const outcome = await dayOutcome(cursor, own, wb?.adjustedTarget ?? own, marks);
+    if (outcome) outcomes.push(outcome);
     cursor = shiftDate(cursor, 1);
   }
-  if (outcomes.length === 0) return;
-
+  // Even when every elapsed day was untracked, the days are still evaluated:
+  // move the marker on so they are not looked at again.
   await updatePet({
     wellbeing: rollWellbeing(pet.wellbeing, outcomes),
     wellbeing_evaluated_date: yesterday,

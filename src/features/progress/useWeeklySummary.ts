@@ -29,6 +29,8 @@ export interface DailySummary {
   counted: number;
   /** Whether it is part of the averages. */
   inAverage: boolean;
+  /** Looks under-logged and has not been answered yet. */
+  suspect: boolean;
 }
 
 export interface WeeklySummary {
@@ -40,6 +42,8 @@ export interface WeeklySummary {
   daysCounted: number;
   /** Past days left out: nothing logged, or marked untracked. */
   daysLeftOut: number;
+  /** Days left out because they look under-logged and are unanswered. */
+  daysUnanswered: number;
 }
 
 /**
@@ -96,6 +100,7 @@ export function useWeeklySummary(
       kind: r.kind,
       counted: r.effective,
       inAverage: r.inAverage,
+      suspect: r.suspect,
     }));
 
     // Protein is only known for days logged for real.
@@ -116,6 +121,7 @@ export function useWeeklySummary(
       daysCounted: counted.length,
       daysLeftOut: days.filter((d) => d.kind === 'empty' || d.kind === 'untracked')
         .length,
+      daysUnanswered: days.filter((d) => d.suspect).length,
     };
   }, [profile, rangeDays]);
 }

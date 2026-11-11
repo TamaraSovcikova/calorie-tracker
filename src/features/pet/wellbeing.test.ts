@@ -54,3 +54,35 @@ describe('rollWellbeing', () => {
     expect(rollWellbeing(-20, [])).toBe(0);
   });
 });
+
+describe('outcomeForDay', () => {
+  it('skips a day marked untracked: no dip, no lift', async () => {
+    const { outcomeForDay } = await import('./wellbeing');
+    expect(outcomeForDay({ kind: 'untracked', effective: 1700 }, 1700)).toBeNull();
+  });
+
+  it('treats an estimated day as logged, judged on the estimate', async () => {
+    const { outcomeForDay } = await import('./wellbeing');
+    expect(outcomeForDay({ kind: 'estimated', effective: 2200 }, 1700)).toEqual({
+      logged: true,
+      hitGoal: false,
+      overGoal: true,
+    });
+    expect(outcomeForDay({ kind: 'estimated', effective: 1700 }, 1700)).toEqual({
+      logged: true,
+      hitGoal: true,
+      overGoal: false,
+    });
+  });
+
+  it('still counts an empty past day as skipped', async () => {
+    const { outcomeForDay } = await import('./wellbeing');
+    // An empty day resolves to its goal for budget purposes; the pet must
+    // not read that as "ate exactly on goal".
+    expect(outcomeForDay({ kind: 'empty', effective: 1700 }, 1700)).toEqual({
+      logged: false,
+      hitGoal: false,
+      overGoal: false,
+    });
+  });
+});

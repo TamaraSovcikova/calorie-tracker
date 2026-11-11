@@ -97,7 +97,8 @@ export interface ResolvedDay {
   effective: number;
   /** Whether the day belongs in a "daily average". */
   inAverage: boolean;
-  /** Logged, finished, and suspiciously low; nobody has ruled on it yet. */
+  /** Logged, finished, and suspiciously low; nobody has ruled on it yet.
+   *  Out of the average until answered. */
   suspect: boolean;
 }
 
@@ -128,16 +129,16 @@ export function resolveDay(
       ? { ...base, kind: 'empty', effective: day.goal, inAverage: false }
       : { ...base, kind: 'pending', effective: day.kcal, inAverage: false };
   }
-  return {
-    kind: 'logged',
-    effective: day.kcal,
-    inAverage: true,
-    suspect:
-      !mark?.ok &&
-      day.date < today &&
-      day.goal > 0 &&
-      day.kcal < day.goal * UNDER_LOGGED_RATIO,
-  };
+  const suspect =
+    !mark?.ok &&
+    day.date < today &&
+    day.goal > 0 &&
+    day.kcal < day.goal * UNDER_LOGGED_RATIO;
+  // A suspect day keeps its real number in the budget (a genuinely light
+  // day must not be erased on a guess), but stays out of the AVERAGE until
+  // it is answered. "What do I usually eat" should not be built on a day
+  // that is probably half-logged; confirming it puts it straight back.
+  return { kind: 'logged', effective: day.kcal, inAverage: !suspect, suspect };
 }
 
 /** Mean of the days that count, or 0 when none do. */
