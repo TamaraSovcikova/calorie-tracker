@@ -251,6 +251,21 @@ export interface FoodRecent {
 }
 
 /**
+ * What a product costs, for the compare tool. Kept on this device only (no
+ * sync): prices are a shop-floor scratchpad, and they differ per shop.
+ */
+export interface FoodPrice {
+  id: ID; // `${user_id}:${food_id}`
+  user_id: ID;
+  food_id: ID;
+  /** Price of one pack, in whatever currency the user shops in. */
+  price?: number;
+  /** Weight of one pack in grams. */
+  pack_g?: number;
+  updated_at: ISOTimestamp;
+}
+
+/**
  * A remembered answer to "which food is this ingredient?".
  *
  * Written when the user picks a food in the recipe-scan review, read first on

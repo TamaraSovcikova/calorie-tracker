@@ -1,4 +1,5 @@
-import { lazy, Suspense, useCallback, useState } from 'react';
+import { lazy, Suspense, useCallback, useRef, useState } from 'react';
+import { findFoodByBarcode } from '@/features/food-search/barcodeLookup';
 import { recordFoodSeen } from '@/db/repos/diary';
 import { Loader2 } from 'lucide-react';
 import { Sheet } from '@/components/ui/Sheet';
@@ -11,9 +12,7 @@ import { CaptureChooser, type CaptureKind } from '@/features/food-search/Capture
 import { aiUnavailableReason } from '@/features/settings/aiAvailability';
 import { analyzeLabel, type ScannedLabel } from '@/features/food-search/photoLabel';
 import type { QuantityState, ResolvedMacros } from '@/features/food-search/foodMath';
-import { lookupBarcode, OffRateLimitError } from '@/lib/off-api';
-import { db } from '@/db/dexie';
-import { currentUserId } from '@/db/userId';
+import { OffRateLimitError } from '@/lib/off-api';
 import type { Food } from '@/db/types';
 import type { MealItemInput } from '@/db/repos/meals';
 
@@ -28,7 +27,15 @@ interface IngredientPickerSheetProps {
   open: boolean;
   onClose: () => void;
   /** Called once with the new ingredient input - caller appends to the meal. */
-  onPicked: (item: MealItemInput, food: Food) => void;
+  onPicked?: (item: MealItemInput, food: Food) => void;
+  /**
+   * Pick a product only, with no amount step. The whole of this sheet
+   * (search, barcode, label scan, manual entry) is exactly what choosing a
+   * product for the compare tool needs, minus "how much".
+   */
+  onFood?: (food: Food) => void;
+  /** Sheet title on the first step. */
+  title?: string;
 }
 
 type Step =
@@ -48,6 +55,8 @@ export function IngredientPickerSheet({
   open,
   onClose,
   onPicked,
+  onFood,
+  title: pickTitle = 'Add ingredient',
 }: IngredientPickerSheetProps) {
   const [tab, setTab] = useState<Tab>('search');
   const [step, setStep] = useState<Step>({ kind: 'pick' });
@@ -99,17 +108,31 @@ export function IngredientPickerSheet({
     reset();
   };
 
-  const handlePick = (food: Food) => setStep({ kind: 'quantity', food });
+  /** A product was chosen: hand it straight back, or go on to the amount. */
+  const choose = (food: Food) => {
+    if (onFood) {
+      void recordFoodSeen(food.id);
+      onFood(food);
+      handleClose();
+      return;
+    }
+    setStep({ kind: 'quantity', food });
+  };
+  // handleBarcode has to keep a stable identity (see below), so it reaches
+  // the current `choose` through a ref.
+  const chooseRef = useRef(choose);
+  chooseRef.current = choose;
+
+  const handlePick = choose;
   const handleManualEntry = (name: string) =>
     setStep({ kind: 'manual', presetName: name || undefined });
-  const handleManualCreated = (food: Food) =>
-    setStep({ kind: 'quantity', food });
+  const handleManualCreated = choose;
 
   const handleSave = (state: QuantityState, macros: ResolvedMacros) => {
     if (step.kind !== 'quantity') return;
     if (macros.grams <= 0) return;
     void recordFoodSeen(step.food.id);
-    onPicked(
+    onPicked?.(
       { food_id: step.food.id, qty: state.qty, unit: macros.unit },
       step.food,
     );
@@ -121,26 +144,9 @@ export function IngredientPickerSheet({
     setScanError(null);
     setStep({ kind: 'looking-up', barcode: code });
     try {
-      // Use a library copy if we already have this barcode - instant, offline.
-      const cached = await db.foods
-        .where('user_id')
-        .equals(currentUserId())
-        .filter(
-          (f) => !f.deleted_at && (f.id === `off:${code}` || f.off_barcode === code),
-        )
-        .first();
-      if (cached) {
-        // A scan is a scan wherever it happens: it goes in recents even if
-        // the meal is never saved.
-        void recordFoodSeen(cached.id);
-        setStep({ kind: 'quantity', food: cached });
-        return;
-      }
-      const food = await lookupBarcode(code);
+      const food = await findFoodByBarcode(code);
       if (food) {
-        await db.foods.put(food);
-        void recordFoodSeen(food.id);
-        setStep({ kind: 'quantity', food });
+        chooseRef.current(food);
         return;
       }
       setStep({ kind: 'manual', presetBarcode: code });
@@ -163,7 +169,7 @@ export function IngredientPickerSheet({
   let title: string;
   let content: React.ReactNode;
   if (step.kind === 'pick') {
-    title = 'Add ingredient';
+    title = pickTitle;
     content = (
       <div className="flex h-full flex-col">
         <div className="border-b border-border p-3">

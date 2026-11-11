@@ -11,6 +11,7 @@ import type {
   Pet,
   Profile,
   Reservation,
+  FoodPrice,
   WeightEntry,
 } from './types';
 
@@ -36,6 +37,7 @@ class CalorieDB extends Dexie {
   food_recents!: EntityTable<FoodRecent, 'id'>;
   ingredient_aliases!: EntityTable<IngredientAlias, 'id'>;
   reservations!: EntityTable<Reservation, 'id'>;
+  food_prices!: EntityTable<FoodPrice, 'id'>;
 
   constructor() {
     super('calorie-tracker');
@@ -78,6 +80,12 @@ class CalorieDB extends Dexie {
     // trimming the goal of the days around it. Additive.
     this.version(6).stores({
       reservations: '&id, user_id, date, [user_id+date], deleted_at, updated_at',
+    });
+
+    // v7: pack price and size per product, for the compare tool. Local
+    // only, never synced. Additive.
+    this.version(7).stores({
+      food_prices: '&id, user_id, food_id',
     });
   }
 }

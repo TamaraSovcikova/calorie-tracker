@@ -1,4 +1,5 @@
 import { lazy, Suspense, useCallback, useState } from 'react';
+import { findFoodByBarcode } from './barcodeLookup';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import { Sheet } from '@/components/ui/Sheet';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
@@ -25,12 +26,10 @@ import {
   type QuantityState,
   type ResolvedMacros,
 } from './foodMath';
-import { createDiaryEntry, lastQuantityForFood, recordFoodSeen } from '@/db/repos/diary';
+import { createDiaryEntry, lastQuantityForFood } from '@/db/repos/diary';
 import { maybeShowFoodFact } from '@/features/food-facts/foodFacts';
 import { toast } from '@/components/ui/toast';
-import { db } from '@/db/dexie';
-import { currentUserId } from '@/db/userId';
-import { lookupBarcode, OffRateLimitError } from '@/lib/off-api';
+import { OffRateLimitError } from '@/lib/off-api';
 import { MealPicker } from '@/features/meals/MealPicker';
 import { LogMealStep } from '@/features/meals/LogMealStep';
 import { PhotoFoodStep } from '@/features/photo-log/PhotoFoodStep';
@@ -241,25 +240,8 @@ export function AddFoodSheet({
     setScanError(null);
     setStep({ kind: 'looking-up', barcode: code });
     try {
-      // Already in the library (scanned before / cached)? Use it - instant,
-      // works offline, and skips a redundant OFF call against the rate limit.
-      const cached = await db.foods
-        .where('user_id')
-        .equals(currentUserId())
-        .filter(
-          (f) => !f.deleted_at && (f.id === `off:${code}` || f.off_barcode === code),
-        )
-        .first();
-      if (cached) {
-        // A scan counts as "recently seen" even if the user never logs it.
-        void recordFoodSeen(cached.id);
-        setStep({ kind: 'quantity', food: cached });
-        return;
-      }
-      const food = await lookupBarcode(code);
+      const food = await findFoodByBarcode(code);
       if (food) {
-        await db.foods.put(food);
-        void recordFoodSeen(food.id);
         setStep({ kind: 'quantity', food });
         return;
       }
