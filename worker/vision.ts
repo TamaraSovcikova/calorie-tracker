@@ -41,9 +41,10 @@ export async function runVisionJson(
   env: Env,
   image: ArrayBuffer,
   prompt: string,
+  maxTokens = 1200,
 ): Promise<unknown> {
   const out = (await env.AI.run(VISION_MODEL, {
-    max_tokens: 1200,
+    max_tokens: maxTokens,
     messages: [
       {
         role: 'user',
@@ -56,6 +57,20 @@ export async function runVisionJson(
         ],
       },
     ],
+  })) as { response?: string };
+  return extractJson(out.response);
+}
+
+/** Run the same model on plain text + prompt; return its parsed JSON. */
+export async function runTextJson(
+  env: Env,
+  text: string,
+  prompt: string,
+  maxTokens = 1200,
+): Promise<unknown> {
+  const out = (await env.AI.run(VISION_MODEL, {
+    max_tokens: maxTokens,
+    messages: [{ role: 'user', content: `${prompt}\n\nRECIPE:\n${text}` }],
   })) as { response?: string };
   return extractJson(out.response);
 }

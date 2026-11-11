@@ -93,6 +93,9 @@ export interface IngredientCandidate {
  * Keys are lowercase and de-accented. A value may be several words.
  */
 const FOOD_WORD_TRANSLATIONS: Readonly<Record<string, string>> = {
+  // Not a translation, but the same job: one word for one thing, so a
+  // recipe's "tinned" finds a food stored as "canned".
+  canned: 'tinned',
   // ---- French: meat & fish ----
   boeuf: 'beef', veau: 'veal', porc: 'pork', agneau: 'lamb',
   poulet: 'chicken', dinde: 'turkey', canard: 'duck', jambon: 'ham',
@@ -160,7 +163,12 @@ const QUALIFIER_WORDS: ReadonlySet<string> = new Set([
   'yellow',
   // knife work - changes the shape, not the macros
   'grated', 'chopped', 'diced', 'sliced', 'crushed', 'finely', 'roughly',
-  'peeled', 'trimmed',
+  'peeled', 'trimmed', 'shredded', 'cubed', 'halved', 'quartered', 'torn',
+  'thinly', 'thickly', 'deseeded', 'cored', 'zested', 'juiced', 'washed',
+  // butchery and tin handling - the same food either way
+  'boneless', 'skinless', 'drained', 'rinsed', 'unsalted', 'salted',
+  // filler a recipe line carries
+  'optional', 'taste', 'freshly', 'approx', 'about',
 ]);
 // Deliberately NOT knife work: minced and ground, which identify the cut of
 // meat; dried and smoked, which change the food.
@@ -210,6 +218,10 @@ export function sigWords(s: string): string[] {
 export function wordsMatch(a: string, b: string): boolean {
   if (a === b) return true;
   const [short, long] = a.length <= b.length ? [a, b] : [b, a];
+  // A plain plural is the same word however short: "egg"/"eggs",
+  // "oat"/"oats". Without this "3 eggs" skipped "Egg, whole, raw" and
+  // landed on "Scrambled eggs".
+  if (short.length >= 3 && (long === `${short}s` || long === `${short}es`)) return true;
   if (short.length < 4 || !long.startsWith(short)) return false;
   return short.length / long.length >= 0.7;
 }
@@ -380,6 +392,32 @@ export function statePenalty(query: string, foodName: string): number {
 }
 
 /**
+ * How far a cooked entry drops behind its raw twin when the ingredient
+ * names no state. Enough to settle it without a warning.
+ */
+const UNSTATED_COOKED_PENALTY = 0.25;
+
+/** Is this food stated as cooked (not raw, dry, or simply tinned)? */
+function isCookedEntry(foodName: string): boolean {
+  return prepStates(foodName).some(
+    (s) =>
+      STATE_GROUP[s] !== 'raw' &&
+      STATE_GROUP[s] !== 'dry' &&
+      s !== 'canned' &&
+      s !== 'tinned',
+  );
+}
+
+/** The food's name with its preparation words removed, as a key. */
+function stateFreeKey(foodName: string): string {
+  const states: ReadonlySet<string> = new Set(PREP_STATES);
+  return sigWords(foodName)
+    .filter((w) => !states.has(w))
+    .sort()
+    .join(' ');
+}
+
+/**
  * 0..1 name similarity. 0 means "not a plausible match at all".
  *
  * Coverage (how much of the query the food accounts for) drives the score.
@@ -414,14 +452,26 @@ export function nameMatchScore(foodName: string, query: string): number {
   // At least half of what was asked for has to be present.
   if (coverage < 0.5) return 0;
 
-  const extraWords = foodWords.length - matched;
-  const noise = Math.min(0.3, extraWords * 0.06);
+  // Extra words cost, but not all equally. "canned", "raw", "fresh" say how
+  // the same food comes; "bell" in "Bell pepper" says which food it is.
+  const extras = foodWords.filter((_, i) => !usedFood.has(i));
+  const descriptors = extras.filter((w) => DESCRIPTOR_WORDS.has(w)).length;
+  const noise = Math.min(0.3, descriptors * 0.02 + (extras.length - descriptors) * 0.06);
   const score = Math.max(0, coverage - noise);
   // A bare half-match on a multi-word query is noise, not a candidate:
   // "Beef steak" against "beef mince" shares only "beef" and would otherwise
   // clutter the picker with something the user has to reject every time.
   return score < MIN_NAME_SCORE ? 0 : score;
 }
+
+/** Words that describe how a food comes without changing which food it is. */
+const DESCRIPTOR_WORDS: ReadonlySet<string> = new Set([
+  'raw', 'fresh', 'frozen', 'whole', 'plain', 'natural', 'lean', 'cooked',
+  'boiled', 'dried', 'dry', 'uncooked', 'ground', 'organic', 'average',
+  'generic', 'unsweetened', 'rolled',
+  // Deliberately NOT tinned: fresh tomatoes and tinned ones are different
+  // answers to "3 tomatoes", so a tinned entry is not a near-exact match.
+]);
 
 /** Floor a name has to clear, after the extra-word penalty, to be offered. */
 const MIN_NAME_SCORE = 0.5;
@@ -464,6 +514,94 @@ export function formPenalty(query: string, foodName: string): number {
   return 0.45; // both name a form, and they disagree
 }
 
+/**
+ * Words that name a DISH or a made product. When the food has one and the
+ * ingredient asked for does not, it is a different food that merely
+ * contains the ingredient: "chopped tomatoes" is not "Pizza, cheese &
+ * tomato", "water" is not "Porridge, cooked with water", "garlic" is not
+ * "Garlic bread". Before this, each of those cost 0.06 as "an extra word"
+ * and the pizza won a real scan on the strength of having been logged
+ * recently, adding 1,064 kcal to a soup.
+ *
+ * Deliberately NOT here: cheese, seeds, vinegar, yogurt, flakes. A recipe
+ * says "feta", "sesame", "balsamic" and means the food whose name ends in
+ * one of those.
+ */
+const DISH_WORDS: ReadonlySet<string> = new Set([
+  'pizza', 'porridge', 'bread', 'soup', 'stew', 'pie', 'cake', 'ketchup',
+  'salad', 'sandwich', 'burger', 'curry', 'lasagne', 'lasagna', 'casserole',
+  'smoothie', 'jam', 'crisps', 'chips', 'biscuit', 'cookie', 'bar', 'cereal',
+  'muffin', 'pancake', 'omelette', 'quiche', 'risotto', 'gravy', 'sausage',
+  'nugget', 'kebab', 'cracker', 'dip', 'hummus', 'houmous', 'pesto', 'mayo',
+  'mayonnaise', 'marinade', 'seasoning', 'wrap', 'roll', 'toast', 'bake',
+  'noodle', 'dumpling', 'chocolate', 'drink',
+  'tea', 'coffee', 'wine', 'beer', 'pickle', 'pickled', 'relish',
+  'chutney', 'salsa', 'tart', 'crumble', 'pudding', 'custard', 'granola',
+  'muesli', 'bagel', 'croissant', 'pastry', 'fritter',
+  'meatball', 'pasty', 'tortilla', 'taco', 'burrito', 'ramen', 'sushi',
+]);
+
+/**
+ * Penalty for a food that is a dish built around the ingredient rather than
+ * the ingredient. 0.4 per dish word the query did not ask for, capped so a
+ * long product name is not punished twice over. Returns 0..0.6.
+ */
+export function dishPenalty(query: string, foodName: string): number {
+  const q = sigWords(query);
+  const extra = sigWords(foodName).filter(
+    (fw) =>
+      [...DISH_WORDS].some((d) => wordsMatch(fw, d)) &&
+      !q.some((qw) => wordsMatch(qw, fw)),
+  );
+  return Math.min(0.6, extra.length * 0.4);
+}
+
+/**
+ * Pantry items that are worth no decision at all.
+ *
+ *  - 'water' is not an ingredient for calorie purposes. It is dropped.
+ *  - 'negligible' covers salt, pepper, dried herbs, spices and raising
+ *    agents: a few grams, a few calories. Whatever they resolve to cannot
+ *    move the total, so they are never worth a warning.
+ *
+ * Returns null for anything that deserves real matching.
+ */
+export function pantryClass(name: string): 'water' | 'negligible' | null {
+  const words = sigWords(name);
+  if (words.length === 0) return null;
+  if (words.every((w) => WATER_WORDS.has(w))) return 'water';
+  // A real food that happens to carry a seasoning word is not seasoning:
+  // "pepper steak", "garlic and herb chicken", "salted butter".
+  if (words.some((w) => [...NOT_SEASONING].some((n) => wordsMatch(w, n)))) return null;
+  if (words.includes('pepper')) {
+    // Bare "pepper" in a recipe can be a bell pepper. Only the ground kind.
+    return words.some((w) => PEPPER_KINDS.has(w)) ? 'negligible' : null;
+  }
+  return words.some((w) => [...SEASONINGS].some((x) => wordsMatch(w, x)))
+    ? 'negligible'
+    : null;
+}
+
+const WATER_WORDS: ReadonlySet<string> = new Set([
+  'water', 'cold', 'hot', 'warm', 'boiling', 'boiled', 'tap', 'ice',
+]);
+const PEPPER_KINDS: ReadonlySet<string> = new Set([
+  'black', 'white', 'ground', 'cracked', 'peppercorn', 'peppercorns', 'cayenne',
+]);
+const SEASONINGS: ReadonlySet<string> = new Set([
+  'salt', 'peppercorn', 'rosemary', 'thyme', 'oregano', 'basil', 'parsley',
+  'sage', 'dill', 'mint', 'coriander', 'cilantro', 'chives', 'tarragon',
+  'marjoram', 'bay', 'paprika', 'cumin', 'turmeric', 'cinnamon', 'nutmeg',
+  'cayenne', 'allspice', 'cardamom', 'saffron', 'masala', 'herbs', 'spice',
+  'seasoning', 'bicarbonate', 'yeast', 'vanilla',
+]);
+/** Words that make it a food in its own right, seasoning word or not. */
+const NOT_SEASONING: ReadonlySet<string> = new Set([
+  'chicken', 'beef', 'pork', 'lamb', 'fish', 'steak', 'butter', 'cheese',
+  'bread', 'sauce', 'oil', 'cream', 'yogurt', 'nuts', 'peanuts', 'crisps',
+  'tea', 'chocolate', 'sugar',
+]);
+
 /** Small nudges that break ties between similarly-named foods. */
 function qualityBonus(food: Food): number {
   let b = 0;
@@ -492,13 +630,24 @@ export function candidateScore(
 ): number {
   const nameScore = nameMatchScore(food.name, query);
   if (nameScore === 0) return 0;
+  // A dish built around the ingredient is not a weaker match, it is a
+  // wrong one. If the penalty takes it under the floor it is not offered.
+  const matched = nameScore - dishPenalty(query, food.name);
+  if (matched < MIN_NAME_SCORE) return 0;
+  // "You use this" only means something when it IS this. The personal
+  // bonus fades out as the name match weakens, so a recently logged food
+  // cannot ride a loose match past the right built-in.
+  const closeness = PERSONAL_TIERS.has(tier)
+    ? Math.min(1, Math.max(0, (matched - MIN_NAME_SCORE) / (0.9 - MIN_NAME_SCORE)))
+    : 1;
   const score =
-    nameScore +
-    TIER_BONUS[tier] +
+    matched +
+    TIER_BONUS[tier] * closeness +
     qualityBonus(food) -
     statePenalty(query, food.name) -
     formPenalty(query, food.name) -
-    (food.kcal_100 > 0 ? 0 : BLANK_FOOD_PENALTY);
+    // A built-in at 0 kcal (salt) is a fact, not a stub.
+    (food.kcal_100 > 0 || tier === 'curated' ? 0 : BLANK_FOOD_PENALTY);
   return Math.max(0, score);
 }
 
@@ -517,6 +666,30 @@ export function rankCandidates(
     const score = candidateScore(food, tier, query);
     if (score <= 0) continue;
     out.push({ food, tier, nameScore: nameMatchScore(food.name, query), score });
+  }
+  // A recipe that just says "1 kg chicken thighs" means them as bought, and
+  // cooked meat is far denser (thigh: 121 kcal raw, 209 cooked). So when
+  // the ingredient names no state and the SAME food is on offer both raw
+  // and cooked, the cooked one steps back. Done here rather than per food
+  // because it only applies when there is a raw twin to prefer: many
+  // built-ins exist only as "cooked", and those must not lose to junk.
+  if (prepStates(query).length === 0) {
+    const hasUncooked = new Set(
+      out
+        // Only a twin worth trusting counts. A stray database row called
+        // "BEEF MINCE" must not push the built-in cooked mince down.
+        .filter(
+          (c) =>
+            !isCookedEntry(c.food.name) &&
+            (c.tier === 'curated' || PERSONAL_TIERS.has(c.tier)),
+        )
+        .map((c) => stateFreeKey(c.food.name)),
+    );
+    for (const c of out) {
+      if (isCookedEntry(c.food.name) && hasUncooked.has(stateFreeKey(c.food.name))) {
+        c.score = Math.max(0.01, c.score - UNSTATED_COOKED_PENALTY);
+      }
+    }
   }
   return out.sort((a, b) => b.score - a.score);
 }
@@ -559,7 +732,7 @@ export function rankLibraryCandidates(
 }
 
 /** How far ahead the winner must be before we stop asking the user. */
-const CONFIDENT_MARGIN = 0.25;
+export const CONFIDENT_MARGIN = 0.25;
 /** Below this the top match is not good enough to auto-accept. */
 const CONFIDENT_MIN_SCORE = 0.9;
 
@@ -594,14 +767,27 @@ export function isConfident(
   // An exact name match to a sanity-checked built-in is not uncertainty.
   // Flagging "large onion" -> "Onion" alongside genuine ambiguity trains the
   // user to tap past the warning, which defeats it.
-  const exactCurated = top.tier === 'curated' && top.nameScore >= 1;
+  // "Cannellini beans, canned" for "cannellini beans" is the same food with
+  // descriptors on the end (0.96+); "Bell pepper" for "pepper" (0.94) is not.
+  const exactCurated = top.tier === 'curated' && top.nameScore >= 0.955;
   const trusted =
     PERSONAL_TIERS.has(top.tier) ||
     exactCurated ||
     (!ctx.hasPersonalHistory && top.tier === 'curated');
   if (!trusted) return false;
   if (top.score < CONFIDENT_MIN_SCORE) return false;
-  const runnerUp = candidates[1];
+  // Only a rival worth trusting can cast doubt on a trusted winner. A row
+  // from a database or an unused product scoring close behind the built-in
+  // is the same food with different paperwork, not a real alternative.
+  // It also has to match the name about as well. "Spring onion" behind an
+  // exact "Onion" is a different, more specific food, not a rival reading.
+  const runnerUp = candidates
+    .slice(1)
+    .find(
+      (c) =>
+        (PERSONAL_TIERS.has(c.tier) || c.tier === 'curated') &&
+        c.nameScore >= top.nameScore - 0.015,
+    );
   if (!runnerUp) return true;
   return top.score - runnerUp.score >= CONFIDENT_MARGIN;
 }

@@ -19,8 +19,9 @@ Last updated: 2026-11-11
 
 Tamara brought a list of daily frustrations. Investigated all of them first,
 agreed an order, then built four of six. All on branch
-`claude/peaceful-volta-hdy861`, 465 tests. Pushed to that branch, nothing
-deployed, nothing merged.
+`claude/peaceful-volta-hdy861`, 492 tests. Days one and two were deployed
+by Tamara from that branch on 2026-11-11; day three (recipe scan) is pushed
+but not deployed. Not merged to main.
 
 **Deploy needs a D1 migration first** (batches). Four ALTERs on `meals`,
 listed in `worker/schema.sql`, to run BEFORE `wrangler deploy`:
@@ -105,6 +106,49 @@ If the worker goes out first, every meal push fails on the unknown columns.
   `food_recents`, `ingredient_aliases` and `food_prices` behind under the
   old id. All four now move (the last three are re-keyed, their id embeds
   the user id). Checked against a real IndexedDB in the browser.
+
+### Day three: recipe scan, after a real scan went badly
+
+Tamara deployed day two herself, scanned a Tuscan chicken soup, and got 611
+kcal a portion with 12 of 16 rows flagged. Chopped tomatoes had matched
+"Pizza, cheese & tomato" (1,064 kcal), water had matched "Porridge, cooked
+with water" (825 kcal), and my day-one change (flags block Create meal) had
+turned ten harmless doubts into ten mandatory taps. The same recipe now
+resolves to about 345 kcal a portion with nothing flagged.
+
+- **Ingredient beats dish** (`dishPenalty` in `ingredientMatch.ts`). A food
+  with a dish word the ingredient did not ask for (pizza, porridge, bread,
+  ketchup...) is a different food, not a loose match. The personal-tier
+  bonus now fades as the name match weakens, so "used recently" cannot
+  carry a loose match past the right built-in.
+- **Pantry** (`pantryClass`). Water is dropped. Salt, pepper, dried herbs
+  and spices are never flagged and prefer the built-in entry.
+- **Flag by calories at risk** (`recipe-scan/reviewRisk.ts`). A row is
+  flagged only when the match is uncertain AND at least max(30 kcal, 3% of
+  the recipe) rides on it. Flagged rows are listed first.
+- **Units by table** (`recipe-scan/units.ts`). The model now returns amount
+  and unit as written; a fixed table converts. It had turned 2 tbsp of
+  puree into 10 g. Its own gram guess is kept only as a fallback.
+- **Prompt** (`worker/photoRecipe.ts`): copy amounts, prefer the plain-
+  ingredient alternative, split "salt and pepper", name "lemon juice" when
+  only the juice is used, leave water out. Token budget 1200 -> 2600 and
+  one retry on unparseable JSON.
+- **Paste recipe text.** Same endpoint with `text/plain`. A recipe that is
+  already text no longer goes through the camera.
+- Matcher details that the test recipes shook out: raw preferred over
+  cooked when the ingredient names no state and a trusted raw twin exists;
+  plain plurals match however short ("egg"/"eggs"); canned = tinned; a tin
+  unit or "drained" adds "tinned" to the lookup; a rival only casts doubt
+  if it is trusted and matches the name as well as the winner.
+- Curated list v5: about 60 additions. Seasonings, and the dry/raw forms
+  recipes actually list (rice, pasta, lentils, mince, potato), which the
+  list only had cooked.
+- `recipe-scan/resolveDrafts.test.ts` runs five whole recipes through the
+  pipeline, including the soup both as the scanner should now report it
+  and exactly as it reported it the first time. Add a recipe there when a
+  scan goes wrong.
+- The prompt changes are NOT verified: no AI access from the build
+  session. Everything downstream of the model is.
 
 ### Not done
 

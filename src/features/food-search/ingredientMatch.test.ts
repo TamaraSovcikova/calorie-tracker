@@ -52,7 +52,15 @@ describe('wordsMatch', () => {
   });
 
   it('still needs 4 characters to prefix-match at all', () => {
-    expect(wordsMatch('oat', 'oats')).toBe(false);
+    expect(wordsMatch('oat', 'oatmeal')).toBe(false);
+    expect(wordsMatch('pep', 'pepper')).toBe(false);
+  });
+
+  it('treats a plain plural as the same word, however short', () => {
+    // "3 eggs" used to skip "Egg, whole, raw" and land on "Scrambled eggs".
+    expect(wordsMatch('egg', 'eggs')).toBe(true);
+    expect(wordsMatch('oat', 'oats')).toBe(true);
+    expect(wordsMatch('tomato', 'tomatoes')).toBe(true);
   });
 
   it('is order-independent', () => {
@@ -62,7 +70,8 @@ describe('wordsMatch', () => {
 
 describe('sigWords', () => {
   it('drops short words and punctuation', () => {
-    expect(sigWords('Black beans, canned')).toEqual(['black', 'beans', 'canned']);
+    // canned and tinned are one word, so either spelling finds the other.
+    expect(sigWords('Black beans, canned')).toEqual(['black', 'beans', 'tinned']);
     expect(sigWords('5% fat beef mince')).toEqual(['fat', 'beef', 'mince']);
   });
 });
@@ -194,7 +203,8 @@ describe('isConfident', () => {
   ): IngredientCandidate => ({
     food: food(name),
     tier,
-    nameScore: score,
+    // A name score tops out at 1; the rest of `score` is the tier bonus.
+    nameScore: Math.min(1, score),
     score,
   });
 

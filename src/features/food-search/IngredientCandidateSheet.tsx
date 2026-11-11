@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Check, Plus } from 'lucide-react';
+import { Check, Plus, Trash2 } from 'lucide-react';
 import { Sheet } from '@/components/ui/Sheet';
 import { Input, LabeledInput } from '@/components/ui/Input';
 import { ensureFoodSaved } from '@/db/repos/foods';
@@ -33,6 +33,9 @@ interface IngredientCandidateSheetProps {
   /** Offer "none of these - add blank". Off for the photo log, where a
    *  blank food would silently log zero calories into the diary. */
   allowBlank?: boolean;
+  /** When set, offers "leave this out": the scanner read something that is
+   *  not an ingredient, or one the cook is skipping. */
+  onRemove?: () => void;
   onClose: () => void;
 }
 
@@ -55,6 +58,7 @@ export function IngredientCandidateSheet({
   onPickFood,
   onGramsChange,
   allowBlank = true,
+  onRemove,
   onClose,
 }: IngredientCandidateSheetProps) {
   const [gramsText, setGramsText] = useState(String(grams));
@@ -153,6 +157,23 @@ export function IngredientCandidateSheet({
                 </span>
               </span>
               {chosen === -1 && <Check className="h-4 w-4 shrink-0 text-primary" />}
+            </button>
+          </li>
+        )}
+        {onRemove && (
+          <li>
+            <button
+              type="button"
+              onClick={onRemove}
+              className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-muted/50"
+            >
+              <Trash2 className="h-4 w-4 shrink-0 text-muted-foreground" />
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-medium">Leave this out</span>
+                <span className="mt-0.5 block text-xs text-muted-foreground">
+                  Not an ingredient, or you are not using it.
+                </span>
+              </span>
             </button>
           </li>
         )}

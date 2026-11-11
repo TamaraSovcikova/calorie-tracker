@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Loader2, RotateCcw, ScanLine } from 'lucide-react';
+import { ClipboardPaste, Loader2, RotateCcw, ScanLine } from 'lucide-react';
 import { Sheet } from '@/components/ui/Sheet';
 import { Button } from '@/components/ui/Button';
 import { AiFeatureGate } from '@/features/settings/AiFeatureGate';
@@ -8,6 +8,7 @@ import { CaptureOverlay } from '@/features/food-search/CaptureOverlay';
 import { RecipeReviewStep } from './RecipeReviewStep';
 import {
   analyzeRecipePhoto,
+  analyzeRecipeText,
   commitResolvedRecipe,
   resolveScannedRecipe,
   type ResolvedRecipe,
@@ -18,7 +19,9 @@ interface RecipeScanSheetProps {
   onClose: () => void;
 }
 
-type Phase = 'pick' | 'analyzing' | 'review' | 'error';
+type Phase = 'pick' | 'paste' | 'analyzing' | 'review' | 'error';
+
+type ScanResult = Awaited<ReturnType<typeof analyzeRecipePhoto>>;
 
 /**
  * Fast-lane meal insert: pick a screenshot of a recipe, AI reads the
@@ -33,8 +36,10 @@ export function RecipeScanSheet({ open, onClose }: RecipeScanSheetProps) {
   const [resolved, setResolved] = useState<ResolvedRecipe | null>(null);
   const [saving, setSaving] = useState(false);
   const [cameraOpen, setCameraOpen] = useState(false);
+  const [pasted, setPasted] = useState('');
 
   const reset = () => {
+    setPasted('');
     setPhase('pick');
     setError(null);
     setImageUrl(null);
@@ -46,13 +51,10 @@ export function RecipeScanSheet({ open, onClose }: RecipeScanSheetProps) {
     reset();
   };
 
-  const handleFile = async (file: Blob) => {
-    setImageUrl(URL.createObjectURL(file));
-    setPhase('analyzing');
-    setError(null);
-    const { recipe, error: scanError } = await analyzeRecipePhoto(file);
+  /** Shared tail of both inputs: show the result, or the error. */
+  const finish = async ({ recipe, error: scanError }: ScanResult, kind: string) => {
     if (!recipe) {
-      setError(scanError ?? 'Could not read a recipe from that image.');
+      setError(scanError ?? `Could not read a recipe from that ${kind}.`);
       setPhase('error');
       return;
     }
@@ -61,6 +63,21 @@ export function RecipeScanSheet({ open, onClose }: RecipeScanSheetProps) {
     // exactly like a real ingredient.
     setResolved(await resolveScannedRecipe(recipe));
     setPhase('review');
+  };
+
+  const handleFile = async (file: Blob) => {
+    setImageUrl(URL.createObjectURL(file));
+    setPhase('analyzing');
+    setError(null);
+    await finish(await analyzeRecipePhoto(file), 'image');
+  };
+
+  /** A recipe that is already text skips the camera and its misreads. */
+  const handleText = async () => {
+    setImageUrl(null);
+    setPhase('analyzing');
+    setError(null);
+    await finish(await analyzeRecipeText(pasted), 'text');
   };
 
   const handleConfirm = async () => {
@@ -114,8 +131,52 @@ export function RecipeScanSheet({ open, onClose }: RecipeScanSheetProps) {
             <ScanLine className="h-4 w-4" />
             Open the camera
           </Button>
+          <Button type="button" variant="secondary" onClick={() => setPhase('paste')}>
+            <ClipboardPaste className="h-4 w-4" />
+            Paste recipe text
+          </Button>
+          <p className="text-xs text-muted-foreground">
+            If the recipe is already text (a message, a web page), pasting it
+            is more accurate than a photo of it.
+          </p>
         </div>
         </AiFeatureGate>
+      )}
+
+      {phase === 'paste' && (
+        <div className="flex flex-col gap-3 p-4">
+          <label className="block space-y-1">
+            <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Recipe text
+            </span>
+            <textarea
+              value={pasted}
+              onChange={(e) => setPasted(e.target.value)}
+              rows={12}
+              autoFocus
+              placeholder={'Tuscan chicken soup, 6 portions\n1 kg chicken thighs\n2 tins cannellini beans\n...'}
+              className="flex w-full rounded-lg border border-input bg-background px-3 py-2 text-base placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
+            />
+          </label>
+          <p className="text-xs text-muted-foreground">
+            Include the name, how many portions it makes and the ingredients
+            with their amounts. The method is optional.
+          </p>
+          <div className="flex gap-2">
+            <Button type="button" variant="secondary" onClick={() => setPhase('pick')}>
+              Back
+            </Button>
+            <Button
+              type="button"
+              variant="primary"
+              block
+              disabled={pasted.trim().length < 10}
+              onClick={() => void handleText()}
+            >
+              Read this recipe
+            </Button>
+          </div>
+        </div>
       )}
 
       {phase === 'analyzing' && (

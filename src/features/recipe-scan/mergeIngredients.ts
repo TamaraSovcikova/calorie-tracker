@@ -6,6 +6,9 @@ interface Mergeable {
   grams: number;
   /** Id of the food it currently resolves to, if any. */
   foodId?: string;
+  /** The amount as written, for display. Dropped on a merge: "2 tbsp" is
+   *  no longer true of the combined row. */
+  written?: string;
 }
 
 /**
@@ -35,7 +38,8 @@ export function mergeDuplicateIngredients<T extends Mergeable>(rows: T[]): T[] {
         sameName(key, words(o.name)) ||
         (!!row.foodId && o.foodId === row.foodId),
     );
-    if (hit >= 0) out[hit] = { ...out[hit], grams: out[hit].grams + row.grams };
+    if (hit >= 0)
+      out[hit] = { ...out[hit], grams: out[hit].grams + row.grams, written: undefined };
     else out.push(row);
   }
   return out;

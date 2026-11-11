@@ -87,6 +87,26 @@ export function RecipeReviewStep({
   };
 
   const unsure = recipe.ingredients.filter((i) => !i.confident).length;
+  // Rows that need a look come first: one flagged ingredient at the bottom
+  // of eighteen is one nobody finds. Fixed when the screen opens, so a row
+  // does not jump away the moment it is answered.
+  const [order, setOrder] = useState(() =>
+    recipe.ingredients
+      .map((ing, i) => ({ i, flagged: !ing.confident }))
+      .sort((a, b) => Number(b.flagged) - Number(a.flagged))
+      .map((x) => x.i),
+  );
+
+  /** Drop a row the scanner should not have produced, or the cook skips. */
+  const remove = (ingIndex: number) => {
+    onChange({
+      ...recipe,
+      ingredients: recipe.ingredients.filter((_, i) => i !== ingIndex),
+    });
+    // Later rows move up one; keep the display order pointing at them.
+    setOrder((o) => o.filter((i) => i !== ingIndex).map((i) => (i > ingIndex ? i - 1 : i)));
+    setPicking(null);
+  };
   const total = recipe.ingredients.reduce((sum, ing) => {
     const k = ing.chosen >= 0 ? kcalFor(ing, ing.chosen) : 0;
     return sum + (k ?? 0);
@@ -108,10 +128,21 @@ export function RecipeReviewStep({
             look - tap to choose which food to use.
           </p>
         )}
+        {unsure === 0 && (
+          <p className="mt-2 text-xs text-muted-foreground">
+            Everything matched. Tap any row to change the food or the amount.
+          </p>
+        )}
+        {recipe.leftOut.length > 0 && (
+          <p className="mt-1 text-xs text-muted-foreground">
+            Left out, no calories: {recipe.leftOut.join(', ')}.
+          </p>
+        )}
       </div>
 
       <ul className="flex-1 divide-y divide-border overflow-y-auto">
-        {recipe.ingredients.map((ing, i) => {
+        {order.map((i) => {
+          const ing = recipe.ingredients[i];
           const cand = ing.chosen >= 0 ? ing.candidates[ing.chosen] : undefined;
           const kcal = ing.chosen >= 0 ? kcalFor(ing, ing.chosen) : null;
           const personal = cand ? PERSONAL_TIERS.has(cand.tier) : false;
@@ -135,7 +166,11 @@ export function RecipeReviewStep({
                     {cand ? cand.food.name : 'No match - will be added blank'}
                   </span>
                   <span className="mt-0.5 flex items-center gap-2 text-[11px] tabular-nums text-muted-foreground">
-                    <span>{ing.grams} g</span>
+                    <span>
+                      {ing.written && !/^[\d.]+ ?g$/i.test(ing.written)
+                        ? `${ing.written} = ${ing.grams} g`
+                        : `${ing.grams} g`}
+                    </span>
                     {kcal !== null && <span>{formatKcal(kcal)} kcal</span>}
                     {cand && (
                       <span
@@ -184,7 +219,8 @@ export function RecipeReviewStep({
           chosen={recipe.ingredients[picking].chosen}
           onPick={(chosen) => setChosen(picking, chosen)}
           onPickFood={(food) => setChosenFood(picking, food)}
-          onGramsChange={(grams) => patch(picking, { grams })}
+          onGramsChange={(grams) => patch(picking, { grams, written: undefined })}
+          onRemove={() => remove(picking)}
           onClose={() => setPicking(null)}
         />
       )}

@@ -7,7 +7,6 @@
  * review-and-save.
  */
 
-import { mergeDuplicateIngredients } from './mergeIngredients';
 import { getSyncConfig, syncBaseUrl } from '@/db/sync/config';
 import { createFood } from '@/db/repos/foods';
 import type { MealItemInput } from '@/db/repos/meals';
@@ -17,15 +16,24 @@ import {
   hasPersonalFoodHistory,
 } from '@/features/meal-planner/mealPlanner';
 import {
-  isConfident,
+  pantryClass,
   type IngredientCandidate,
 } from '@/features/food-search/ingredientMatch';
+import {
+  buildDrafts,
+  lookupName,
+  type RecipeIngredientDraft,
+  type ResolvedRecipe,
+  type ScannedIngredient,
+} from './resolveDrafts';
+
+export type { RecipeIngredientDraft, ResolvedRecipe, ScannedIngredient };
 import { downscaleImage } from '@/features/photo-log/photoLog';
 
 export interface ScannedRecipe {
   name: string;
   servings: number;
-  ingredients: { name: string; grams: number }[];
+  ingredients: ScannedIngredient[];
   steps: string[];
 }
 
@@ -34,8 +42,11 @@ export interface RecipeScanResult {
   error?: string;
 }
 
-/** Send a recipe screenshot to the Worker. Never throws. */
-export async function analyzeRecipePhoto(file: Blob): Promise<RecipeScanResult> {
+/** POST a recipe (image or text) to the Worker. Never throws. */
+async function sendRecipe(
+  body: Blob | string,
+  contentType: string,
+): Promise<RecipeScanResult> {
   const { token } = getSyncConfig();
   if (!token) {
     return {
@@ -43,15 +54,13 @@ export async function analyzeRecipePhoto(file: Blob): Promise<RecipeScanResult> 
       error: 'Connect a sync code in Settings to scan recipes.',
     };
   }
-  // Recipe text is small print like a label, not a plate of food.
-  const body = await downscaleImage(file, 1600);
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 60_000);
+  const timeout = setTimeout(() => controller.abort(), 90_000);
   try {
     const res = await fetch(`${syncBaseUrl()}/api/photo-recipe`, {
       method: 'POST',
       headers: {
-        'content-type': 'image/jpeg',
+        'content-type': contentType,
         authorization: `Bearer ${token}`,
       },
       body,
@@ -73,30 +82,22 @@ export async function analyzeRecipePhoto(file: Blob): Promise<RecipeScanResult> 
   }
 }
 
-/** One scanned ingredient, with what it could resolve to. */
-export interface RecipeIngredientDraft {
-  /** Name as the scanner read it off the recipe. */
-  name: string;
-  grams: number;
-  /** Plausible foods, best first. Empty when nothing matched at all. */
-  candidates: IngredientCandidate[];
-  /** Index into `candidates`, or -1 for "create a blank food named this". */
-  chosen: number;
-  /**
-   * True when the top candidate is one of the user's own foods, matches
-   * well, and has no close rival. Everything else is worth a look before
-   * the meal is created - silently committing to the winner is how a
-   * 464 kcal/100g mystery food ended up in a stuffed pepper recipe.
-   */
-  confident: boolean;
+/** Send a recipe screenshot to the Worker. Never throws. */
+export async function analyzeRecipePhoto(file: Blob): Promise<RecipeScanResult> {
+  // Recipe text is small print like a label, not a plate of food.
+  return sendRecipe(await downscaleImage(file, 1600), 'image/jpeg');
 }
 
-export interface ResolvedRecipe {
-  name: string;
-  servings: number;
-  /** Method steps joined into the meal's notes (may be empty). */
-  notes: string;
-  ingredients: RecipeIngredientDraft[];
+/**
+ * Send pasted recipe text. A recipe that is already text (a chat message,
+ * a web page) loses nothing to the camera this way.
+ */
+export async function analyzeRecipeText(text: string): Promise<RecipeScanResult> {
+  const trimmed = text.trim();
+  if (trimmed.length < 10) {
+    return { recipe: null, error: 'Paste the ingredients list first.' };
+  }
+  return sendRecipe(trimmed, 'text/plain; charset=utf-8');
 }
 
 /**
@@ -114,21 +115,19 @@ export async function resolveScannedRecipe(
   // On a fresh install nothing can reach a personal tier, so requiring one
   // would flag every single ingredient.
   const ctx = { hasPersonalHistory: await hasPersonalFoodHistory() };
-  const resolved: (RecipeIngredientDraft & { foodId?: string })[] = [];
+  // Look every ingredient up first (the only part that touches the
+  // database), then let the pure builder decide what to do with them.
+  const candidates = new Map<string, IngredientCandidate[]>();
   for (const ing of recipe.ingredients) {
-    const candidates = await rankIngredientCandidates(ing.name);
-    resolved.push({
-      name: ing.name,
-      grams: ing.grams,
-      candidates,
-      chosen: candidates.length > 0 ? 0 : -1,
-      confident: isConfident(candidates, ctx),
-      foodId: candidates[0]?.food.id,
-    });
+    const key = lookupName(ing);
+    if (pantryClass(ing.name) === 'water' || candidates.has(key)) continue;
+    candidates.set(key, await rankIngredientCandidates(key));
   }
-  const ingredients: RecipeIngredientDraft[] = mergeDuplicateIngredients(
-    resolved,
-  ).map(({ foodId: _foodId, ...draft }) => draft);
+  const { ingredients, leftOut } = buildDrafts(
+    recipe.ingredients,
+    (name) => candidates.get(name) ?? [],
+    ctx,
+  );
   return {
     name: recipe.name,
     servings: recipe.servings,
@@ -137,6 +136,7 @@ export async function resolveScannedRecipe(
         ? recipe.steps.map((s, i) => `${i + 1}. ${s}`).join('\n')
         : '',
     ingredients,
+    leftOut,
   };
 }
 
