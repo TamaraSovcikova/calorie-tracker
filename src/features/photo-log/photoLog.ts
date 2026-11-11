@@ -121,7 +121,7 @@ export async function resolvePhotoFoods(
   resetPlannerCaches();
   return Promise.all(
     foods.map(async (f) => {
-      const candidates = await rankIngredientCandidates(f.name);
+      const candidates = await rankIngredientCandidates(f.name, { asBought: false });
       const food = candidates[0]?.food ?? null;
       const macros = food
         ? computeMacros(food, { mode: 'g', qty: f.grams })

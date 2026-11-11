@@ -651,6 +651,15 @@ export function candidateScore(
   return Math.max(0, score);
 }
 
+export interface RankOptions {
+  /**
+   * The ingredient is listed the way it is bought (a recipe, a meal plan),
+   * so with no state given, raw is meant. Leave off for a photo of a plate,
+   * where the food in front of the camera is cooked.
+   */
+  asBought?: boolean;
+}
+
 /**
  * Rank every food that plausibly matches `query`, best first.
  * `tierOf` says which tier a food belongs to; foods scoring 0 are dropped.
@@ -659,6 +668,7 @@ export function rankCandidates(
   foods: Food[],
   query: string,
   tierOf: (food: Food) => MatchTier,
+  opts: RankOptions = {},
 ): IngredientCandidate[] {
   const out: IngredientCandidate[] = [];
   for (const food of foods) {
@@ -668,27 +678,33 @@ export function rankCandidates(
     out.push({ food, tier, nameScore: nameMatchScore(food.name, query), score });
   }
   // A recipe that just says "1 kg chicken thighs" means them as bought, and
-  // cooked meat is far denser (thigh: 121 kcal raw, 209 cooked). So when
-  // the ingredient names no state and the SAME food is on offer both raw
-  // and cooked, the cooked one steps back. Done here rather than per food
-  // because it only applies when there is a raw twin to prefer: many
+  // cooked meat is far denser (thigh: 121 kcal raw, 209 cooked). So for a
+  // recipe (`asBought`), when the ingredient names no state and the SAME
+  // food is on offer both raw and cooked, the cooked one goes behind the
+  // raw one, however often the cooked one has been logged: logging cooked
+  // chicken off a plate says nothing about what a recipe means. The first
+  // version only subtracted a fixed amount, and a frequently logged cooked
+  // thigh still came out on top of a real scan.
+  // It only applies when there is a trusted raw twin to prefer: many
   // built-ins exist only as "cooked", and those must not lose to junk.
-  if (prepStates(query).length === 0) {
-    const hasUncooked = new Set(
-      out
-        // Only a twin worth trusting counts. A stray database row called
-        // "BEEF MINCE" must not push the built-in cooked mince down.
-        .filter(
-          (c) =>
-            !isCookedEntry(c.food.name) &&
-            (c.tier === 'curated' || PERSONAL_TIERS.has(c.tier)),
-        )
-        .map((c) => stateFreeKey(c.food.name)),
-    );
+  if (opts.asBought && prepStates(query).length === 0) {
+    const bestUncooked = new Map<string, number>();
     for (const c of out) {
-      if (isCookedEntry(c.food.name) && hasUncooked.has(stateFreeKey(c.food.name))) {
-        c.score = Math.max(0.01, c.score - UNSTATED_COOKED_PENALTY);
-      }
+      // A stray database row called "BEEF MINCE" is not a twin worth
+      // demoting the built-in cooked mince for.
+      if (isCookedEntry(c.food.name)) continue;
+      if (c.tier !== 'curated' && !PERSONAL_TIERS.has(c.tier)) continue;
+      const key = stateFreeKey(c.food.name);
+      bestUncooked.set(key, Math.max(bestUncooked.get(key) ?? 0, c.score));
+    }
+    for (const c of out) {
+      if (!isCookedEntry(c.food.name)) continue;
+      const twin = bestUncooked.get(stateFreeKey(c.food.name));
+      if (twin === undefined) continue;
+      c.score = Math.max(
+        0.01,
+        Math.min(c.score, twin) - UNSTATED_COOKED_PENALTY,
+      );
     }
   }
   return out.sort((a, b) => b.score - a.score);
@@ -727,8 +743,9 @@ export function rankLibraryCandidates(
   foods: Food[],
   query: string,
   history: PersonalHistory,
+  opts: RankOptions = {},
 ): IngredientCandidate[] {
-  return rankCandidates(foods, query, (f) => resolveTier(f, history));
+  return rankCandidates(foods, query, (f) => resolveTier(f, history), opts);
 }
 
 /** How far ahead the winner must be before we stop asking the user. */

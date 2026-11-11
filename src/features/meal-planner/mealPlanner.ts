@@ -28,6 +28,7 @@ import {
   rankLibraryCandidates,
   ALIAS_SCORE,
   type IngredientCandidate,
+  type RankOptions,
   isMatchable,
 } from '@/features/food-search/ingredientMatch';
 import { getUsdaApiKey, searchUsda } from '@/lib/usda-api';
@@ -319,10 +320,14 @@ export async function hasPersonalFoodHistory(): Promise<boolean> {
  */
 export async function rankIngredientCandidates(
   name: string,
+  // Recipes and meal plans list food as bought. The photo log passes
+  // asBought: false, because a plate in front of the camera is cooked.
+  opts: RankOptions = { asBought: true },
 ): Promise<IngredientCandidate[]> {
   const key = name.trim().toLowerCase();
   if (!key) return [];
-  const cached = candidateCache.get(key);
+  const cacheKey = `${opts.asBought ? 'bought' : 'plate'}:${key}`;
+  const cached = candidateCache.get(cacheKey);
   if (cached) return cached;
 
   const promise = (async (): Promise<IngredientCandidate[]> => {
@@ -335,7 +340,7 @@ export async function rankIngredientCandidates(
       frequentIds,
       recentIds: new Set(recents.map((f) => f.id)),
     };
-    const local = rankLibraryCandidates(all, key, history);
+    const local = rankLibraryCandidates(all, key, history, opts);
 
     // A food the user has already chosen for this exact phrase wins outright.
     // This is what makes a product no word list could contain - a French
@@ -364,7 +369,7 @@ export async function rankIngredientCandidates(
     try {
       const hits = await searchUsda(key, apiKey, { genericOnly: true });
       if (hits.length === 0) return [];
-      const ranked = rankCandidates(hits, key, () => 'external');
+      const ranked = rankCandidates(hits, key, () => 'external', opts);
       const keep = ranked.slice(0, 5);
       // Cache into Dexie so a saved meal can reference them by id.
       await Promise.all(
@@ -376,7 +381,7 @@ export async function rankIngredientCandidates(
     }
   })();
 
-  candidateCache.set(key, promise);
+  candidateCache.set(cacheKey, promise);
   return promise;
 }
 

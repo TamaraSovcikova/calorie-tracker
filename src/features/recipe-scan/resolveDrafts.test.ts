@@ -41,10 +41,12 @@ const history = {
   frequentIds: new Set<string>(),
   recentIds: new Set(['curated:pizza-cheese', 'o-salt']),
 };
-const run = (scanned: ScannedIngredient[]) =>
-  buildDrafts(scanned, (n) => rankLibraryCandidates(library, n, history), {
-    hasPersonalHistory: true,
-  });
+const run = (scanned: ScannedIngredient[], hist = history) =>
+  buildDrafts(
+    scanned,
+    (n) => rankLibraryCandidates(library, n, hist, { asBought: true }),
+    { hasPersonalHistory: true },
+  );
 
 /** Tuscan chicken and bean soup, as the scanner should now report it. */
 const SOUP: ScannedIngredient[] = [
@@ -277,5 +279,37 @@ describe('what still gets a warning', () => {
       { name: 'mustard of some kind', amount: 1, unit: 'tsp', grams: 5 },
     ]);
     expect(find(v, 'mustard of some kind').flagged).toBe(false);
+  });
+});
+
+describe('raw, not cooked, when the recipe does not say', () => {
+  const thighs: ScannedIngredient[] = [
+    { name: 'boneless chicken thighs', amount: 1, unit: 'kg', grams: 1000 },
+  ];
+  // After the first fix the real scan STILL chose the cooked thigh: she
+  // logs cooked chicken thigh often, and that bonus outweighed the nudge.
+  const cookedOften = {
+    frequentIds: new Set(['curated:chicken-thigh-cooked']),
+    recentIds: new Set(['curated:chicken-thigh-cooked']),
+  };
+
+  it('picks raw even when the cooked one is logged all the time', () => {
+    const { ingredients } = run(thighs, cookedOften);
+    const top = ingredients[0].candidates[0];
+    expect(top.food.name).toBe('Chicken thigh, raw');
+    expect(ingredients[0].confident).toBe(true);
+  });
+
+  it('keeps cooked when the recipe says cooked', () => {
+    const { ingredients } = run(
+      [{ name: 'cooked chicken thighs', amount: 400, unit: 'g', grams: 400 }],
+      cookedOften,
+    );
+    expect(ingredients[0].candidates[0].food.name).toBe('Chicken thigh, cooked');
+  });
+
+  it('leaves a plate photo alone: food on a plate is cooked', () => {
+    const plate = rankLibraryCandidates(library, 'chicken thigh', cookedOften);
+    expect(plate[0].food.name).toBe('Chicken thigh, cooked');
   });
 });

@@ -140,6 +140,12 @@ resolves to about 345 kcal a portion with nothing flagged.
   plain plurals match however short ("egg"/"eggs"); canned = tinned; a tin
   unit or "drained" adds "tinned" to the lookup; a rival only casts doubt
   if it is trusted and matches the name as well as the winner.
+- Follow-up after she deployed and re-scanned: everything right except the
+  thighs, which came out as "Chicken thigh, cooked". The raw preference
+  was a fixed -0.25, and a cooked entry she logs often carries a +0.6
+  personal bonus. Now, for recipes (`asBought`, the default for scan and
+  planner), a cooked entry is always placed 0.25 behind its trusted raw
+  twin. The photo log passes `asBought: false`: a plate is cooked.
 - Curated list v5: about 60 additions. Seasonings, and the dry/raw forms
   recipes actually list (rice, pasta, lentils, mince, potato), which the
   list only had cooked.
