@@ -7,7 +7,7 @@ How to use:
 - End of session: prepend a new entry, bump `Session count`.
 
 Session count: 11
-Last updated: 2026-11-10
+Last updated: 2026-11-11
 
 > **This file is the live log.** `Projects/calorie_tracker/docs/SESSION_LOG.md` in
 > the OneDrive vault is a stale copy that stopped at Chat #2 (2026-06-19); the
@@ -15,13 +15,17 @@ Last updated: 2026-11-10
 
 ---
 
-## Chat #5 - 2026-11-10 (search rework, scroll-lock fix, recipe scan fixes, under-logged days; NOT pushed, NOT deployed)
+## Chat #5 - 2026-11-10/11 (search rework, scroll-lock fix, recipe scan, under-logged days, meal prep batches, compare tool; pushed, NOT deployed)
 
 Tamara brought a list of daily frustrations. Investigated all of them first,
 agreed an order, then built four of six. All on branch
-`claude/peaceful-volta-hdy861`, four commits, 445 tests. Nothing pushed (push
-was not approved in the session) and nothing deployed. No D1 change needed
-for any of it.
+`claude/peaceful-volta-hdy861`, 465 tests. Pushed to that branch, nothing
+deployed, nothing merged.
+
+**Deploy needs a D1 migration first** (batches). Four ALTERs on `meals`,
+listed in `worker/schema.sql`, to run BEFORE `wrangler deploy`:
+`batch_date TEXT`, `batch_of TEXT`, `total_g REAL`, `finished_at TEXT`.
+If the worker goes out first, every meal push fails on the unknown columns.
 
 ### Done
 
@@ -57,20 +61,48 @@ for any of it.
 - A logged low day is NOT auto-neutralised in the budget (an existing test
   pins that). It only changes once she answers the card.
 
+### Day two: meal prep batches (`d69ac88`) and compare
+
+- **Batches.** A batch is a `Meal` row with `batch_date` set: one dated
+  cook, made from a recipe (`batch_of`). Deliberately not a new table: it
+  reuses items, logging, the editor and sync unchanged. Maths is pure in
+  `features/meals/batchMath.ts`.
+  - `CookPage` (`/meals/:id/cook`): change one amount and the rest scale
+    (committed on blur, not per keystroke, or typing "900" would rescale
+    three times). Portions scale with it. Fit to a per-portion protein
+    and/or kcal target with per-ingredient locks; the main protein source
+    starts locked.
+  - Fit only moves ingredients already in the meal. Tamara left that call
+    to me: adding a side means choosing a food for her, and a tool that
+    invents ingredients stops being trusted. A miss says which target and
+    what would fix it.
+  - Portions left are DERIVED from diary entries (`mealPortionsLogged`),
+    nothing is stored, so deleting an entry puts the food back.
+  - Library: "Cooked batches" section. Finished batches stay 7 days, then
+    fold under "older" (her choice: stay visible as finished).
+  - Log by Portions or Grams. Grams use `total_g` if weighed, else the raw
+    ingredient sum with a note saying so.
+- **Compare** (`features/compare/`, Library > Compare tab). Up to 4
+  products on one footing: per 100 g, per pack, to hit N g protein, to hit
+  N kcal. Hand-entered price + pack size, stored on the phone only (her
+  choice) in Dexie v7 `food_prices`, never synced. Best value per row is
+  highlighted, never on a tie.
+- `IngredientPickerSheet` gained a pick-only mode (`onFood`) so compare
+  reuses search, barcode, label scan and manual entry.
+- `findFoodByBarcode` replaces the two copies of the scan lookup that had
+  drifted apart.
+
 ### Not done
 
-- **Meal prep / batches.** Agreed direction: split Recipe (template) from
-  Batch (one dated cook, archived when eaten), scale by one ingredient, fit
-  sides to a protein/kcal target, log by grams for things like a salad bowl.
-  Needs a schema decision (D1 columns or a new table) before building.
-- **Compare tool.** 2 to 4 products side by side per 100 g / per pack / "to
-  hit N g protein", with hand-entered price. Price storage undecided.
 - Pet roll-forward still ignores day marks.
 - `rewriteUserId` in `db/sync/userMigration.ts` does not cover `reservations`
   (found in passing, not fixed).
 - Verified in headless Chromium with seeded data only. Live USDA / Open Food
-  Facts calls were not reachable there, so the live-result path and
-  everything on a real phone are unverified.
+  Facts calls were not reachable there, so the live-result path, the camera
+  scanner and everything on a real phone are unverified.
+- No currency symbol in compare: prices are bare numbers.
+- Batches sync, but a second device only sees them as batches once the D1
+  columns exist.
 
 ---
 

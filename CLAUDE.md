@@ -1,8 +1,10 @@
 # calorie-tracker
 
 **Status:** Live, deployed, multi-user. Chat #5 work (search, scroll lock,
-recipe scan, under-logged days) is on `claude/peaceful-volta-hdy861`, not
-yet deployed. 445 tests passing. (Updated 2026-11-10, chat #5. This line goes
+recipe scan, under-logged days, meal prep batches, compare) is on
+`claude/peaceful-volta-hdy861`, not yet deployed. Deploying it needs four
+D1 ALTERs on `meals` first (see `worker/schema.sql`). 465 tests passing.
+(Updated 2026-11-11, chat #5. This line goes
 stale fast: `docs/SESSION_LOG.md` top entry is the authority.)
 
 Personal calorie + nutrition tracking PWA (Tamara + sister + ~3 friends). Local-first via Dexie/IndexedDB, sync via Cloudflare Worker + D1, per-user isolation via private sync codes. Live at https://calorie-tracker.tamara-sovcik.workers.dev.
@@ -38,10 +40,11 @@ TypeScript strict. Vite 5, React 18, Tailwind CSS, vite-plugin-pwa, Dexie + dexi
 src/
   app/        <- per-route pages (diary/ pet/ settings/ library/ progress/ auth/)
   components/ <- shared UI (Button, Input, Sheet, MacroBar, Switch, etc.)
-  db/         <- dexie.ts (v6 schema), types.ts, userId.ts, seed.ts, repos/, sync/
+  db/         <- dexie.ts (v7 schema), types.ts, userId.ts, seed.ts, repos/, sync/
   features/   <- diary/ food-search/ meals/ meal-planner/ photo-log/ recipe-scan/
                  food-facts/ weekly-budget/ diet-pause/ reservations/ digest/
                  exercise/ pet/ fitbit/ settings/ onboarding/ library/ progress/
+                 day-status/ compare/
   lib/        <- off-api, usda-api, fitbit-api, macros, tdee, units, dates, cn, portionSuggestions
   main.tsx    <- boot: resolveUserId -> pre-seed sync -> ensureSeed -> render
   App.tsx     <- routes + Layout + Toaster + FoodFactCard
@@ -61,7 +64,7 @@ wins and `tsc` resolves to a UNC path that does not exist.
 ```bash
 npm run typecheck   # tsc --noEmit + worker tsconfig
 npm run lint
-npm run test        # vitest run (445 tests, 23 files)
+npm run test        # vitest run (465 tests, 25 files)
 npm run build       # vite build -> dist/
 npm run dev
 npx wrangler deploy # always build first
@@ -106,7 +109,7 @@ Open:
 
 ## Tests
 
-Vitest, colocated `*.test.ts`, 445 tests / 23 files. Pure helpers tested;
+Vitest, colocated `*.test.ts`, 465 tests / 25 files. Pure helpers tested;
 Dexie/Worker verified live. `npm run test`.
 
 ## Credentials
