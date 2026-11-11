@@ -4,7 +4,10 @@ import { Button } from '@/components/ui/Button';
 import { LabeledInput } from '@/components/ui/Input';
 import { useMealResolved } from './useMealResolved';
 import { itemToQuantity, multiplyTotals } from './mealMath';
-import { computeMacros } from '@/features/food-search/foodMath';
+import { computeMacros, gramsForQuantity } from '@/features/food-search/foodMath';
+import { SegmentedControl } from '@/components/ui/SegmentedControl';
+import { useMealPortionsLogged } from '@/db/repos/diary';
+import { batchStatus, isBatch, portionsForGrams } from './batchMath';
 import { formatKcal } from '@/lib/macros';
 
 /** Trim a number to at most one decimal, dropping a trailing ".0". */
@@ -40,7 +43,12 @@ export function LogMealStep({
   notice,
 }: LogMealStepProps) {
   const resolved = useMealResolved(mealId);
+  const portionsLogged = useMealPortionsLogged();
   const [mult, setMult] = useState<number>(initialMultiplier);
+  // Portions suit a meal prep split into equal boxes. Grams suit a bowl
+  // that gets eaten a bit at a time ("45 g of the salad").
+  const [by, setBy] = useState<'portions' | 'grams'>('portions');
+  const [grams, setGrams] = useState('');
 
   if (!resolved) {
     return (
@@ -48,8 +56,34 @@ export function LogMealStep({
     );
   }
 
+  // Weight of the whole dish: weighed if the user did, otherwise the raw
+  // ingredients added up.
+  const rawGrams = resolved.items.reduce((sum, it) => {
+    const food = resolved.foodsById.get(it.food_id);
+    return sum + (food ? gramsForQuantity(food, itemToQuantity(it)) : 0);
+  }, 0);
+  const weighed = !!resolved.meal.total_g && resolved.meal.total_g > 0;
+  const totalGrams = weighed ? (resolved.meal.total_g as number) : rawGrams;
+
   const totals = multiplyTotals(resolved.totals, mult);
   const valid = mult > 0 && Number.isFinite(mult);
+
+  const status = isBatch(resolved.meal)
+    ? batchStatus(resolved.meal, portionsLogged?.get(resolved.meal.id))
+    : null;
+
+  const changeGrams = (text: string) => {
+    setGrams(text);
+    setMult(
+      portionsForGrams(parseFloat(text.replace(',', '.')), totalGrams, resolved.servings),
+    );
+  };
+  const switchBy = (next: 'portions' | 'grams') => {
+    setBy(next);
+    // Carry the current amount across rather than resetting it.
+    if (next === 'grams' && valid && totalGrams > 0)
+      setGrams(String(Math.round((mult / resolved.servings) * totalGrams)));
+  };
 
   return (
     <div className="flex flex-col">
@@ -96,33 +130,72 @@ export function LogMealStep({
             {notice}
           </div>
         )}
-        <div className="flex flex-wrap gap-2">
-          {QUICK_MULTS.map((q) => (
-            <button
-              key={q}
-              type="button"
-              onClick={() => setMult(q)}
-              className={`tap-target rounded-full border px-4 text-sm font-medium transition-colors ${
-                mult === q
-                  ? 'border-primary bg-primary text-primary-foreground'
-                  : 'border-border bg-muted/40 hover:bg-muted'
-              }`}
-            >
-              {q}×
-            </button>
-          ))}
-        </div>
+        {status && (
+          <p className="text-xs text-muted-foreground tabular-nums">
+            {status.finished && status.left === 0
+              ? 'Every portion of this batch is already logged.'
+              : `${fmtQty(status.left)} of ${fmtQty(resolved.servings)} portions left in this batch.`}
+          </p>
+        )}
 
-        <LabeledInput
-          label="Custom portion multiplier"
-          type="number"
-          inputMode="decimal"
-          step="any"
-          min="0"
-          value={Number.isFinite(mult) ? mult : ''}
-          onChange={(e) => setMult(parseFloat(e.target.value))}
-          trailing="× portion"
-        />
+        {totalGrams > 0 && (
+          <SegmentedControl<'portions' | 'grams'>
+            value={by}
+            onChange={switchBy}
+            aria-label="Log by portions or by weight"
+            options={[
+              { value: 'portions', label: 'Portions' },
+              { value: 'grams', label: 'Grams' },
+            ]}
+          />
+        )}
+
+        {by === 'portions' ? (
+          <>
+            <div className="flex flex-wrap gap-2">
+              {QUICK_MULTS.map((q) => (
+                <button
+                  key={q}
+                  type="button"
+                  onClick={() => setMult(q)}
+                  className={`tap-target rounded-full border px-4 text-sm font-medium transition-colors ${
+                    mult === q
+                      ? 'border-primary bg-primary text-primary-foreground'
+                      : 'border-border bg-muted/40 hover:bg-muted'
+                  }`}
+                >
+                  {q}×
+                </button>
+              ))}
+            </div>
+
+            <LabeledInput
+              label="Custom portion multiplier"
+              type="number"
+              inputMode="decimal"
+              step="any"
+              min="0"
+              value={Number.isFinite(mult) ? mult : ''}
+              onChange={(e) => setMult(parseFloat(e.target.value))}
+              trailing="× portion"
+            />
+          </>
+        ) : (
+          <LabeledInput
+            label="How much did you have?"
+            type="text"
+            inputMode="decimal"
+            autoFocus
+            value={grams}
+            onChange={(e) => changeGrams(e.target.value)}
+            trailing="g"
+            hint={
+              weighed
+                ? `Out of ${Math.round(totalGrams)} g cooked.`
+                : `Out of ${Math.round(totalGrams)} g of raw ingredients. Cooked food weighs differently: weigh the finished dish and set it on the meal for an accurate number.`
+            }
+          />
+        )}
 
         <div className="rounded-xl border border-border bg-muted/30 p-4">
           <div className="text-xs uppercase tracking-wide text-muted-foreground">

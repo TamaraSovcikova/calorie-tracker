@@ -137,11 +137,27 @@ CREATE TABLE IF NOT EXISTS meals (
   notes       TEXT,
   servings    INTEGER,  -- portions the batch makes; NULL = 1 (pre-feature rows)
   image_url   TEXT,     -- user meal photo as a downscaled JPEG data URL; NULL = none
+  favorite    INTEGER,
+  category    TEXT,     -- legacy single category
+  categories  TEXT,     -- JSON array of category tokens
+  batch_date  TEXT,     -- YYYY-MM-DD; non-NULL = this row is a batch (one cook)
+  batch_of    TEXT,     -- recipe id a batch was cooked from
+  total_g     REAL,     -- weighed weight of the finished dish, grams
+  finished_at TEXT,     -- when a batch was marked finished
   created_at  TEXT NOT NULL,
   updated_at  TEXT NOT NULL,
   deleted_at  TEXT
 );
 CREATE INDEX IF NOT EXISTS meals_updated_at ON meals (updated_at);
+
+-- Migration for batches (chat #5). Apply BEFORE deploying the worker that
+-- lists these columns, one at a time:
+--   wrangler d1 execute <db> --remote --command "ALTER TABLE meals ADD COLUMN batch_date TEXT"
+--   wrangler d1 execute <db> --remote --command "ALTER TABLE meals ADD COLUMN batch_of TEXT"
+--   wrangler d1 execute <db> --remote --command "ALTER TABLE meals ADD COLUMN total_g REAL"
+--   wrangler d1 execute <db> --remote --command "ALTER TABLE meals ADD COLUMN finished_at TEXT"
+-- (favorite / category / categories already exist on the live table; they
+-- were added by hand and had never been written into this file.)
 
 -- Migration for databases created before the `servings` column existed.
 -- Safe to run once on an existing D1; errors with "duplicate column" if

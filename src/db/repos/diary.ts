@@ -325,6 +325,36 @@ export async function mealLogStats(): Promise<
   return out;
 }
 
+/**
+ * How much of each meal has been logged, in portions, and when it was last
+ * logged. For a batch this is what "3.5 of 5 portions left" is derived
+ * from: nothing is stored on the batch, so deleting or editing a diary
+ * entry puts the food back without any bookkeeping.
+ */
+export async function mealPortionsLogged(): Promise<
+  Map<string, { portions: number; lastAt: string }>
+> {
+  const userId = currentUserId();
+  const out = new Map<string, { portions: number; lastAt: string }>();
+  await db.diary_entries
+    .where('[user_id+date]')
+    .between([userId, '0000-00-00'], [userId, '9999-99-99'])
+    .each((e) => {
+      if (e.kind !== 'meal' || !e.meal_id || e.deleted_at) return;
+      const cur = out.get(e.meal_id) ?? { portions: 0, lastAt: '' };
+      cur.portions += e.portion_multiplier ?? e.qty ?? 1;
+      if (e.created_at > cur.lastAt) cur.lastAt = e.created_at;
+      out.set(e.meal_id, cur);
+    });
+  return out;
+}
+
+export function useMealPortionsLogged():
+  | Map<string, { portions: number; lastAt: string }>
+  | undefined {
+  return useLiveQuery(() => mealPortionsLogged(), []);
+}
+
 /** Live version of {@link mealLogStats}. */
 export function useMealLogStats():
   | Map<string, { count: number; topSection: MealSection | undefined }>

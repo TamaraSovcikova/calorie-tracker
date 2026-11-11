@@ -2,7 +2,9 @@ import { useMemo, useState } from 'react';
 import { ChefHat, ChevronRight, Search, Star } from 'lucide-react';
 import { Input } from '@/components/ui/Input';
 import { cn } from '@/lib/cn';
-import { useMealsWithTotals } from './useMealsWithTotals';
+import { useMealsWithTotals, type MealWithTotals } from './useMealsWithTotals';
+import { batchStatus, isBatch } from './batchMath';
+import { useMealPortionsLogged } from '@/db/repos/diary';
 import { filterMealsByQuery } from './mealMath';
 import { buildMealFilterChips, mealMatchesFilter } from './mealCategory';
 import { useProfile } from '@/db/repos/profile';
@@ -13,7 +15,20 @@ interface MealPickerProps {
 }
 
 export function MealPicker({ onPick }: MealPickerProps) {
-  const meals = useMealsWithTotals();
+  const allMeals = useMealsWithTotals();
+  const portionsLogged = useMealPortionsLogged();
+  // Batches still in the fridge lead the list: they are what gets logged
+  // day to day. Finished ones have nothing left to log, so they are left out.
+  const meals = useMemo(() => {
+    if (!allMeals) return undefined;
+    const left = (m: MealWithTotals) =>
+      batchStatus(m.meal, portionsLogged?.get(m.meal.id));
+    const live = allMeals.filter((m) => !isBatch(m.meal) || !left(m).finished);
+    return [
+      ...live.filter((m) => isBatch(m.meal)),
+      ...live.filter((m) => !isBatch(m.meal)),
+    ];
+  }, [allMeals, portionsLogged]);
   const profile = useProfile();
   const [query, setQuery] = useState('');
   const [filter, setFilter] = useState<string>('all');
@@ -90,7 +105,7 @@ export function MealPicker({ onPick }: MealPickerProps) {
         </div>
       ) : (
         <ul className="divide-y divide-border">
-          {filtered.map(({ meal }) => (
+          {filtered.map(({ meal, servings }) => (
             <li key={meal.id}>
               <button
                 type="button"
@@ -106,7 +121,16 @@ export function MealPicker({ onPick }: MealPickerProps) {
                   )}
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm font-medium">{meal.name}</div>
-                    {meal.notes && (
+                    {isBatch(meal) && (
+                      <div className="mt-0.5 truncate text-xs font-medium text-primary tabular-nums">
+                        Batch ·{' '}
+                        {Math.round(
+                          batchStatus(meal, portionsLogged?.get(meal.id)).left * 10,
+                        ) / 10}{' '}
+                        of {Math.round(servings * 10) / 10} portions left
+                      </div>
+                    )}
+                    {!isBatch(meal) && meal.notes && (
                       <div className="mt-0.5 truncate text-xs text-muted-foreground">
                         {meal.notes}
                       </div>

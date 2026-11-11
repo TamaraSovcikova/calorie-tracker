@@ -301,6 +301,25 @@ export interface Meal {
   /** Starred for fast access - favourites pin to the top of the meal list.
    *  Optional/nullable: pre-feature rows read undefined (falsy). */
   favorite?: boolean;
+  /**
+   * Set when this row is a BATCH: one dated cook, as opposed to a reusable
+   * recipe. The local date it was cooked. A batch is an ordinary meal in
+   * every other way (same items, same logging), which is the point: it
+   * needs no parallel code path. See `features/meals/batchMath.ts`.
+   * Nullable: D1 returns null for recipes.
+   */
+  batch_date?: string | null;
+  /** The recipe a batch was cooked from, when there was one. */
+  batch_of?: ID | null;
+  /**
+   * Weight of the finished dish in grams, when the user weighed it. Lets a
+   * meal be logged by weight ("45 g of the salad"). Without it the raw
+   * ingredient weights are summed as a stand-in.
+   */
+  total_g?: number | null;
+  /** When the user marked a batch finished. A batch whose portions are all
+   *  logged is finished without this. */
+  finished_at?: ISOTimestamp | null;
   created_at: ISOTimestamp;
   updated_at: ISOTimestamp;
   deleted_at?: ISOTimestamp;

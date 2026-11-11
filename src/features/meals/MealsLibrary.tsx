@@ -4,6 +4,7 @@ import {
   ChefHat,
   ChevronDown,
   Coffee,
+  CookingPot,
   Cookie,
   Moon,
   Pencil,
@@ -31,7 +32,9 @@ import {
   mealMatchesFilter,
 } from './mealCategory';
 import { toggleMealFavorite } from '@/db/repos/meals';
-import { useMealLogStats } from '@/db/repos/diary';
+import { useMealLogStats, useMealPortionsLogged } from '@/db/repos/diary';
+import { BatchesSection } from './BatchesSection';
+import { isBatch } from './batchMath';
 import { useProfile } from '@/db/repos/profile';
 import { formatKcal } from '@/lib/macros';
 import type { Meal } from '@/db/types';
@@ -60,7 +63,17 @@ interface MealsLibraryProps {
 
 export function MealsLibrary({ filter, setFilter }: MealsLibraryProps) {
   const navigate = useNavigate();
-  const meals = useMealsWithTotals();
+  const allMeals = useMealsWithTotals();
+  // Recipes and cooked batches are listed apart (see BatchesSection).
+  const meals = useMemo(
+    () => allMeals?.filter((m) => !isBatch(m.meal)),
+    [allMeals],
+  );
+  const batches = useMemo(
+    () => allMeals?.filter((m) => isBatch(m.meal)) ?? [],
+    [allMeals],
+  );
+  const portionsLogged = useMealPortionsLogged();
   const logStats = useMealLogStats();
   const profile = useProfile();
   const [query, setQuery] = useState('');
@@ -136,6 +149,12 @@ export function MealsLibrary({ filter, setFilter }: MealsLibraryProps) {
             New meal
           </Button>
         </div>
+
+        <BatchesSection
+          batches={batches}
+          logged={portionsLogged}
+          onLog={(meal) => setLogging(meal)}
+        />
 
         {hasMeals && (
           <>
@@ -223,7 +242,7 @@ export function MealsLibrary({ filter, setFilter }: MealsLibraryProps) {
                   textTransform: 'uppercase',
                 }}
               >
-                {visible.length} {visible.length === 1 ? 'meal' : 'meals'}
+                {visible.length} {visible.length === 1 ? 'recipe' : 'recipes'}
               </span>
               <div className="relative">
                 <button
@@ -389,7 +408,7 @@ export function MealsLibrary({ filter, setFilter }: MealsLibraryProps) {
                         </span>{' '}
                         kcal{servings > 1 ? '/portion' : ''}
                         {servings > 1 && ` · makes ${formatServings(servings)}`}
-                        {!cat && `${itemCount} ${itemCount === 1 ? 'item' : 'items'} · `}
+                        {!cat && ` · ${itemCount} ${itemCount === 1 ? 'item' : 'items'}`}
                       </div>
                     </div>
 
@@ -415,30 +434,42 @@ export function MealsLibrary({ filter, setFilter }: MealsLibraryProps) {
                       Log
                     </button>
 
-                    {/* Star toggle */}
-                    <button
-                      type="button"
-                      onClick={() => void toggleMealFavorite(meal.id)}
-                      aria-label={meal.favorite ? `Unstar ${meal.name}` : `Star ${meal.name}`}
-                      aria-pressed={!!meal.favorite}
-                      style={{ padding: 6, borderRadius: 8, border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--color-text-faint)', flexShrink: 0 }}
-                    >
-                      <Star
-                        size={14}
-                        strokeWidth={meal.favorite ? 0 : 1.5}
-                        style={{ fill: meal.favorite ? 'var(--color-accent)' : 'none', color: meal.favorite ? 'var(--color-accent)' : 'var(--color-text-faint)' }}
-                      />
-                    </button>
+                    <div className="flex shrink-0 items-center">
+                      {/* Cook a batch from this recipe */}
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/meals/${meal.id}/cook`)}
+                        aria-label={`Cook a batch of ${meal.name}`}
+                        style={{ padding: 6, borderRadius: 8, border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--color-text-faint)', flexShrink: 0 }}
+                      >
+                        <CookingPot size={15} strokeWidth={1.75} />
+                      </button>
 
-                    {/* Pencil */}
-                    <button
-                      type="button"
-                      onClick={() => navigate(`/meals/${meal.id}/edit`)}
-                      aria-label={`Edit ${meal.name}`}
-                      style={{ padding: 6, borderRadius: 8, border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--color-text-faint)', flexShrink: 0 }}
-                    >
-                      <Pencil size={13} strokeWidth={2} style={{ color: 'var(--color-text-faint)' }} />
-                    </button>
+                      {/* Star toggle */}
+                      <button
+                        type="button"
+                        onClick={() => void toggleMealFavorite(meal.id)}
+                        aria-label={meal.favorite ? `Unstar ${meal.name}` : `Star ${meal.name}`}
+                        aria-pressed={!!meal.favorite}
+                        style={{ padding: 6, borderRadius: 8, border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--color-text-faint)', flexShrink: 0 }}
+                      >
+                        <Star
+                          size={14}
+                          strokeWidth={meal.favorite ? 0 : 1.5}
+                          style={{ fill: meal.favorite ? 'var(--color-accent)' : 'none', color: meal.favorite ? 'var(--color-accent)' : 'var(--color-text-faint)' }}
+                        />
+                      </button>
+
+                      {/* Pencil */}
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/meals/${meal.id}/edit`)}
+                        aria-label={`Edit ${meal.name}`}
+                        style={{ padding: 6, borderRadius: 8, border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--color-text-faint)', flexShrink: 0 }}
+                      >
+                        <Pencil size={13} strokeWidth={2} style={{ color: 'var(--color-text-faint)' }} />
+                      </button>
+                    </div>
                   </div>
                 </li>
               );

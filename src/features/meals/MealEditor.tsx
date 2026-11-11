@@ -40,6 +40,7 @@ import {
 import { db } from '@/db/dexie';
 import type { Food } from '@/db/types';
 import { formatGrams, formatKcal } from '@/lib/macros';
+import { isBatch } from './batchMath';
 import { toast } from '@/components/ui/toast';
 import {
   clearMealDraft,
@@ -86,6 +87,8 @@ export function MealEditor({ mode }: MealEditorProps) {
   const [name, setName] = useState('');
   const [notes, setNotes] = useState('');
   const [servings, setServings] = useState(1);
+  // Weighed weight of the finished dish, as typed. Empty = not weighed.
+  const [totalG, setTotalG] = useState('');
   const [categories, setCategories] = useState<string[]>([]);
   // Once the user edits categories, stop following the auto-suggestion.
   const [categoryTouched, setCategoryTouched] = useState(false);
@@ -153,6 +156,7 @@ export function MealEditor({ mode }: MealEditorProps) {
     setName(resolved.meal.name);
     setNotes(resolved.meal.notes ?? '');
     setServings(getServings(resolved.meal));
+    setTotalG(resolved.meal.total_g ? String(resolved.meal.total_g) : '');
     setImageUrl(resolved.meal.image_url ?? undefined);
     const existing = mealCategories(resolved.meal);
     setCategories(existing);
@@ -321,6 +325,8 @@ export function MealEditor({ mode }: MealEditorProps) {
         unit: it.unit,
       }));
       const safeServings = servings > 0 ? servings : 1;
+      const weighed = parseFloat(totalG.replace(',', '.'));
+      const total_g = weighed > 0 ? weighed : undefined;
       if (mode === 'create') {
         await createMeal({
           name: trimmed,
@@ -329,6 +335,7 @@ export function MealEditor({ mode }: MealEditorProps) {
           image_url: imageUrl,
           categories: effectiveCategories,
           items: itemInputs,
+          total_g,
         });
         clearMealDraft();
       } else if (id) {
@@ -339,6 +346,7 @@ export function MealEditor({ mode }: MealEditorProps) {
           image_url: imageUrl,
           servings: safeServings,
           categories: effectiveCategories,
+          total_g: total_g ?? null,
         });
         await replaceMealItems(id, itemInputs);
       }
@@ -398,7 +406,11 @@ export function MealEditor({ mode }: MealEditorProps) {
           <ArrowLeft className="h-5 w-5" />
         </button>
         <h1 className="flex-1 truncate text-base font-semibold">
-          {mode === 'create' ? 'New meal' : 'Edit meal'}
+          {mode === 'create'
+            ? 'New meal'
+            : resolved && isBatch(resolved.meal)
+              ? 'Edit batch'
+              : 'Edit meal'}
         </h1>
         {mode === 'create' && draftActive && (
           <button
@@ -545,6 +557,16 @@ export function MealEditor({ mode }: MealEditorProps) {
             uses {servings > 1 ? `1⁄${Math.round(servings)}` : 'all'} of it.
           </p>
         </div>
+
+        <LabeledInput
+          label="Cooked weight (optional)"
+          type="text"
+          inputMode="decimal"
+          value={totalG}
+          onChange={(e) => setTotalG(e.target.value)}
+          trailing="g"
+          hint="Weigh the finished dish to log it by grams, e.g. 45 g of a salad bowl."
+        />
 
         <div className="rounded-2xl border border-border bg-card p-4">
           <div className="text-xs uppercase tracking-wide text-muted-foreground">

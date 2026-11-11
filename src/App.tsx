@@ -7,6 +7,7 @@ import { LibraryPage } from '@/app/library/LibraryPage';
 import { ProgressPage } from '@/app/progress/ProgressPage';
 import { SettingsPage } from '@/app/settings/SettingsPage';
 import { MealEditor } from '@/features/meals/MealEditor';
+import { CookPage } from '@/features/meals/CookPage';
 import { MealPlannerPage } from '@/features/meal-planner/MealPlannerPage';
 import { ReservePage } from '@/features/reservations/ReservePage';
 import { FitbitCallback } from '@/app/auth/FitbitCallback';
@@ -26,6 +27,7 @@ export default function App() {
         <Route path="/meals/new" element={<MealEditor mode="create" />} />
         <Route path="/meals/plan" element={<MealPlannerPage />} />
         <Route path="/meals/:id/edit" element={<MealEditor mode="edit" />} />
+        <Route path="/meals/:id/cook" element={<CookPage />} />
         <Route path="/pet" element={<PetPage />} />
         <Route path="/quick-add" element={<QuickAddPage />} />
 

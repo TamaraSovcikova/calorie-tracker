@@ -20,6 +20,12 @@ export interface CreateMealInput {
   /** Category tokens for filtering (a meal can belong to several). */
   categories?: string[];
   items: MealItemInput[];
+  /** Set to make this a batch (one dated cook) rather than a recipe. */
+  batch_date?: string;
+  /** Recipe the batch was cooked from. */
+  batch_of?: string;
+  /** Weighed weight of the finished dish, grams. */
+  total_g?: number;
 }
 
 function normaliseServings(servings: number | undefined): number {
@@ -39,6 +45,9 @@ export async function createMeal(input: CreateMealInput): Promise<Meal> {
     servings: normaliseServings(input.servings),
     image_url: input.image_url,
     categories: input.categories,
+    batch_date: input.batch_date,
+    batch_of: input.batch_of,
+    total_g: input.total_g,
     created_at: now,
     updated_at: now,
   };
@@ -89,6 +98,13 @@ export async function toggleMealFavorite(id: string): Promise<void> {
   await db.meals.update(id, {
     favorite: !meal.favorite,
     updated_at: new Date().toISOString(),
+  });
+}
+
+/** Mark a batch finished by hand, or put it back in use. */
+export async function setBatchFinished(id: string, finished: boolean): Promise<void> {
+  await updateMeal(id, {
+    finished_at: finished ? new Date().toISOString() : null,
   });
 }
 
