@@ -223,3 +223,179 @@ export function batchName(recipeName: string, dateLabel: string): string {
   const base = recipeName.replace(/\s+·\s+\d{1,2} [A-Z][a-z]{2}$/, '');
   return `${base} · ${dateLabel}`;
 }
+
+/* ------------------------------------------------------------------ *
+ * Changing the portion: "what could I add to get 100 kcal more?"
+ * ------------------------------------------------------------------ */
+
+/** One ingredient as the options list sees it. */
+export interface OptionLine {
+  qty: number;
+  unit: string;
+  /** Totals this line contributes at `qty`. */
+  kcal: number;
+  protein: number;
+  /** Salt, herbs, spices: never offered as a way to change a portion. */
+  negligible?: boolean;
+}
+
+/** A per-portion change. Set exactly one. May be negative. */
+export interface PortionChange {
+  kcal?: number;
+  protein?: number;
+}
+
+export interface PortionOption {
+  /** 'one' moves a single ingredient, 'all' scales the whole recipe. */
+  kind: 'one' | 'all';
+  /** The ingredient moved, for 'one'. */
+  index?: number;
+  /** New amount for every line, same order. */
+  qtys: number[];
+  /** What a portion comes to with these amounts (after rounding). */
+  perPortion: { kcal: number; protein: number };
+  /**
+   * Shown straight away. The rest sit behind "more options": they work,
+   * but they lean on a minor ingredient.
+   */
+  primary: boolean;
+}
+
+/** How far one option may move an ingredient: at most 2.5x, at least 1/4. */
+const OPTION_MAX_FACTOR = 2.5;
+const OPTION_MIN_FACTOR = 0.25;
+/** An ingredient is a "main" one from this share of the recipe upward. */
+const MAIN_SHARE = 0.1;
+/** At most this many single-ingredient options up front. */
+const MAX_PRIMARY = 4;
+/** To count as a way to add protein, this share of its kcal is protein. */
+const PROTEIN_SOURCE_SHARE = 0.2;
+/** Rounding (whole eggs, quarter wraps) may miss the ask by this much. */
+const OPTION_TOLERANCE = 0.3;
+
+/**
+ * The sensible ways to change a portion by `change`.
+ *
+ * The earlier design had one "fit" button that picked an answer. But "100
+ * kcal more" has several good answers (more chicken, more rice, more
+ * cheese) that differ in what they do to the protein and to the shopping,
+ * and only the cook knows which she wants. So this lists them.
+ *
+ * It also refuses to list the silly ones, which matter as much:
+ *  - seasonings are never an option;
+ *  - nothing that would need an ingredient more than 2.5x or under a
+ *    quarter of what the recipe has (100 kcal more "by adding broccoli" is
+ *    half a kilo of broccoli);
+ *  - for protein, only ingredients that are actually a protein source;
+ *  - nothing where rounding to a real amount misses the ask by over 30%;
+ *  - counted things (wraps, eggs) only in halves per portion, and only up
+ *    front when it is a whole one each.
+ * Minor ingredients that pass are kept, but not shown first.
+ */
+export function portionOptions(
+  lines: OptionLine[],
+  servings: number,
+  change: PortionChange,
+): PortionOption[] {
+  const n = servings > 0 ? servings : 1;
+  const byProtein = change.protein !== undefined && change.protein !== 0;
+  const ask = byProtein ? (change.protein as number) : (change.kcal ?? 0);
+  if (!ask || !Number.isFinite(ask)) return [];
+  const want = ask * n; // change across the whole batch
+  const valueOf = (l: OptionLine) => (byProtein ? l.protein : l.kcal);
+
+  const usable = (l: OptionLine) => !l.negligible && l.qty > 0 && l.kcal > 0;
+  const total = lines.reduce(
+    (t, l) => ({ kcal: t.kcal + l.kcal, protein: t.protein + l.protein }),
+    { kcal: 0, protein: 0 },
+  );
+  const totalValue = byProtein ? total.protein : total.kcal;
+
+  const outcome = (qtys: number[]) => {
+    const t = lines.reduce(
+      (acc, l, i) => {
+        const f = l.qty > 0 ? qtys[i] / l.qty : 1;
+        return { kcal: acc.kcal + l.kcal * f, protein: acc.protein + l.protein * f };
+      },
+      { kcal: 0, protein: 0 },
+    );
+    return { kcal: t.kcal / n, protein: t.protein / n };
+  };
+  /** Did the rounded amounts deliver roughly what was asked? */
+  const delivers = (per: { kcal: number; protein: number }) => {
+    const got = (byProtein ? per.protein : per.kcal) - totalValue / n;
+    return Math.sign(got) === Math.sign(ask) && Math.abs(got - ask) <= Math.abs(ask) * OPTION_TOLERANCE;
+  };
+
+  const options: (PortionOption & { share: number })[] = [];
+  lines.forEach((l, i) => {
+    if (!usable(l)) return;
+    const value = valueOf(l);
+    if (!(value > 0)) return;
+    if (byProtein && ask > 0 && (l.protein * 4) / l.kcal < PROTEIN_SOURCE_SHARE) return;
+    const factor = 1 + want / value;
+    if (factor > OPTION_MAX_FACTOR || factor < OPTION_MIN_FACTOR) return;
+    // Counted things (wraps, eggs) move in halves PER PORTION. "0.6 of a
+    // wrap more each" is arithmetic, not a suggestion anyone can cook.
+    const counted = l.unit !== 'g' && l.unit !== 'ml';
+    const step = n * 0.5;
+    const next = counted
+      ? Math.max(step, Math.round((l.qty * factor) / step) * step)
+      : roundAmount(l.qty * factor, l.unit);
+    const qtys = lines.map((x, j) => (j === i ? next : x.qty));
+    if (qtys[i] === l.qty) return;
+    const perPortion = outcome(qtys);
+    if (!delivers(perPortion)) return;
+    // Half a wrap more each is possible but awkward: offered, not up front.
+    const awkward = counted && !Number.isInteger((next - l.qty) / n);
+    options.push({
+      kind: 'one',
+      index: i,
+      qtys,
+      perPortion,
+      primary: false,
+      share: awkward ? 0 : totalValue > 0 ? value / totalValue : 0,
+    });
+  });
+
+  // Biggest contributors first: they are the least surprising to change.
+  options.sort((a, b) => b.share - a.share);
+  let shown = 0;
+  for (const o of options) {
+    if (o.share >= MAIN_SHARE && shown < MAX_PRIMARY) {
+      o.primary = true;
+      shown += 1;
+    }
+  }
+
+  const result: PortionOption[] = options.map(({ share: _share, ...o }) => o);
+
+  // Everything together: a bigger or smaller portion of the same dish.
+  const scalable = lines.filter(usable).reduce((s, l) => s + valueOf(l), 0);
+  if (scalable > 0) {
+    const factor = 1 + want / scalable;
+    if (factor <= 2 && factor >= 0.5) {
+      const qtys = lines.map((l) => (usable(l) ? roundAmount(l.qty * factor, l.unit) : l.qty));
+      const perPortion = outcome(qtys);
+      if (delivers(perPortion)) {
+        result.push({ kind: 'all', qtys, perPortion, primary: true });
+      }
+    }
+  }
+  return result;
+}
+
+/**
+ * Scale every amount for a new number of portions, keeping each portion
+ * the same. This is what "make 10 instead of 5" means on every recipe site;
+ * the first version of the cook screen kept the food and shrank the
+ * portions instead, which is the rarer question.
+ */
+export function scaleForPortions(
+  lines: { qty: number; unit: string }[],
+  fromPortions: number,
+  toPortions: number,
+): number[] {
+  const f = scaleFactor(fromPortions, toPortions);
+  return lines.map((l) => roundAmount(l.qty * f, l.unit));
+}

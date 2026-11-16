@@ -3,6 +3,8 @@ import {
   batchName,
   batchStatus,
   fitToTarget,
+  portionOptions,
+  scaleForPortions,
   portionsForGrams,
   roundAmount,
   scaleFactor,
@@ -136,5 +138,100 @@ describe('batchName', () => {
     expect(batchName('Chicken stroganoff · 4 Nov', '11 Nov')).toBe(
       'Chicken stroganoff · 11 Nov',
     );
+  });
+});
+
+describe('portionOptions', () => {
+  // 5 portions: chicken, dry rice, broccoli, a little oil, garlic, salt.
+  const lines = () => [
+    line(800, 165, 31), // chicken   1320 kcal, 248 g protein
+    line(300, 360, 7), //  rice      1080 kcal
+    line(400, 34, 2.8), // broccoli   136 kcal
+    line(15, 884, 0), //   oil        133 kcal
+    line(12, 149, 6), //   garlic      18 kcal
+    { ...line(5, 0, 0), negligible: true }, // salt
+  ];
+  const one = (opts: ReturnType<typeof portionOptions>, i: number) =>
+    opts.find((o) => o.kind === 'one' && o.index === i);
+
+  it('offers the main ingredients and the whole dish for +100 kcal', () => {
+    const opts = portionOptions(lines(), 5, { kcal: 100 });
+    const shown = opts.filter((o) => o.primary);
+    expect(shown.map((o) => (o.kind === 'all' ? 'all' : o.index))).toEqual([0, 1, 'all']);
+    // Chicken: 500 kcal more across the batch is about 300 g more.
+    expect(one(opts, 0)!.qtys[0]).toBe(1105);
+    expect(Math.round(one(opts, 0)!.perPortion.kcal)).toBe(638);
+    // The same calories from rice barely move the protein; chicken does.
+    expect(one(opts, 0)!.perPortion.protein).toBeGreaterThan(one(opts, 1)!.perPortion.protein + 15);
+  });
+
+  it('does not suggest absurd amounts or seasonings', () => {
+    const opts = portionOptions(lines(), 5, { kcal: 100 });
+    expect(one(opts, 2)).toBeUndefined(); // 1.5 kg of broccoli
+    expect(one(opts, 3)).toBeUndefined(); // five times the oil
+    expect(one(opts, 4)).toBeUndefined(); // garlic
+    expect(one(opts, 5)).toBeUndefined(); // salt
+  });
+
+  it('keeps a workable minor ingredient, but not up front', () => {
+    // +20 kcal: the oil can do that (about 11 g more), it is just not the
+    // first thing anyone would reach for.
+    const opts = portionOptions(lines(), 5, { kcal: 20 });
+    expect(one(opts, 3)).toBeDefined();
+    expect(one(opts, 3)!.primary).toBe(false);
+    expect(one(opts, 0)!.primary).toBe(true);
+  });
+
+  it('for protein, only offers real protein sources', () => {
+    const opts = portionOptions(lines(), 5, { protein: 10 });
+    expect(one(opts, 0)).toBeDefined();
+    expect(one(opts, 1)).toBeUndefined(); // rice is not how you add protein
+    expect(Math.round(one(opts, 0)!.perPortion.protein - 56)).toBeGreaterThanOrEqual(9);
+  });
+
+  it('works downward too, without emptying an ingredient', () => {
+    const opts = portionOptions(lines(), 5, { kcal: -100 });
+    expect(one(opts, 1)!.qtys[1]).toBeLessThan(300);
+    expect(opts.every((o) => o.qtys.every((q, i) => q >= lines()[i].qty * 0.25))).toBe(true);
+    // Taking 100 kcal a portion out of the oil alone is not possible.
+    expect(one(opts, 3)).toBeUndefined();
+  });
+
+  it('moves counted things in halves per portion, whole ones up front', () => {
+    const wraps = [
+      { qty: 5, unit: 'wrap', kcal: 900, protein: 25 }, // 180 kcal each
+      line(500, 165, 31),
+    ];
+    // +180 kcal a portion is exactly one more wrap each.
+    const whole = one(portionOptions(wraps, 5, { kcal: 180 }), 0)!;
+    expect(whole.qtys[0]).toBe(10);
+    expect(whole.primary).toBe(true);
+    // +100 kcal is nearest to half a wrap each (90 kcal): possible, awkward.
+    const half = one(portionOptions(wraps, 5, { kcal: 100 }), 0)!;
+    expect(half.qtys[0]).toBe(7.5);
+    expect(half.primary).toBe(false);
+    // +20 kcal a portion would be a ninth of a wrap: not offered.
+    expect(one(portionOptions(wraps, 5, { kcal: 20 }), 0)).toBeUndefined();
+  });
+
+  it('returns nothing for no change', () => {
+    expect(portionOptions(lines(), 5, {})).toEqual([]);
+    expect(portionOptions(lines(), 5, { kcal: 0 })).toEqual([]);
+  });
+});
+
+describe('scaleForPortions', () => {
+  it('doubles the food for double the portions', () => {
+    expect(
+      scaleForPortions(
+        [
+          { qty: 800, unit: 'g' },
+          { qty: 5, unit: 'wrap' },
+          { qty: 12, unit: 'g' },
+        ],
+        5,
+        10,
+      ),
+    ).toEqual([1600, 10, 24]);
   });
 });

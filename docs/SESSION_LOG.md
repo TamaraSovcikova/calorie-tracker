@@ -156,6 +156,33 @@ resolves to about 345 kcal a portion with nothing flagged.
 - The prompt changes are NOT verified: no AI access from the build
   session. Everything downstream of the model is.
 
+### Day four: cook screen rethought (2026-11-16)
+
+Tamara's feedback on batches: she tapped 10 portions expecting the recipe
+to scale, and it kept the food and halved the macros. The screen was
+answering the rarer question. Checked how recipe tools handle it: changing
+servings scales the ingredients nearly everywhere; "same food, different
+split" is a separate, secondary control where it exists at all.
+
+- **Portions scales the food** (`scaleForPortions`), each portion
+  unchanged. Stepper plus a typed field. A switch, "Same food, split
+  differently", gives the old behaviour.
+- Portion changes scale from a remembered starting point (`basis` ref in
+  `CookPage`), not from the last rounded amounts, so 5 -> 9 -> 5 lands
+  back exactly. Any other edit becomes the new starting point.
+- **Change a portion** replaces "Fit to a target" as the main tool:
+  +/-50/100/200 kcal (or protein, or a typed target) lists the ways to get
+  there and she picks. `portionOptions` in `batchMath.ts`.
+- She asked for no weird recommendations. The rules: never a seasoning;
+  nothing needing an ingredient over 2.5x or under a quarter of the recipe;
+  for protein only real protein sources; counted items (wraps, eggs) only
+  in halves per portion; nothing where rounding misses the ask by over 30%.
+  Up to four main ingredients (10%+ of the recipe) show first plus "a bit
+  more of everything"; workable minor ones sit behind "more options". She
+  was unsure whether to show all or the top few; this does both.
+- The solver survives as a collapsed "Exact targets" section; lock icons
+  only appear while it is open.
+
 ### Not done
 
 - Verified in headless Chromium with seeded data only. Live USDA / Open Food
