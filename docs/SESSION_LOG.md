@@ -183,6 +183,30 @@ split" is a separate, secondary control where it exists at all.
 - The solver survives as a collapsed "Exact targets" section; lock icons
   only appear while it is open.
 
+### Day five: cook screen layout (2026-11-17)
+
+Same maths, new layout. The day-four screen worked but was six stacked
+cards with two always-on switches, and the calories being edited scrolled
+off the top. Offered three layouts, mocked up the chosen one as a
+clickable prototype first (a Design artifact, not in the repo), she
+approved it, then built it.
+
+- Header and a two-tile summary (Portions, Per portion) are sticky. The
+  tiles are the controls: each opens a small sheet.
+- `PortionsSheet`: stepper plus the two readings as side-by-side choices
+  ("Cook more or less food" / "Same food, split differently") with a live
+  result line. The switch is gone: the question is asked where the number
+  changes. Scales from the state at open, so up and back is exact.
+- `ChangeSheet`: the options list from day four, unchanged in behaviour.
+- The body is only the ingredient list, with - / + per row. Tapping an
+  amount opens `AmountSheet`: type what you have, then "Change just this"
+  or "Scale the whole recipe to match". That replaced the "Scale
+  together" switch.
+- `MoreSheet`: exact targets (with the locks), cooked weight, and the way
+  into the editor for a batch.
+- All of it lives in `features/meals/CookPage.tsx`; `batchMath.ts` did not
+  change.
+
 ### Not done
 
 - Verified in headless Chromium with seeded data only. Live USDA / Open Food
