@@ -3,7 +3,7 @@
 **Status:** Live, deployed, multi-user. Chat #5 work lives on
 `claude/peaceful-volta-hdy861` (not merged to main). Search, batches and
 compare are deployed; the recipe-scan rework and the reworked cook screen are
-pushed but may not be deployed (no D1 change needed). 503 tests passing. (Updated 2026-11-17, chat #5. This
+pushed but may not be deployed (no D1 change needed). 508 tests passing. (Updated 2026-11-17, chat #5. This
 line goes stale fast: `docs/SESSION_LOG.md` top entry is the authority.)
 
 Personal calorie + nutrition tracking PWA (Tamara + sister + ~3 friends). Local-first via Dexie/IndexedDB, sync via Cloudflare Worker + D1, per-user isolation via private sync codes. Live at https://calorie-tracker.tamara-sovcik.workers.dev.
@@ -63,7 +63,7 @@ wins and `tsc` resolves to a UNC path that does not exist.
 ```bash
 npm run typecheck   # tsc --noEmit + worker tsconfig
 npm run lint
-npm run test        # vitest run (503 tests, 27 files)
+npm run test        # vitest run (508 tests, 28 files)
 npm run build       # vite build -> dist/
 npm run dev
 npx wrangler deploy # always build first
@@ -108,7 +108,7 @@ Open:
 
 ## Tests
 
-Vitest, colocated `*.test.ts`, 503 tests / 27 files. Pure helpers tested;
+Vitest, colocated `*.test.ts`, 508 tests / 28 files. Pure helpers tested;
 Dexie/Worker verified live. `npm run test`.
 
 ## Credentials

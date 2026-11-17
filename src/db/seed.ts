@@ -9,6 +9,7 @@
  *                            land straight in the diary.
  */
 
+import { mergeUnits } from '@/features/food-search/customUnits';
 import { db } from './dexie';
 import { ensureProfile } from './repos/profile';
 import { ensurePet } from './repos/pet';
@@ -33,6 +34,12 @@ export async function ensureCuratedFoods(): Promise<void> {
   }
   const userId = currentUserId();
   const now = new Date().toISOString();
+  // Refreshing the built-in list rewrites every built-in food. Units the
+  // user added to one ("1 bowl = 250 g" on rice) and its star live on that
+  // same row, so they are carried across. They used to be wiped each time
+  // the list was updated.
+  const existing = await db.foods.bulkGet(CURATED_FOODS.map((cf) => `curated:${cf.slug}`));
+  const kept = new Map(existing.filter((f): f is Food => !!f).map((f) => [f.id, f]));
   const rows: Food[] = CURATED_FOODS.map((cf) => ({
     id: `curated:${cf.slug}`,
     user_id: userId,
@@ -42,8 +49,9 @@ export async function ensureCuratedFoods(): Promise<void> {
     protein_100: cf.protein,
     carbs_100: cf.carbs,
     fat_100: cf.fat,
-    custom_units: cf.units,
-    created_at: now,
+    custom_units: mergeUnits(cf.units, kept.get(`curated:${cf.slug}`)?.custom_units ?? []),
+    favorite: kept.get(`curated:${cf.slug}`)?.favorite,
+    created_at: kept.get(`curated:${cf.slug}`)?.created_at ?? now,
     updated_at: now,
   }));
   await db.foods.bulkPut(rows);

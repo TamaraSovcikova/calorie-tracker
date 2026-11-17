@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { mergeUnits, readUnitDraft } from './customUnits';
 import { ArrowLeft, Loader2, Plus, ScanText, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input, LabeledInput } from '@/components/ui/Input';
@@ -91,6 +92,7 @@ export function ManualEntryForm({
     };
   });
   const [units, setUnits] = useState<CustomUnit[]>(food?.custom_units ?? []);
+  const [unitError, setUnitError] = useState<string | null>(null);
   const [newLabel, setNewLabel] = useState('');
   const [newGrams, setNewGrams] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -138,12 +140,21 @@ export function ManualEntryForm({
 
   const update = (k: keyof FormState, v: string) => setForm((s) => ({ ...s, [k]: v }));
 
-  const addUnit = () => {
-    const grams = parseFloat(newGrams);
-    if (!newLabel.trim() || !Number.isFinite(grams) || grams <= 0) return;
-    setUnits((u) => [...u, { label: newLabel.trim(), grams }]);
+  /** Add what is typed in the two unit fields. Null when it cannot be
+   *  added (the reason is shown); otherwise the resulting list. */
+  const addUnit = (): CustomUnit[] | null => {
+    const draft = readUnitDraft(newLabel, newGrams, units);
+    if (draft.error) {
+      setUnitError(draft.error);
+      return null;
+    }
+    setUnitError(null);
+    if (!draft.unit) return units;
+    const next = [...units, draft.unit];
+    setUnits(next);
     setNewLabel('');
     setNewGrams('');
+    return next;
   };
 
   const removeUnit = (label: string) => {
@@ -170,6 +181,10 @@ export function ManualEntryForm({
       const n = parseFloat(v);
       return Number.isFinite(n) && n >= 0 ? n : undefined;
     };
+    // A unit typed in but never added with the + button used to be thrown
+    // away on Save, with nothing to say so. Saving the product saves it too.
+    const allUnits = addUnit();
+    if (allUnits === null) return;
     setSaving(true);
     try {
       const fields = {
@@ -183,7 +198,7 @@ export function ManualEntryForm({
         sugar_100: optNum(form.sugar),
         sodium_100: optNum(form.sodium),
         serving_g,
-        custom_units: units,
+        custom_units: allUnits,
       };
       if (food) {
         await updateFood(food.id, fields);
@@ -394,7 +409,7 @@ export function ManualEntryForm({
                   <button
                     key={s.label}
                     type="button"
-                    onClick={() => setUnits((prev) => [...prev, s])}
+                    onClick={() => setUnits((prev) => mergeUnits(prev, [s]))}
                     className="flex items-center gap-1 rounded-full border border-primary/40 bg-primary/5 px-2.5 py-1 text-xs font-medium text-primary hover:bg-primary/10 active:scale-95 transition-transform"
                   >
                     <Plus className="h-3 w-3" />
@@ -408,20 +423,45 @@ export function ManualEntryForm({
             <Input
               placeholder="e.g. scoop"
               value={newLabel}
-              onChange={(e) => setNewLabel(e.target.value)}
+              aria-label="Unit name"
+              onChange={(e) => {
+                setNewLabel(e.target.value);
+                setUnitError(null);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  addUnit();
+                }
+              }}
             />
             <Input
               placeholder="grams"
-              type="number"
+              type="text"
               inputMode="decimal"
-              step="any"
+              aria-label="Grams in one unit"
               value={newGrams}
-              onChange={(e) => setNewGrams(e.target.value)}
+              onChange={(e) => {
+                setNewGrams(e.target.value);
+                setUnitError(null);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  addUnit();
+                }
+              }}
             />
-            <Button type="button" variant="secondary" onClick={addUnit} aria-label="Add custom unit">
+            <Button type="button" variant="secondary" onClick={() => addUnit()}>
               <Plus className="h-4 w-4" />
+              Add
             </Button>
           </div>
+          {unitError && (
+            <p role="alert" className="text-xs text-destructive">
+              {unitError}
+            </p>
+          )}
         </div>
 
         {error && <p className="text-sm text-destructive">{error}</p>}

@@ -11,7 +11,8 @@ import {
   type QuantityState,
   type ResolvedMacros,
 } from './foodMath';
-import { updateFood } from '@/db/repos/foods';
+import { getFood, updateFood } from '@/db/repos/foods';
+import { mergeUnits, readUnitDraft } from './customUnits';
 import { suggestPortions } from '@/lib/portionSuggestions';
 import type { CustomUnit, Food } from '@/db/types';
 
@@ -38,11 +39,27 @@ export function QuantityStep({
   const [showAddUnit, setShowAddUnit] = useState(false);
   const [newUnitLabel, setNewUnitLabel] = useState('');
   const [newUnitGrams, setNewUnitGrams] = useState('');
+  const [unitError, setUnitError] = useState<string | null>(null);
 
-  // Resync only when the step is reused for a different food - keying on
-  // food.id (not the units array) avoids clobbering a just-added unit.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => setCustomUnits(food.custom_units), [food.id]);
+  // `food` is whatever copy the parent happens to hold, and it is often an
+  // old one: a search result or a diary entry's food fetched before a unit
+  // was added. Starting from that copy made a unit added a minute ago look
+  // gone, and the next unit saved then wrote the old list back over it. So
+  // the units are read from the database whenever the food changes.
+  // Keyed on food.id, not the units array, so a just-added unit is kept.
+  useEffect(() => {
+    let cancelled = false;
+    setCustomUnits(food.custom_units);
+    void getFood(food.id).then((fresh) => {
+      if (!cancelled && fresh) {
+        setCustomUnits((local) => mergeUnits(fresh.custom_units ?? [], local));
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [food.id]);
 
   // `food` is a prop snapshot the parent owns; custom units added here are
   // tracked locally (and persisted) so they appear immediately without
@@ -65,30 +82,37 @@ export function QuantityStep({
     [food.id, food.name, food.brand, customUnits.length],
   );
 
+  /** Save the unit list. Adds are merged onto what is stored right now. */
   const persistUnits = async (next: CustomUnit[]) => {
     setCustomUnits(next);
     await updateFood(food.id, { custom_units: next });
   };
-
-  // Add a suggested unit and immediately switch to it.
-  const addSuggestion = async (unit: CustomUnit) => {
-    const next = [...customUnits, unit];
-    await persistUnits(next);
+  const addUnit = async (unit: CustomUnit): Promise<void> => {
+    const stored = (await getFood(food.id))?.custom_units ?? [];
+    await persistUnits(mergeUnits(mergeUnits(stored, customUnits), [unit]));
     setState({ mode: `unit:${unit.label}` as QuantityMode, qty: 1 });
   };
 
-  const handleAddCustomUnit = async () => {
-    const grams = parseFloat(newUnitGrams);
-    const label = newUnitLabel.trim();
-    if (!label || !Number.isFinite(grams) || grams <= 0) return;
-    if (customUnits.some((u) => u.label.toLowerCase() === label.toLowerCase())) {
-      return;
+  // Add a suggested unit and immediately switch to it.
+  const addSuggestion = (unit: CustomUnit) => addUnit(unit);
+
+  /**
+   * Save what is typed in the two unit fields. Returns false when there is
+   * something typed that cannot be saved (and says why).
+   */
+  const handleAddCustomUnit = async (): Promise<boolean> => {
+    const draft = readUnitDraft(newUnitLabel, newUnitGrams, customUnits);
+    if (draft.error) {
+      setUnitError(draft.error);
+      return false;
     }
-    await persistUnits([...customUnits, { label, grams }]);
-    setState({ mode: `unit:${label}` as QuantityMode, qty: 1 });
+    setUnitError(null);
+    if (!draft.unit) return true;
+    await addUnit(draft.unit);
     setShowAddUnit(false);
     setNewUnitLabel('');
     setNewUnitGrams('');
+    return true;
   };
 
   const handleRemoveUnit = async (label: string) => {
@@ -223,9 +247,9 @@ export function QuantityStep({
           <button
             type="button"
             onClick={() => setShowAddUnit(true)}
-            className="inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline"
+            className="tap-target inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"
           >
-            <Plus className="h-3.5 w-3.5" />
+            <Plus className="h-4 w-4" />
             Add a custom unit (e.g. "1 scoop = 35 g")
           </button>
         ) : (
@@ -234,24 +258,49 @@ export function QuantityStep({
               <Input
                 placeholder="Unit name e.g. scoop"
                 value={newUnitLabel}
-                onChange={(e) => setNewUnitLabel(e.target.value)}
+                aria-label="Unit name"
+                autoFocus
+                onChange={(e) => {
+                  setNewUnitLabel(e.target.value);
+                  setUnitError(null);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') void handleAddCustomUnit();
+                }}
               />
+              {/* A text field, not type=number: a number field returns an
+                  empty string for "37,5" and the unit silently vanished. */}
               <Input
                 placeholder="Grams"
-                type="number"
+                type="text"
                 inputMode="decimal"
+                aria-label="Grams in one unit"
                 value={newUnitGrams}
-                onChange={(e) => setNewUnitGrams(e.target.value)}
+                onChange={(e) => {
+                  setNewUnitGrams(e.target.value);
+                  setUnitError(null);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') void handleAddCustomUnit();
+                }}
               />
             </div>
+            {unitError && (
+              <p role="alert" className="text-xs text-destructive">
+                {unitError}
+              </p>
+            )}
             <div className="flex gap-2">
-              <Button size="sm" variant="primary" onClick={handleAddCustomUnit}>
+              <Button type="button" variant="primary" block onClick={() => void handleAddCustomUnit()}>
                 Save unit
               </Button>
               <Button
-                size="sm"
+                type="button"
                 variant="ghost"
-                onClick={() => setShowAddUnit(false)}
+                onClick={() => {
+                  setShowAddUnit(false);
+                  setUnitError(null);
+                }}
               >
                 Cancel
               </Button>
@@ -294,7 +343,15 @@ export function QuantityStep({
           variant="primary"
           block
           disabled={!valid}
-          onClick={() => valid && onSave(state, macros)}
+          onClick={() => {
+            // A unit typed in but not yet saved would be lost here. Save it
+            // first; it becomes the selected unit, and the next tap logs.
+            if (showAddUnit && (newUnitLabel.trim() || newUnitGrams.trim())) {
+              void handleAddCustomUnit();
+              return;
+            }
+            if (valid) onSave(state, macros);
+          }}
         >
           {saveLabel}
         </Button>

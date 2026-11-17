@@ -207,6 +207,25 @@ approved it, then built it.
 - All of it lives in `features/meals/CookPage.tsx`; `batchMath.ts` did not
   change.
 
+### Day five, later: "add unit" was unreliable
+
+Reported as fiddly, sometimes not adding or saving. Five separate causes:
+
+- Every invalid input returned silently: empty field, a name in use, and a
+  decimal comma (a `type=number` field hands back "" for "37,5"). Now each
+  is a sentence under the fields (`food-search/customUnits.ts`), and the
+  grams field is text with a decimal keypad.
+- `QuantityStep` started from the parent's copy of the food, which is often
+  stale (a search result, a diary entry's food). A unit added a minute ago
+  looked gone, and the next save wrote the stale list back over it. It now
+  reads the stored units on open and merges on save.
+- A unit typed but not confirmed was dropped when the main button was
+  pressed, in both `QuantityStep` and `ManualEntryForm`. Both now save it.
+- `ensureCuratedFoods` rewrote every built-in food on a list update,
+  wiping units (and stars) the user had added to them. I had triggered
+  exactly that with the v5 list on day three. It now carries them over.
+- Small tap targets; Enter in either field now saves.
+
 ### Not done
 
 - Verified in headless Chromium with seeded data only. Live USDA / Open Food
