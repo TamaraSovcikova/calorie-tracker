@@ -236,6 +236,11 @@ export function LogMealStep({
                     </span>
                     <span className="shrink-0 text-muted-foreground tabular-nums">
                       {fmtQty(it.qty * factor)} {it.unit}
+                      {/* "4 serving" alone says nothing about how much. */}
+                      {food &&
+                        it.unit !== 'g' &&
+                        it.unit !== 'ml' &&
+                        ` (${Math.round(gramsForQuantity(food, itemToQuantity(it)) * factor)} g)`}
                     </span>
                   </div>
                   <div className="mt-0.5 text-xs text-muted-foreground tabular-nums">

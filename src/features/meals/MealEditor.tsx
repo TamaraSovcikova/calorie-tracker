@@ -38,6 +38,7 @@ import {
   type MealItemInput,
 } from '@/db/repos/meals';
 import { db } from '@/db/dexie';
+import { useLiveQuery } from 'dexie-react-hooks';
 import type { Food } from '@/db/types';
 import { formatGrams, formatKcal } from '@/lib/macros';
 import { isBatch } from './batchMath';
@@ -237,13 +238,30 @@ export function MealEditor({ mode }: MealEditorProps) {
     return () => clearTimeout(t);
   }, [mode, name, notes, servings, categories, categoryTouched, imageUrl, items]);
 
+  // Each item carries a copy of its food, taken when it was added. That copy
+  // goes stale the moment the food changes, and the commonest change is
+  // made from right here: adding a unit ("1 pack = 500 g") while setting the
+  // amount. The item then said "1 pack" against a food that had no "pack",
+  // which is 0 g, and the meal showed 0 kcal. So the foods are read live
+  // and laid over the copies.
+  const itemFoodIds = items.map((i) => i.food_id).join('|');
+  const liveFoods = useLiveQuery(async () => {
+    const ids = [...new Set(itemFoodIds.split('|').filter(Boolean))];
+    const rows = await db.foods.bulkGet(ids);
+    return new Map(rows.filter((f): f is Food => !!f).map((f) => [f.id, f]));
+  }, [itemFoodIds]);
+  const viewItems = useMemo(
+    () => items.map((it) => ({ ...it, food: liveFoods?.get(it.food_id) ?? it.food })),
+    [items, liveFoods],
+  );
+
   const totals = useMemo(() => {
-    if (items.length === 0)
+    if (viewItems.length === 0)
       return { kcal: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, sugar: 0, sodium: 0 };
     const foodsById = new Map<string, Food>();
-    for (const it of items) if (it.food) foodsById.set(it.food_id, it.food);
+    for (const it of viewItems) if (it.food) foodsById.set(it.food_id, it.food);
     return computeMealTotals(
-      items.map((it) => ({
+      viewItems.map((it) => ({
         id: it.uiKey,
         meal_id: 'draft',
         food_id: it.food_id,
@@ -252,7 +270,7 @@ export function MealEditor({ mode }: MealEditorProps) {
       })),
       foodsById,
     );
-  }, [items]);
+  }, [viewItems]);
 
   const perPortion = useMemo(
     () => perServingTotals(totals, servings > 0 ? servings : 1),
@@ -312,7 +330,7 @@ export function MealEditor({ mode }: MealEditorProps) {
       curr.map((i) => (i.uiKey === uiKey ? { ...i, qty, unit } : i)),
     );
 
-  const editingDraft = items.find((i) => i.uiKey === editingKey) ?? null;
+  const editingDraft = viewItems.find((i) => i.uiKey === editingKey) ?? null;
 
   const handleSave = async () => {
     const trimmed = name.trim();
@@ -614,7 +632,7 @@ export function MealEditor({ mode }: MealEditorProps) {
             </div>
           ) : (
             <ul className="divide-y divide-border rounded-xl border border-border bg-card">
-              {items.map((it) => (
+              {viewItems.map((it) => (
                 <IngredientRow
                   key={it.uiKey}
                   draft={it}
@@ -721,19 +739,7 @@ function IngredientRow({
   onEdit: () => void;
   onRemove: () => void;
 }) {
-  // Lazy-load food in case it wasn't included in the initial hydrate.
-  const [food, setFood] = useState<Food | undefined>(draft.food);
-  useEffect(() => {
-    if (food) return;
-    let cancelled = false;
-    void db.foods.get(draft.food_id).then((f) => {
-      if (!cancelled && f) setFood(f);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [draft.food_id, food]);
-
+  const food = draft.food;
   const macros = food
     ? computeMacros(food, itemToQuantity({
         id: '',
@@ -743,6 +749,10 @@ function IngredientRow({
         unit: draft.unit,
       }))
     : null;
+  const inGrams = draft.unit === 'g' || draft.unit === 'ml';
+  // The amount is in a unit this food does not have (it was removed or
+  // renamed). That is 0 g, and a silent 0 kcal is worse than saying so.
+  const unitMissing = !!macros && draft.qty > 0 && macros.grams <= 0;
 
   return (
     <li className="flex items-center justify-between gap-1 px-1 py-1">
@@ -754,14 +764,21 @@ function IngredientRow({
         <div className="truncate text-sm font-medium">{food?.name ?? '…'}</div>
         <div className="mt-0.5 truncate text-xs text-muted-foreground tabular-nums">
           {formatGrams(draft.qty)} {draft.unit}
-          {macros && (
+          {macros && !inGrams && !unitMissing && ` (${formatGrams(macros.grams)} g)`}
+          {macros && !unitMissing && (
             <>
               {' · '}{formatKcal(macros.kcal)} kcal
               {' · '}{Math.round(macros.protein)}P / {Math.round(macros.carbs)}C / {Math.round(macros.fat)}F
             </>
           )}
         </div>
-        <div className="text-[11px] text-muted-foreground/60">tap to edit</div>
+        {unitMissing ? (
+          <div className="text-[11px] font-medium text-destructive">
+            This food has no unit called "{draft.unit}". Tap to set the amount again.
+          </div>
+        ) : (
+          <div className="text-[11px] text-muted-foreground/60">tap to edit</div>
+        )}
       </button>
       <button
         type="button"

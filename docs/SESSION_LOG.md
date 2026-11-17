@@ -226,6 +226,23 @@ Reported as fiddly, sometimes not adding or saving. Five separate causes:
   exactly that with the v5 list on day three. It now carries them over.
 - Small tap targets; Enter in either field now saves.
 
+### Day five, last: what a batch contains, and a 0 kcal bug
+
+- **A batch can differ from its recipe in what goes in.** On the cook
+  screen an ingredient can be swapped ("potatoes instead of pasta": pick
+  the food, then Same calories / Same carbs / Same protein / Same weight,
+  each showing what a portion becomes), added, or removed. Foods the
+  recipe does not have are held in `extraFoods` on `CookPage`.
+- Amounts in a counted unit show their grams ("4 servings" + "300 g"),
+  on the cook screen, in the meal editor and in the log breakdown.
+- All macros are shown, not only protein ("P 51 · C 64 · F 4").
+- **0 kcal after adding a unit in the meal editor.** `MealEditor` kept a
+  copy of each food taken when the ingredient was added. Adding a unit
+  ("1 pack = 500 g") from the amount step changed the food but not the
+  copy, so "1 pack" resolved to 0 g. The editor now reads its foods live
+  (`viewItems`). A row whose unit the food does not have says so instead
+  of showing 0.
+
 ### Not done
 
 - Verified in headless Chromium with seeded data only. Live USDA / Open Food

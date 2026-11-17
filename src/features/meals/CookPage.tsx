@@ -17,6 +17,7 @@ import { Sheet } from '@/components/ui/Sheet';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { pantryClass } from '@/features/food-search/ingredientMatch';
 import { toast } from '@/components/ui/toast';
+import { IngredientPickerSheet } from './IngredientPickerSheet';
 import { createMeal, replaceMealItems, updateMeal } from '@/db/repos/meals';
 import { computeMacros, gramsForQuantity } from '@/features/food-search/foodMath';
 import { formatKcal } from '@/lib/macros';
@@ -48,6 +49,8 @@ interface Row {
   qty: number;
   /** Kept fixed by the exact-targets solver. */
   locked: boolean;
+  /** Not in the recipe: put in for this batch, or swapped for something. */
+  origin?: 'added' | 'swapped';
 }
 
 type SheetState =
@@ -55,6 +58,9 @@ type SheetState =
   | { kind: 'portions' }
   | { kind: 'change' }
   | { kind: 'amount'; index: number }
+  | { kind: 'add' }
+  | { kind: 'swap'; index: number }
+  | { kind: 'swapAmount'; index: number; food: Food }
   | { kind: 'more' };
 
 /** Parse a typed number, accepting a decimal comma. NaN when not a number. */
@@ -100,7 +106,18 @@ function nudgeStep(qty: number, unit: string): number {
   return 100;
 }
 
-const amountLabel = (qty: number, unit: string) => `${trimNum(qty)} ${unit}`;
+const inGrams = (unit: string) => unit === 'g' || unit === 'ml';
+
+/** "750 g", "4 servings", "1 wrap". */
+const amountLabel = (qty: number, unit: string) =>
+  `${trimNum(qty)} ${inGrams(unit) || qty === 1 || unit.endsWith('s') ? unit : `${unit}s`}`;
+
+/** "P 51 · C 64 · F 4": every macro, not only protein. */
+const macroLine = (m: { protein: number; carbs: number; fat: number }) =>
+  `P ${Math.round(m.protein)} · C ${Math.round(m.carbs)} · F ${Math.round(m.fat)}`;
+
+let rowKey = 0;
+const newRowKey = () => `new-${Date.now()}-${rowKey++}`;
 
 /**
  * "Cook this": take a recipe, set it to what is actually being cooked, and
@@ -122,6 +139,11 @@ const amountLabel = (qty: number, unit: string) => `${trimNum(qty)} ${unit}`;
  * edited scrolled off the top. Asking the question at the moment it matters
  * removed both.
  *
+ * A batch is also allowed to differ from its recipe in WHAT goes in, not
+ * only how much: potatoes instead of pasta this week, or one extra thing.
+ * An ingredient can be swapped (keeping its calories, its carbs or its
+ * weight), added or removed here, without touching the recipe.
+ *
  * Opened on a batch instead of a recipe, it edits that batch in place.
  */
 export function CookPage() {
@@ -134,6 +156,9 @@ export function CookPage() {
   const [totalG, setTotalG] = useState('');
   const [sheet, setSheet] = useState<SheetState>(null);
   const [saving, setSaving] = useState(false);
+  // Foods brought in by a swap or an add; the recipe does not know them.
+  const [extraFoods, setExtraFoods] = useState<Map<string, Food>>(new Map());
+  const seed = useRef<Row[]>([]);
 
   const source = resolved?.meal;
   // "Cook again" on a finished batch starts a NEW batch from its amounts.
@@ -165,12 +190,17 @@ export function CookPage() {
       }
     });
     if (top >= 0 && seeded.length > 1) seeded[top].locked = true;
+    seed.current = seeded;
     setRows(seeded);
     setPortions(resolved.servings);
     setTotalG(resolved.meal.total_g ? trimNum(resolved.meal.total_g) : '');
   }, [resolved, rows]);
 
-  const foods = resolved?.foodsById;
+  const recipeFoods = resolved?.foodsById;
+  const foods = useMemo(
+    () => new Map([...(recipeFoods ?? new Map<string, Food>()), ...extraFoods]),
+    [recipeFoods, extraFoods],
+  );
   const totals = useMemo(() => totalsOf(rows ?? [], foods), [rows, foods]);
 
   if (resolved === undefined || (resolved && rows === null)) {
@@ -187,15 +217,25 @@ export function CookPage() {
     );
   }
 
-  const per = { kcal: totals.kcal / portions, protein: totals.protein / portions };
-  const changed = rows.some((r) => r.qty !== r.base) || portions !== resolved.servings;
+  const per = {
+    kcal: totals.kcal / portions,
+    protein: totals.protein / portions,
+    carbs: totals.carbs / portions,
+    fat: totals.fat / portions,
+  };
+  const changed =
+    rows.length !== seed.current.length ||
+    rows.some((r) => r.qty !== r.base || r.origin) ||
+    portions !== resolved.servings;
   const nameOf = (r: Row) => foods?.get(r.food_id)?.name ?? '(deleted food)';
   const close = () => setSheet(null);
 
   const reset = () => {
-    setRows(rows.map((r) => ({ ...r, qty: r.base })));
+    setRows(seed.current);
     setPortions(resolved.servings);
   };
+  const remember = (food: Food) =>
+    setExtraFoods((m) => new Map(m).set(food.id, food));
 
   const nudge = (index: number, dir: 1 | -1) => {
     const r = rows[index];
@@ -293,15 +333,15 @@ export function CookPage() {
               <span className="mt-0.5 flex items-baseline gap-1.5">
                 <span className="text-2xl font-semibold tabular-nums">{formatKcal(per.kcal)}</span>
                 <span className="text-sm text-muted-foreground">kcal</span>
-                <span className="truncate text-xs text-muted-foreground tabular-nums">
-                  · {Math.round(per.protein)} g protein
-                </span>
                 <ChevronDown className="h-3.5 w-3.5 shrink-0 text-primary" aria-hidden="true" />
+              </span>
+              <span className="block truncate text-xs text-muted-foreground tabular-nums">
+                {macroLine(per)} g
               </span>
             </button>
           </div>
           <p className="px-1 text-xs text-muted-foreground tabular-nums">
-            Whole batch · {formatKcal(totals.kcal)} kcal · {Math.round(totals.protein)} g protein
+            Whole batch · {formatKcal(totals.kcal)} kcal · {macroLine(totals)} g
             {changed && ` · recipe was ${formatKcal(resolved.totals.kcal)} kcal a portion`}
           </p>
         </div>
@@ -313,7 +353,7 @@ export function CookPage() {
         </h2>
         <ul className="divide-y divide-border rounded-2xl border border-border bg-card">
           {rows.map((r, i) => {
-            const m = macrosFor(foods?.get(r.food_id), r);
+            const m = macrosFor(foods.get(r.food_id), r);
             const delta = Math.round((r.qty - r.base) * 100) / 100;
             const name = nameOf(r);
             return (
@@ -321,13 +361,19 @@ export function CookPage() {
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-sm font-medium">{name}</div>
                   <div className="truncate text-xs text-muted-foreground tabular-nums">
-                    {formatKcal(m.kcal)} kcal · {Math.round(m.protein)} g protein
+                    {formatKcal(m.kcal)} kcal · {macroLine(m)}
                   </div>
-                  {delta !== 0 && (
-                    <div className="truncate text-[11px] font-medium text-primary tabular-nums">
-                      {delta > 0 ? '+' : '−'}
-                      {trimNum(Math.abs(delta))} {r.unit} vs recipe
+                  {r.origin ? (
+                    <div className="truncate text-[11px] font-medium text-primary">
+                      {r.origin === 'added' ? 'Added to this batch' : 'Swapped in'}
                     </div>
+                  ) : (
+                    delta !== 0 && (
+                      <div className="truncate text-[11px] font-medium text-primary tabular-nums">
+                        {delta > 0 ? '+' : '−'}
+                        {trimNum(Math.abs(delta))} {r.unit} vs recipe
+                      </div>
+                    )
                   )}
                 </div>
                 <StepButton label={`Less ${name}`} onClick={() => nudge(i, -1)}>
@@ -336,10 +382,18 @@ export function CookPage() {
                 <button
                   type="button"
                   onClick={() => setSheet({ kind: 'amount', index: i })}
-                  aria-label={`Change amount of ${name}, now ${amountLabel(r.qty, r.unit)}`}
-                  className="h-10 min-w-[4.5rem] shrink-0 rounded-lg border border-border bg-background px-1.5 text-sm font-semibold tabular-nums hover:bg-muted/50"
+                  aria-label={`Change ${name}, now ${amountLabel(r.qty, r.unit)}`}
+                  className="flex h-10 min-w-[4.75rem] shrink-0 flex-col items-center justify-center rounded-lg border border-border bg-background px-1.5 tabular-nums hover:bg-muted/50"
                 >
-                  {amountLabel(r.qty, r.unit)}
+                  <span className="text-sm font-semibold leading-tight">
+                    {amountLabel(r.qty, r.unit)}
+                  </span>
+                  {/* "4 servings" says nothing about how much to weigh out. */}
+                  {!inGrams(r.unit) && m.grams > 0 && (
+                    <span className="text-[10px] leading-tight text-muted-foreground">
+                      {Math.round(m.grams)} g
+                    </span>
+                  )}
                 </button>
                 <StepButton label={`More ${name}`} onClick={() => nudge(i, 1)}>
                   <Plus className="h-4 w-4" />
@@ -348,9 +402,17 @@ export function CookPage() {
             );
           })}
         </ul>
+        <button
+          type="button"
+          onClick={() => setSheet({ kind: 'add' })}
+          className="tap-target flex w-full items-center justify-center gap-1.5 rounded-2xl border border-dashed border-border text-sm font-medium text-primary hover:bg-muted/40"
+        >
+          <Plus className="h-4 w-4" />
+          Add an ingredient
+        </button>
         <p className="px-1 text-xs text-muted-foreground">
-          + and − change one ingredient. Tap an amount to type what you have, or to
-          scale the whole recipe from it.
+          + and − change one ingredient. Tap an amount to type what you have, scale
+          the whole recipe from it, swap it for another food, or take it out.
         </p>
       </div>
 
@@ -404,6 +466,76 @@ export function CookPage() {
           onApply={(nextRows, nextPortions) => {
             setRows(nextRows);
             setPortions(nextPortions);
+            close();
+          }}
+          onSwap={() => setSheet({ kind: 'swap', index: sheet.index })}
+          onRemove={
+            rows.length > 1
+              ? () => {
+                  setRows(rows.filter((_, i) => i !== sheet.index));
+                  close();
+                }
+              : null
+          }
+          onClose={close}
+        />
+      )}
+      {/* The picker closes itself after handing a food back, so its close
+          must not undo the step that pick just moved on to. */}
+      <IngredientPickerSheet
+        open={sheet?.kind === 'add'}
+        title="Add to this batch"
+        onClose={() => setSheet((cur) => (cur?.kind === 'add' ? null : cur))}
+        onPicked={(item, food) => {
+          remember(food);
+          setRows([
+            ...rows,
+            {
+              key: newRowKey(),
+              food_id: item.food_id,
+              unit: item.unit,
+              base: item.qty,
+              qty: item.qty,
+              locked: false,
+              origin: 'added',
+            },
+          ]);
+        }}
+      />
+      <IngredientPickerSheet
+        open={sheet?.kind === 'swap'}
+        title="Swap for"
+        onClose={() => setSheet((cur) => (cur?.kind === 'swap' ? null : cur))}
+        onFood={(food) => {
+          if (sheet?.kind !== 'swap') return;
+          remember(food);
+          setSheet({ kind: 'swapAmount', index: sheet.index, food });
+        }}
+      />
+      {sheet?.kind === 'swapAmount' && rows[sheet.index] && (
+        <SwapSheet
+          rows={rows}
+          index={sheet.index}
+          portions={portions}
+          foods={foods}
+          from={nameOf(rows[sheet.index])}
+          to={sheet.food}
+          onApply={(grams) => {
+            setRows(
+              rows.map((r, i) =>
+                i === sheet.index
+                  ? {
+                      key: newRowKey(),
+                      food_id: sheet.food.id,
+                      unit: 'g',
+                      base: grams,
+                      qty: grams,
+                      locked: false,
+                      origin: 'swapped',
+                    }
+                  : r,
+              ),
+            );
             close();
           }}
           onClose={close}
@@ -653,8 +785,18 @@ function ChangeSheet({
     };
   });
   const t = totalsOf(rows, foods);
-  const per = { kcal: t.kcal / portions, protein: t.protein / portions };
+  const per = {
+    kcal: t.kcal / portions,
+    protein: t.protein / portions,
+    carbs: t.carbs / portions,
+    fat: t.fat / portions,
+  };
   const now = by === 'kcal' ? per.kcal : per.protein;
+  /** Everything a portion comes to with an option's amounts. */
+  const after = (qtys: number[]) => {
+    const a = totalsOf(rows.map((r, i) => ({ ...r, qty: qtys[i] })), foods);
+    return { protein: a.protein / portions, carbs: a.carbs / portions, fat: a.fat / portions };
+  };
   // A typed target ("make it 600") is the same thing as a step from here.
   const typed = num(target) > 0 ? num(target) - now : null;
   const delta = typed ?? step;
@@ -667,7 +809,7 @@ function ChangeSheet({
     <Sheet open onClose={onClose} title="Change a portion" fullScreenMobile={false}>
       <div className="space-y-3 p-4">
         <p className="text-xs text-muted-foreground tabular-nums">
-          Now {formatKcal(per.kcal)} kcal and {Math.round(per.protein)} g protein. Stays at{' '}
+          Now {formatKcal(per.kcal)} kcal ({macroLine(per)} g). Stays at{' '}
           {trimNum(portions)} {portions === 1 ? 'portion' : 'portions'}.
         </p>
         <SegmentedControl<'kcal' | 'protein'>
@@ -755,6 +897,7 @@ function ChangeSheet({
                 row={o.kind === 'one' ? rows[o.index as number] : null}
                 portions={portions}
                 before={per}
+                after={after(o.qtys)}
                 onPick={() => onApply(o.qtys)}
               />
             ))}
@@ -781,6 +924,7 @@ function OptionRow({
   row,
   portions,
   before,
+  after,
   onPick,
 }: {
   option: PortionOption;
@@ -788,6 +932,7 @@ function OptionRow({
   row: Row | null;
   portions: number;
   before: { kcal: number; protein: number };
+  after: { protein: number; carbs: number; fat: number };
   onPick: () => void;
 }) {
   const up = option.perPortion.kcal >= before.kcal;
@@ -822,9 +967,14 @@ function OptionRow({
             {formatKcal(option.perPortion.kcal)} kcal
           </span>
           <span className="block text-xs text-muted-foreground">
-            {Math.round(option.perPortion.protein)} g protein
-            {dProtein !== 0 && ` (${dProtein > 0 ? '+' : '−'}${Math.abs(dProtein)})`}
+            {macroLine(after)}
           </span>
+          {dProtein !== 0 && (
+            <span className="block text-[11px] text-muted-foreground">
+              protein {dProtein > 0 ? '+' : '−'}
+              {Math.abs(dProtein)} g
+            </span>
+          )}
         </span>
       </button>
     </li>
@@ -843,11 +993,16 @@ function AmountSheet({
   foods,
   name,
   onApply,
+  onSwap,
+  onRemove,
   onClose,
 }: SheetBase & {
   index: number;
   name: string;
   onApply: (rows: Row[], portions: number) => void;
+  onSwap: () => void;
+  /** Null when this is the only ingredient left. */
+  onRemove: (() => void) | null;
 }) {
   const row = rows[index];
   const [qty, setQty] = useState(row.qty);
@@ -879,6 +1034,11 @@ function AmountSheet({
           onMore={() => setQty(Math.round((qty + step) * 100) / 100)}
           onType={setQty}
         />
+        {!inGrams(row.unit) && (
+          <p className="text-center text-xs text-muted-foreground tabular-nums">
+            = {Math.round(macrosFor(foods?.get(row.food_id), { ...row, qty }).grams)} g
+          </p>
+        )}
         <div className="space-y-2">
           <Choice
             title="Change just this"
@@ -901,6 +1061,96 @@ function AmountSheet({
             />
           )}
         </div>
+        <div className="flex gap-2 border-t border-border pt-3">
+          <Button type="button" variant="secondary" block onClick={onSwap}>
+            Swap for another food
+          </Button>
+          {onRemove && (
+            <Button type="button" variant="ghost" onClick={onRemove} className="shrink-0 text-destructive">
+              Remove
+            </Button>
+          )}
+        </div>
+      </div>
+    </Sheet>
+  );
+}
+
+/**
+ * How much of the new food replaces the old one. "Potatoes instead of
+ * pasta" has no single right amount: the same calories keeps the meal's
+ * numbers, the same carbs keeps it doing the same job, the same weight is
+ * what fits the pan. So each is offered, with what the portion becomes.
+ */
+function SwapSheet({
+  rows,
+  index,
+  portions,
+  foods,
+  from,
+  to,
+  onApply,
+  onClose,
+}: SheetBase & {
+  index: number;
+  from: string;
+  to: Food;
+  onApply: (grams: number) => void;
+}) {
+  const old = macrosFor(foods?.get(rows[index].food_id), rows[index]);
+  const perGram = (v: number) => v / 100;
+  const gramsFor = (target: number, per100: number) =>
+    per100 > 0 && target > 0 ? roundAmount(target / perGram(per100), 'g') : null;
+  const portionWith = (grams: number) => {
+    const next = rows.map((r, i) =>
+      i === index ? { ...r, food_id: to.id, unit: 'g', qty: grams } : r,
+    );
+    const t = totalsOf(next, new Map([...(foods ?? []), [to.id, to]]));
+    return `${amountLabel(grams, 'g')}. A portion becomes ${formatKcal(t.kcal / portions)} kcal (${macroLine({ protein: t.protein / portions, carbs: t.carbs / portions, fat: t.fat / portions })}).`;
+  };
+
+  const byKcal = gramsFor(old.kcal, to.kcal_100);
+  // Only worth offering when both are carb foods: pasta for potatoes yes,
+  // chicken for tofu no.
+  const byCarbs = old.carbs >= 20 && to.carbs_100 >= 5 ? gramsFor(old.carbs, to.carbs_100) : null;
+  const byProtein =
+    old.protein >= 20 && to.protein_100 >= 5 ? gramsFor(old.protein, to.protein_100) : null;
+  const byWeight = old.grams > 0 ? roundAmount(old.grams, 'g') : null;
+
+  return (
+    <Sheet open onClose={onClose} title={`${to.name} instead of ${from}`} fullScreenMobile={false}>
+      <div className="space-y-2 p-4">
+        <p className="pb-1 text-xs text-muted-foreground">
+          How much? You can fine-tune the amount afterwards.
+        </p>
+        {byKcal !== null && (
+          <Choice
+            title="Same calories"
+            detail={portionWith(byKcal)}
+            onClick={() => onApply(byKcal)}
+          />
+        )}
+        {byCarbs !== null && byCarbs !== byKcal && (
+          <Choice
+            title="Same carbs"
+            detail={portionWith(byCarbs)}
+            onClick={() => onApply(byCarbs)}
+          />
+        )}
+        {byProtein !== null && byProtein !== byKcal && (
+          <Choice
+            title="Same protein"
+            detail={portionWith(byProtein)}
+            onClick={() => onApply(byProtein)}
+          />
+        )}
+        {byWeight !== null && byWeight !== byKcal && (
+          <Choice
+            title="Same weight"
+            detail={portionWith(byWeight)}
+            onClick={() => onApply(byWeight)}
+          />
+        )}
       </div>
     </Sheet>
   );
@@ -923,7 +1173,7 @@ function MoreSheet({
   onNavigate,
   onClose,
 }: SheetBase & {
-  per: { kcal: number; protein: number };
+  per: { kcal: number; protein: number; carbs: number; fat: number };
   rawGrams: number;
   totalG: string;
   onTotalG: (v: string) => void;

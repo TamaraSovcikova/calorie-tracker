@@ -80,8 +80,8 @@ export function BatchesSection({ batches, logged, onLog }: BatchesSectionProps) 
                 </span>{' '}
                 portions left
                 <span className="block truncate">
-                  {formatKcal(b.totals.kcal)} kcal · {Math.round(b.totals.protein)} g
-                  protein each
+                  {formatKcal(b.totals.kcal)} kcal · P {Math.round(b.totals.protein)} · C{' '}
+                  {Math.round(b.totals.carbs)} · F {Math.round(b.totals.fat)} each
                 </span>
               </div>
               <button
